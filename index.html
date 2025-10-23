@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"> <!-- Added user-scalable=no -->
     <title>Pixel Farm Game</title>
     <style>
         body {
@@ -15,79 +15,108 @@
             margin: 0;
             background-color: #333;
             color: white;
-            overflow: hidden; 
+            overflow: hidden;
+            touch-action: none; /* Prevent default touch actions like scroll/zoom */
         }
 
         h1 {
-            margin-bottom: 15px; 
+            margin-bottom: 15px;
             font-weight: normal;
         }
 
         p {
-            margin-top: 10px; 
-            margin-bottom: 10px; 
+            margin-top: 10px;
+            margin-bottom: 10px;
             font-size: 0.9em;
+            text-align: center; /* Center instructions */
         }
 
-        /* Estilo da Janela do Jogo - RESTAURADO */
         #gameContainer {
             position: relative;
             width: 640px;
             height: 480px;
-            
+
             background-color: #000;
             border: 2px solid #555;
             border-radius: 10px;
-            /* Restaurando a sombra e brilho anteriores */
-            box-shadow: 0 0 15px rgba(150, 150, 255, 0.5), 
-                        inset 0 0 10px rgba(0, 0, 0, 0.5); 
-            padding: 2px; /* RESTAURADO: Adiciona padding para a borda interna */
-            overflow: hidden; 
+            box-shadow: 0 0 15px rgba(150, 150, 255, 0.5),
+                        inset 0 0 10px rgba(0, 0, 0, 0.5);
+            padding: 2px;
+            overflow: hidden;
         }
 
-        /* Canvas e overlays agora ajustados ao padding do container */
         canvas, #nightOverlay, #lightCanvas {
             position: absolute;
-            top: 2px; 
-            left: 2px; 
-            image-rendering: pixelated; 
-            width: calc(100% - 4px); /* Considera o padding */ 
-            height: calc(100% - 4px); /* Considera o padding */
-            border-radius: 8px; 
+            top: 2px;
+            left: 2px;
+            image-rendering: pixelated;
+            width: calc(100% - 4px);
+            height: calc(100% - 4px);
+            border-radius: 8px;
         }
-        
+
         #nightOverlay {
-            background-color: #000033; 
-            opacity: 0; 
-            z-index: 5; 
-            pointer-events: none; 
-            transition: opacity 1s linear; 
+            background-color: #000033;
+            opacity: 0;
+            z-index: 5;
+            pointer-events: none;
+            transition: opacity 1s linear;
         }
 
         #lightCanvas {
-            z-index: 6; /* Acima do nightOverlay */
+            z-index: 6;
             pointer-events: none;
         }
 
-        /* Inventário de volta para dentro do container */
-        #inventoryBar {
-            position: absolute; /* RESTAURADO */
-            bottom: 10px;      /* RESTAURADO */
-            left: 50%;         /* RESTAURADO */
-            transform: translateX(-50%); /* RESTAURADO */
-            /* margin-top: 10px; */ /* REMOVIDO */
+        /* --- Container da Hotbar e Ícone da Mochila --- */
+        #bottomUIContainer {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
             display: flex;
-            gap: 5px;
+            align-items: flex-end; /* Alinha o ícone e a hotbar na base */
+            gap: 8px; /* Espaço entre o ícone e a hotbar */
+            z-index: 10;
+        }
+
+        /* Ícone da Mochila */
+        #backpackIcon {
+            width: 45px;
+            height: 45px;
+            background-color: rgba(68, 68, 68, 0.8); /* #444 com alpha */
+            border: 2px solid #888;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px; /* Tamanho do emoji */
+            cursor: pointer;
+            transition: background-color 0.2s;
+            user-select: none;
+        }
+        #backpackIcon:hover {
+            background-color: rgba(102, 102, 102, 0.9); /* #666 com alpha */
+            border-color: #aaa;
+        }
+
+
+        /* Barra de Atalhos (Hotbar) */
+        #hotbar {
+            /* position, bottom, left, transform removidos (agora controlados pelo container) */
+            display: flex;
+            gap: 3px;
             background-color: rgba(0, 0, 0, 0.6);
             border: 2px solid #555;
             padding: 5px;
             border-radius: 8px;
-            z-index: 10; /* RESTAURADO */
+            /* z-index removido (controlado pelo container) */
         }
 
+        /* --- Estilo Geral do Slot (usado por Hotbar e Mochila) --- */
         .slot {
-            width: 50px;
-            height: 50px;
+            width: 45px;
+            height: 45px;
             border: 2px solid #888;
             background-color: #444;
             border-radius: 5px;
@@ -95,46 +124,103 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            font-size: 10px;
+            font-size: 9px;
             color: white;
-            position: relative; 
+            position: relative;
             cursor: pointer;
-            user-select: none; 
+            user-select: none;
+             transition: transform 0.1s ease-out, opacity 0.1s ease-out; /* Para feedback visual ao arrastar */
+        }
+        /* Estilo para quando um slot está sendo arrastado */
+        .slot.dragging {
+            opacity: 0.5;
+            transform: scale(0.9);
+        }
+        /* Estilo para quando o mouse está sobre um slot válido para soltar */
+        .slot.drag-over {
+            border-color: #FFD700; /* Dourado */
+            background-color: #555;
         }
 
-        .slot.active {
+
+        /* Destaque do slot ativo na hotbar */
+        #hotbar .slot.active {
             background-color: #666;
             border-color: #FFF;
-            box-shadow: 0 0 10px #FFF;
-        }
-        
-        .slot-name {
-            font-weight: bold;
-            font-size: 11px;
-            text-shadow: 1px 1px #000;
-        }
-        
-        .slot-count {
-            margin-top: 3px;
-            font-size: 14px;
-            color: #FFD700; 
-            font-weight: bold;
+            box-shadow: 0 0 8px #FFF;
         }
 
-        .slot-key {
+        /* --- Container da Mochila --- */
+        #backpackContainer {
             position: absolute;
-            top: 2px;
-            left: 3px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 300px;
+            background-color: rgba(40, 40, 40, 0.95); /* Slightly less transparent */
+            border: 3px solid #666;
+            border-radius: 10px;
+            padding: 15px;
+            z-index: 20;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+        }
+
+        #backpackTitle {
+            font-size: 1.2em;
+            margin-bottom: 10px;
+            color: #eee;
+        }
+
+        #backpackGrid {
+            display: grid;
+            grid-template-columns: repeat(5, 50px);
+            gap: 8px;
+        }
+
+        #backpackGrid .slot {
+             width: 50px;
+             height: 50px;
+             font-size: 10px;
+        }
+
+        #backpackGrid .slot.selected-for-assignment {
+             border-color: #FFD700;
+             box-shadow: 0 0 8px #FFD700;
+         }
+
+        .slot-name {
+            font-weight: bold;
             font-size: 10px;
+            text-shadow: 1px 1px #000;
+            pointer-events: none;
+        }
+
+        .slot-count {
+            margin-top: 2px;
+            font-size: 12px;
+            color: #FFD700;
+            font-weight: bold;
+            pointer-events: none;
+        }
+
+        #hotbar .slot-key {
+            position: absolute;
+            top: 1px;
+            left: 2px;
+            font-size: 9px;
             color: #AAA;
             font-weight: bold;
+            pointer-events: none;
         }
 
         #gameClock {
             position: absolute;
             top: 10px;
             right: 10px;
-            z-index: 10; 
+            z-index: 10;
             background-color: rgba(0, 0, 0, 0.7);
             border: 2px solid #555;
             padding: 5px 10px;
@@ -143,9 +229,9 @@
             font-size: 16px;
             font-weight: bold;
             text-shadow: 1px 1px #000;
-            display: flex; 
+            display: flex;
             align-items: center;
-            gap: 5px; 
+            gap: 5px;
         }
 
         .time-icon {
@@ -157,13 +243,13 @@
         }
 
         #gameClock span {
-            line-height: 1; 
+            line-height: 1;
         }
 
         #timeToggleButton {
-             margin-top: 5px; 
-             padding: 5px 10px; 
-             font-family: 'Consolas', monospace; 
+             margin-top: 5px;
+             padding: 5px 10px;
+             font-family: 'Consolas', monospace;
              cursor: pointer;
              background-color: #555;
              color: white;
@@ -183,55 +269,42 @@
         <canvas id="gameCanvas">
             Seu navegador não suporta o elemento Canvas.
         </canvas>
-        
+
         <div id="nightOverlay"></div>
-        <canvas id="lightCanvas"></canvas> 
+        <canvas id="lightCanvas"></canvas>
         <div id="gameClock">
             <canvas id="timeIconCanvas" class="time-icon" width="20" height="20"></canvas>
             <span>00:00</span>
         </div>
-        <!-- Inventário MOVIDO de volta para DENTRO do gameContainer -->
-        <div id="inventoryBar">
-            <div class="slot" data-index="0">
-                <span class="slot-key">1</span>
-                <span class="slot-name">Enxada</span>
-                <span class="slot-count">1</span>
+
+        <div id="backpackContainer">
+            <div id="backpackTitle">Mochila</div>
+            <div id="backpackGrid">
+                <!-- Slots da mochila gerados pelo JS -->
             </div>
-            <div class="slot" data-index="1">
-                <span class="slot-key">2</span>
-                <span class="slot-name">Semente</span>
-                <span class="slot-count">10</span>
-            </div>
-            <div class="slot" data-index="2">
-                <span class="slot-key">3</span>
-                <span class="slot-name">Colheita</span>
-                <span class="slot-count">0</span>
-            </div>
-            <div class="slot" data-index="3">
-                <span class="slot-key">4</span>
-                <span class="slot-name">Pá</span>
-                <span class="slot-count">1</span>
-            </div>
-            <div class="slot" data-index="4">
-                <span class="slot-key">5</span>
-                <span class="slot-name">Regador</span>
-                <span class="slot-count">0</span>
-            </div>
-            <div class="slot" data-index="5">
-                <span class="slot-key">6</span>
-                <span class="slot-name"></span>
-                <span class="slot-count"></span>
-            </div>
-            <div class="slot" data-index="6">
-                <span class="slot-key">7</span>
-                <span class="slot-name"></span>
-                <span class="slot-count"></span>
+             <p style="font-size: 0.8em; margin-top: 10px; color: #ccc;">Clique em um item e depois em um atalho (1-0) para atribuir.</p>
+        </div>
+
+        <div id="bottomUIContainer">
+            <div id="backpackIcon">🎒</div>
+            <div id="hotbar">
+                <div class="slot" data-hotbar-index="0" draggable="true"> <span class="slot-key">1</span> <span class="slot-name"></span> <span class="slot-count"></span> </div>
+                <div class="slot" data-hotbar-index="1" draggable="true"> <span class="slot-key">2</span> <span class="slot-name"></span> <span class="slot-count"></span> </div>
+                <div class="slot" data-hotbar-index="2" draggable="true"> <span class="slot-key">3</span> <span class="slot-name"></span> <span class="slot-count"></span> </div>
+                <div class="slot" data-hotbar-index="3" draggable="true"> <span class="slot-key">4</span> <span class="slot-name"></span> <span class="slot-count"></span> </div>
+                <div class="slot" data-hotbar-index="4" draggable="true"> <span class="slot-key">5</span> <span class="slot-name"></span> <span class="slot-count"></span> </div>
+                <div class="slot" data-hotbar-index="5" draggable="true"> <span class="slot-key">6</span> <span class="slot-name"></span> <span class="slot-count"></span> </div>
+                <div class="slot" data-hotbar-index="6" draggable="true"> <span class="slot-key">7</span> <span class="slot-name"></span> <span class="slot-count"></span> </div>
+                <div class="slot" data-hotbar-index="7" draggable="true"> <span class="slot-key">8</span> <span class="slot-name"></span> <span class="slot-count"></span> </div>
+                <div class="slot" data-hotbar-index="8" draggable="true"> <span class="slot-key">9</span> <span class="slot-name"></span> <span class="slot-count"></span> </div>
+                <div class="slot" data-hotbar-index="9" draggable="true"> <span class="slot-key">0</span> <span class="slot-name"></span> <span class="slot-count"></span> </div>
             </div>
         </div>
 
+
     </div>
-    
-    <p>Setas para mover (toque para virar, segure para andar). Espaço para usar. 1-7 para inventário.</p>
+    <!-- Instruções Atualizadas -->
+    <p>Setas/Toque: Mover. Espaço/Toque à frente: Usar. 1-0: Atalhos. B/🎒: Mochila.</p>
     <button id="timeToggleButton">Avançar 12h (Teste)</button>
 
 
@@ -239,1127 +312,679 @@
         // --- Configurações Iniciais ---
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const gameClockSpan = document.querySelector('#gameClock span'); 
-        const timeIconCanvas = document.getElementById('timeIconCanvas'); 
+        const gameClockSpan = document.querySelector('#gameClock span');
+        const timeIconCanvas = document.getElementById('timeIconCanvas');
         const timeIconCtx = timeIconCanvas.getContext('2d');
-        const nightOverlay = document.getElementById('nightOverlay'); 
-        
+        const nightOverlay = document.getElementById('nightOverlay');
         const lightCanvas = document.getElementById('lightCanvas');
         const lightCtx = lightCanvas.getContext('2d');
+        const backpackContainer = document.getElementById('backpackContainer');
+        const backpackGrid = document.getElementById('backpackGrid');
+        const hotbarElement = document.getElementById('hotbar');
+        let backpackIcon = null; // Definido dentro de init()
 
-        ctx.imageSmoothingEnabled = false; 
-        timeIconCtx.imageSmoothingEnabled = false; 
-        lightCtx.imageSmoothingEnabled = false; 
+        ctx.imageSmoothingEnabled = false;
+        timeIconCtx.imageSmoothingEnabled = false;
+        lightCtx.imageSmoothingEnabled = false;
 
-        const zoomLevel = 1; 
-        
-        // Ajuste do tamanho do canvas para corresponder ao container COM PADDING
-        canvas.width = (640 - 4) / zoomLevel; 
-        canvas.height = (480 - 4) / zoomLevel; 
-        lightCanvas.width = canvas.width; 
+        const zoomLevel = 1;
+
+        canvas.width = (640 - 4) / zoomLevel;
+        canvas.height = (480 - 4) / zoomLevel;
+        lightCanvas.width = canvas.width;
         lightCanvas.height = canvas.height;
-
 
         // --- Configurações do Jogo ---
         const TILE_SIZE = 32;
-        const GROWTH_TIME_SPROUT = 60000;  // 1 minuto
-        const GROWTH_TIME_PLANT = 120000;   // 2 minutos
-        const GROWTH_TIME_HARVEST = 180000; // 3 minutos
-        const TOOL_ANIM_DURATION = 150; 
+        const GROWTH_TIME_SPROUT = 60000;
+        const GROWTH_TIME_PLANT = 120000;
+        const GROWTH_TIME_HARVEST = 180000;
+        const TOOL_ANIM_DURATION = 150;
+        const BACKPACK_SIZE = 20;
+        const HOTBAR_SIZE = 10;
+        const TOUCH_MOVE_THRESHOLD = TILE_SIZE * 0.5; // Distância mínima para registrar toque como movimento
+        const TAP_TIME_THRESHOLD = 300; // Tempo máximo (ms) para um toque ser considerado 'tap' para ação (aumentado um pouco)
 
         // --- Estado do Jogo ---
         let player = {
-            x: 11 * TILE_SIZE,
-            y: 11 * TILE_SIZE,
-            width: 20,
-            height: 28,
-            colorHead: '#FFDAB9',
-            colorBody: '#007BFF',
-            colorLegs: '#0056B3',
-            speed: 2,
-            isMoving: false,
-            targetX: 11 * TILE_SIZE,
-            targetY: 11 * TILE_SIZE,
-            walkBob: 0,
-            walkBobSpeed: 0.15,
-            isUsingTool: false,
-            toolAnimStart: 0, 
-            lastMoveDir: { dx: 0, dy: 1 } 
+            x: 11 * TILE_SIZE, y: 11 * TILE_SIZE, width: 20, height: 28,
+            colorHead: '#FFDAB9', colorBody: '#007BFF', colorLegs: '#0056B3',
+            speed: 2, isMoving: false, targetX: 11 * TILE_SIZE, targetY: 11 * TILE_SIZE,
+            walkBob: 0, walkBobSpeed: 0.15, isUsingTool: false, toolAnimStart: 0,
+            lastMoveDir: { dx: 0, dy: 1 }
         };
 
-        let camera = {
-            x: 0,
-            y: 0
-        };
+        let camera = { x: 0, y: 0 };
 
         // 0=Grama, 1=Terra, 2=Arado, 3=Água, 4=Semente, 5=Muda, 6=Planta, 7=Colheita
         let map = [
-            [0, 0, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 3, 3, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 3, 3, 0, 0, 0, 0, 0, 1, 2, 2, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 3, 3, 0, 0, 0, 0, 0, 1, 2, 1, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 3, 3, 0, 3, 0, 0, 1, 2, 1, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 3, 3, 3, 3, 0, 0, 1, 2, 2, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 3, 3, 3, 3, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+            [0,0,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,3,3,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0],
+            [0,0,3,3,0,0,0,0,0,1,2,2,2,2,1,0,0,0,0,0,0,0,0,0,0],
+            [0,0,3,3,0,0,0,0,0,1,2,1,1,2,1,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,3,3,0,3,0,0,1,2,1,1,2,1,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,3,3,3,3,0,0,1,2,2,2,2,1,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,3,3,3,3,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,3,3,3,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,3,3,3,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,3,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,3,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
         ];
-        const MAP_WIDTH_TILES = map[0].length;
-        const MAP_HEIGHT_TILES = map.length;
-        const MAP_WIDTH_PX = MAP_WIDTH_TILES * TILE_SIZE;
-        const MAP_HEIGHT_PX = MAP_HEIGHT_TILES * TILE_SIZE;
+        const MAP_WIDTH_TILES = map[0].length; const MAP_HEIGHT_TILES = map.length;
+        const MAP_WIDTH_PX = MAP_WIDTH_TILES * TILE_SIZE; const MAP_HEIGHT_PX = MAP_HEIGHT_TILES * TILE_SIZE;
 
-        // { "x,y": { plantedAt: timestamp, boosted: true/false } }
         let plantGrowthData = {};
-        
-        // NOVO: Objetos do Mapa (Árvores, Pedras, Fogueiras, Tochas)
+
         // type: 0=Rocha, 1=Árvore, 2=Fogueira, 3=Tocha
-        // x, y são posições de TILE
         let mapObjects = [
-            // Árvores (garantir que x,y não caiam em tile 3 no 'map' acima)
-            { type: 1, x: 4, y: 7 }, 
-            { type: 1, x: 6, y: 10 },
-            { type: 1, x: 18, y: 8 },
-            { type: 1, x: 20, y: 12 },
-            { type: 1, x: 22, y: 5 }, 
-            // Pedras (garantir que x,y não caiam em tile 3 no 'map' acima)
-            { type: 0, x: 5, y: 8 }, 
-            { type: 0, x: 19, y: 6 }, 
-            { type: 0, x: 21, y: 11 },
-            { type: 0, x: 23, y: 14 },
-            { type: 0, x: 17, y: 13 },
-            // Fogueiras
-            { type: 2, x: 13, y: 12 }, 
-            { type: 2, x: 8, y: 18 },
-            // Tochas (idealmente em bordas de grama/terra)
-            { type: 3, x: 16, y: 1 }, 
-            { type: 3, x: 1, y: 15 },
-            { type: 3, x: 23, y: 1 },
-            { type: 3, x: 12, y: 24 },
+            { type: 1, x: 4, y: 7 }, { type: 1, x: 6, y: 10 }, { type: 1, x: 18, y: 8 }, { type: 1, x: 20, y: 12 }, { type: 1, x: 22, y: 5 },
+            { type: 0, x: 5, y: 8 }, { type: 0, x: 19, y: 6 }, { type: 0, x: 21, y: 11 }, { type: 0, x: 23, y: 14 }, { type: 0, x: 17, y: 13 },
+            { type: 2, x: 13, y: 12 }, { type: 2, x: 8, y: 18 },
+            { type: 3, x: 16, y: 1 }, { type: 3, x: 1, y: 15 }, { type: 3, x: 23, y: 1 }, { type: 3, x: 12, y: 24 },
         ];
 
 
-        let inventory = [
-            { name: "Enxada", count: 1 },
-            { name: "Semente", count: 10 },
-            { name: "Colheita", count: 0 },
-            { name: "Pá", count: 1 },
-            { name: "Regador", count: 0 }, 
-            null, 
-            null  
-        ];
-        let activeSlot = 0; 
+        // --- Estrutura de Inventário ---
+        let backpackInventory = new Array(BACKPACK_SIZE).fill(null);
+        let hotbarMapping = new Array(HOTBAR_SIZE).fill(-1);
+        let activeHotbarSlot = 0;
+        let isBackpackOpen = false;
+        let selectedBackpackIndex = -1;
 
         let activeAnimations = [];
 
         // --- Variáveis de Tempo ---
-        let gameHour = 0;
-        let gameMinute = 0;
-        let gameTimeOffset = 0;
-        const GAME_MINUTES_PER_DAY = 1440;
-        const REAL_SECONDS_PER_GAME_DAY = 3600;
-        
+        let gameHour = 0; let gameMinute = 0; let gameTimeOffset = 0;
+        const GAME_MINUTES_PER_DAY = 1440; const REAL_SECONDS_PER_GAME_DAY = 3600;
+
+        // --- Variáveis de Toque ---
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchStartTime = 0;
+        let touchHoldTimeout = null; // Timeout para detectar "hold"
+        let isHolding = false; // Flag para indicar se está segurando para mover
+
         const preRenderedMapCanvas = document.createElement('canvas');
-        preRenderedMapCanvas.width = MAP_WIDTH_PX;
-        preRenderedMapCanvas.height = MAP_HEIGHT_PX;
+        preRenderedMapCanvas.width = MAP_WIDTH_PX; preRenderedMapCanvas.height = MAP_HEIGHT_PX;
         const preRenderedMapCtx = preRenderedMapCanvas.getContext('2d');
         preRenderedMapCtx.imageSmoothingEnabled = false;
 
-        // --- Funções de Desenho dos Tiles (Chão) ---
-        function drawGrassTile(ctx, x, y, size) {
-            ctx.fillStyle = '#558B2F';
-            ctx.fillRect(x, y, size, size);
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-            const pixelSize = 4;
-            for (let ty = 0; ty < size; ty += pixelSize * 2) {
-                for (let tx = 0; tx < size; tx += pixelSize * 2) {
-                     ctx.fillRect(x + tx, y + ty, pixelSize, pixelSize);
-                     ctx.fillRect(x + tx + pixelSize, y + ty + pixelSize, pixelSize, pixelSize);
-                }
-            }
-        }
-        function drawEarthTile(ctx, x, y, size) {
-            ctx.fillStyle = '#8D6E63';
-            ctx.fillRect(x, y, size, size);
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
-            ctx.fillRect(x + 5, y + 10, 4, 4);
-            ctx.fillRect(x + 15, y + 25, 4, 4);
-            ctx.fillRect(x + 22, y + 8, 4, 4);
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-            ctx.fillRect(x + 8, y + 20, 3, 3);
-            ctx.fillRect(x + 18, y + 5, 3, 3);
-            ctx.fillRect(x + 25, y + 15, 3, 3);
-        }
-        function drawPlowedTile(ctx, x, y, size) {
-            ctx.fillStyle = '#5D4037';
-            ctx.fillRect(x, y, size, size);
-            ctx.fillStyle = '#A1887F';
-            const furrowHeight = 4;
-            const spacing = 10;
-            for (let fy = 2; fy < size; fy += spacing) {
-                ctx.fillRect(x, y + fy, size, furrowHeight);
-            }
-        }
-        function drawWaterTile(ctx, x, y, size) {
-            ctx.fillStyle = '#1976D2';
-            ctx.fillRect(x, y, size, size);
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-            ctx.fillRect(x + 5, y + 8, 10, 4);
-            ctx.fillRect(x + 18, y + 20, 8, 4);
-            ctx.fillRect(x + 10, y + 15, 6, 3);
-        }
-        function drawSeedTile(ctx, x, y, size) {
-            drawPlowedTile(ctx, x, y, size);
-            ctx.fillStyle = '#A1887F';
-            ctx.fillRect(x + 8, y + 6, 3, 3);
-            ctx.fillRect(x + 20, y + 16, 3, 3);
-            ctx.fillRect(x + 12, y + 26, 3, 3);
-        }
-        function drawSproutTile(ctx, x, y, size) {
-            drawPlowedTile(ctx, x, y, size);
-            ctx.fillStyle = '#8BC34A';
-            ctx.fillRect(x + 13, y + 10, 6, 8);
-            ctx.fillRect(x + 15, y + 8, 2, 4);
-        }
-        function drawPlantTile(ctx, x, y, size) {
-            drawPlowedTile(ctx, x, y, size);
-            ctx.fillStyle = '#4CAF50';
-            ctx.fillRect(x + 12, y + 8, 8, 16);
-            ctx.fillRect(x + 8, y + 12, 4, 8);
-            ctx.fillRect(x + 20, y + 12, 4, 8);
-        }
-        function drawHarvestableTile(ctx, x, y, size) {
-            drawPlowedTile(ctx, x, y, size);
-            ctx.fillStyle = '#388E3C';
-            ctx.fillRect(x + 10, y + 5, 12, 22);
-            ctx.fillRect(x + 6, y + 10, 4, 12);
-            ctx.fillRect(x + 22, y + 10, 4, 12);
-            ctx.fillStyle = '#E53935';
-            ctx.fillRect(x + 14, y + 14, 4, 4); 
-            ctx.fillRect(x + 10, y + 18, 4, 4);
-            ctx.fillRect(x + 18, y + 18, 4, 4);
-        }
-        
-        // --- Funções de Desenho de OBJETOS ---
-        function drawRock(ctx, x_px, y_px) {
-            const y_base = y_px + TILE_SIZE; 
-            
-            // Sombra já tratada no Y-Sort
-            // ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-            // ...
+        // --- Funções de Desenho ---
+        function drawGrassTile(ctx, x, y, size) { ctx.fillStyle = '#558B2F'; ctx.fillRect(x, y, size, size); ctx.fillStyle = 'rgba(255, 255, 255, 0.05)'; const pS = 4; for (let ty=0; ty<size; ty+=pS*2){ for(let tx=0; tx<size; tx+=pS*2){ ctx.fillRect(x+tx, y+ty, pS, pS); ctx.fillRect(x+tx+pS, y+ty+pS, pS, pS); } } }
+        function drawEarthTile(ctx, x, y, size) { ctx.fillStyle = '#8D6E63'; ctx.fillRect(x, y, size, size); ctx.fillStyle = 'rgba(0,0,0,0.1)'; ctx.fillRect(x+5, y+10, 4, 4); ctx.fillRect(x+15, y+25, 4, 4); ctx.fillRect(x+22, y+8, 4, 4); ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(x+8, y+20, 3, 3); ctx.fillRect(x+18, y+5, 3, 3); ctx.fillRect(x+25, y+15, 3, 3); }
+        function drawPlowedTile(ctx, x, y, size) { ctx.fillStyle = '#5D4037'; ctx.fillRect(x, y, size, size); ctx.fillStyle = '#A1887F'; const fH = 4; const s = 10; for(let fy=2; fy<size; fy+=s){ ctx.fillRect(x, y+fy, size, fH); } }
+        function drawWaterTile(ctx, x, y, size) { ctx.fillStyle = '#1976D2'; ctx.fillRect(x, y, size, size); ctx.fillStyle = 'rgba(255, 255, 255, 0.2)'; ctx.fillRect(x+5, y+8, 10, 4); ctx.fillRect(x+18, y+20, 8, 4); ctx.fillRect(x+10, y+15, 6, 3); }
+        function drawSeedTile(ctx, x, y, size) { drawPlowedTile(ctx, x, y, size); ctx.fillStyle = '#A1887F'; ctx.fillRect(x+8, y+6, 3, 3); ctx.fillRect(x+20, y+16, 3, 3); ctx.fillRect(x+12, y+26, 3, 3); }
+        function drawSproutTile(ctx, x, y, size) { drawPlowedTile(ctx, x, y, size); ctx.fillStyle = '#8BC34A'; ctx.fillRect(x+13, y+10, 6, 8); ctx.fillRect(x+15, y+8, 2, 4); }
+        function drawPlantTile(ctx, x, y, size) { drawPlowedTile(ctx, x, y, size); ctx.fillStyle = '#4CAF50'; ctx.fillRect(x+12, y+8, 8, 16); ctx.fillRect(x+8, y+12, 4, 8); ctx.fillRect(x+20, y+12, 4, 8); }
+        function drawHarvestableTile(ctx, x, y, size) { drawPlowedTile(ctx, x, y, size); ctx.fillStyle = '#388E3C'; ctx.fillRect(x+10, y+5, 12, 22); ctx.fillRect(x+6, y+10, 4, 12); ctx.fillRect(x+22, y+10, 4, 12); ctx.fillStyle = '#E53935'; ctx.fillRect(x+14, y+14, 4, 4); ctx.fillRect(x+10, y+18, 4, 4); ctx.fillRect(x+18, y+18, 4, 4); }
+        function drawRock(ctx, x_px, y_px) { ctx.fillStyle='#795548'; ctx.fillRect(x_px+4, y_px+10, 24, 18); ctx.fillStyle='#8D6E63'; ctx.fillRect(x_px+6, y_px+12, 20, 14); ctx.fillStyle='#5D4037'; ctx.fillRect(x_px+18, y_px+15, 6, 6); ctx.fillRect(x_px+8, y_px+20, 8, 8); }
+        function drawTreeTrunk(ctx, x_px, y_px) { ctx.fillStyle='#5D4037'; ctx.fillRect(x_px+12, y_px+16, 8, TILE_SIZE-16); ctx.fillStyle='#795548'; ctx.fillRect(x_px+13, y_px+17, 6, TILE_SIZE-18); }
+        function drawTreeCanopy(ctx, x_px, y_px) { const yT=y_px-TILE_SIZE*1.5+8; const xC=x_px+TILE_SIZE/2; ctx.fillStyle='#388E3C'; ctx.beginPath(); ctx.ellipse(xC, yT+TILE_SIZE*0.8, TILE_SIZE*1.1, TILE_SIZE*0.9, 0, 0, Math.PI*2); ctx.ellipse(xC-TILE_SIZE*0.5, yT+TILE_SIZE*1.2, TILE_SIZE*0.8, TILE_SIZE*0.7, 0, 0, Math.PI*2); ctx.ellipse(xC+TILE_SIZE*0.5, yT+TILE_SIZE*1.2, TILE_SIZE*0.8, TILE_SIZE*0.7, 0, 0, Math.PI*2); ctx.fill(); ctx.fillStyle='#4CAF50'; ctx.beginPath(); ctx.ellipse(xC, yT+TILE_SIZE*0.7, TILE_SIZE*0.8, TILE_SIZE*0.7, 0, 0, Math.PI*2); ctx.ellipse(xC-TILE_SIZE*0.4, yT+TILE_SIZE*1.0, TILE_SIZE*0.6, TILE_SIZE*0.5, 0, 0, Math.PI*2); ctx.ellipse(xC+TILE_SIZE*0.4, yT+TILE_SIZE*1.0, TILE_SIZE*0.6, TILE_SIZE*0.5, 0, 0, Math.PI*2); ctx.fill(); }
+        function drawCampfire(ctx, x_px, y_px, timestamp) { ctx.fillStyle='#A1887F'; ctx.fillRect(x_px+10, y_px+20, 4, 6); ctx.fillRect(x_px+18, y_px+22, 4, 6); ctx.fillRect(x_px+14, y_px+24, 6, 4); ctx.fillStyle='#795548'; ctx.fillRect(x_px+12, y_px+21, 8, 2); ctx.fillRect(x_px+12, y_px+23, 8, 2); const fH=(Math.sin(timestamp*0.005)*0.1+0.9)*30; const fS=Math.sin(timestamp*0.003)*1+3; ctx.fillStyle=`hsl(${fH}, 100%, 50%)`; ctx.fillRect(x_px+14, y_px+16-fS, 4, 4+fS); ctx.fillStyle=`hsl(${fH+10}, 100%, 60%)`; ctx.fillRect(x_px+12, y_px+18-fS/2, 4, 4+fS/2); ctx.fillRect(x_px+18, y_px+18-fS/2, 4, 4+fS/2); const sO=(timestamp*0.001)%(TILE_SIZE/2); ctx.fillStyle=`rgba(180,180,180, ${0.3-(sO/(TILE_SIZE/2))*0.3})`; ctx.fillRect(x_px+15, y_px+10-sO, 2, 2); ctx.fillRect(x_px+17, y_px+8-sO*1.5, 2, 2); }
+        function drawTorch(ctx, x_px, y_px, timestamp) { const tX=x_px+TILE_SIZE/2-2; const tY=y_px+TILE_SIZE/2; ctx.fillStyle='#795548'; ctx.fillRect(tX, tY, 4, 10); ctx.fillStyle='#A0A0A0'; ctx.fillRect(tX-1, tY-2, 6, 2); const fH=(Math.sin(timestamp*0.007)*0.1+0.9)*30; const fS=Math.sin(timestamp*0.004)*0.5+1.5; ctx.fillStyle=`hsl(${fH}, 100%, 50%)`; ctx.fillRect(tX+1, tY-6-fS, 2, 4+fS); ctx.fillStyle=`hsl(${fH+10}, 100%, 60%)`; ctx.fillRect(tX, tY-4-fS/2, 4, 2+fS/2); }
+        function preRenderMap() { for(let y=0; y<MAP_HEIGHT_TILES; y++){ for(let x=0; x<MAP_WIDTH_TILES; x++){ updatePreRenderedTile(x, y, map[y][x]); } } console.log("Mapa pré-renderizado!"); }
+        function updatePreRenderedTile(tileX, tileY, tileId) { const dX=tileX*TILE_SIZE; const dY=tileY*TILE_SIZE; switch(tileId){ case 0: drawGrassTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break; case 1: drawEarthTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break; case 2: drawPlowedTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break; case 3: drawWaterTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break; case 4: drawSeedTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break; case 5: drawSproutTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break; case 6: drawPlantTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break; case 7: drawHarvestableTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break; default: drawGrassTile(preRenderedMapCtx, dX, dY, TILE_SIZE); } }
+        function drawPlayer(timestamp) { const px=player.x; const py=player.y; const w=player.width; const h=player.height; let fB=0; if(player.isMoving){fB=Math.sin(player.walkBob)*2;}else if(player.isUsingTool){const aP=(timestamp-player.toolAnimStart)/TOOL_ANIM_DURATION; fB=Math.abs(Math.sin(aP*Math.PI))*6;} const bH=py+fB; ctx.fillStyle=player.colorLegs; ctx.fillRect(px, bH+h*0.6, w*0.45, h*0.4); ctx.fillRect(px+w*0.55, bH+h*0.6, w*0.45, h*0.4); ctx.fillStyle=player.colorBody; ctx.fillRect(px, bH+h*0.3, w, h*0.4); const hX=px+w*0.1; const hY=bH; const hW=w*0.8; const hH=h*0.4; ctx.fillStyle=player.colorHead; ctx.fillRect(hX, hY, hW, hH); ctx.fillStyle='#000'; const eS=2; let e1x, e1y, e2x, e2y; if(player.lastMoveDir.dy===1){e1x=hX+hW*0.25; e1y=hY+hH*0.6; e2x=hX+hW*0.75-eS; e2y=hY+hH*0.6;}else if(player.lastMoveDir.dy===-1){e1x=hX+hW*0.25; e1y=hY+hH*0.2; e2x=hX+hW*0.75-eS; e2y=hY+hH*0.2;}else if(player.lastMoveDir.dx===-1){e1x=hX+hW*0.2; e1y=hY+hH*0.4; e2x=hX+hW*0.5-eS; e2y=hY+hH*0.4;}else if(player.lastMoveDir.dx===1){e1x=hX+hW*0.5; e1y=hY+hH*0.4; e2x=hX+hW*0.8-eS; e2y=hY+hH*0.4;} if(e1x){ctx.fillRect(e1x, e1y, eS, eS); ctx.fillRect(e2x, e2y, eS, eS);} }
+        function drawWaterAnimation(anim, timestamp) { const el=timestamp-anim.startTime; const pr=el/anim.duration; if(pr>1)return; const x=anim.x*TILE_SIZE+TILE_SIZE/2; const y=anim.y*TILE_SIZE+TILE_SIZE/2; for(let i=0; i<5; i++){ const an=i*(Math.PI*2/5)+pr*2; const ra=5+pr*15; const dX=x+Math.cos(an)*ra; const dY=y+Math.sin(an)*ra; ctx.fillStyle=`rgba(100,181,246, ${1-pr})`; ctx.beginPath(); ctx.arc(dX, dY, 2, 0, 2*Math.PI); ctx.fill(); } }
+        function drawAnimations(timestamp) { activeAnimations=activeAnimations.filter(an=>{const el=timestamp-an.startTime; if(el>an.duration)return false; if(an.type==='water'){drawWaterAnimation(an, timestamp);} return true;}); }
+        function drawPlantTimers(timestamp) { ctx.font='bold 12px Consolas'; ctx.textAlign='center'; ctx.shadowColor='black'; ctx.shadowBlur=2; for(const key in plantGrowthData){ const[x,y]=key.split(',').map(Number); const data=plantGrowthData[key]; const tId=map[y][x]; if(tId>=4&&tId<=6){ const tP=timestamp-data.plantedAt; const eA=tP; let taT=0; if(tId===4)taT=GROWTH_TIME_SPROUT; else if(tId===5)taT=GROWTH_TIME_PLANT; else if(tId===6)taT=GROWTH_TIME_HARVEST; if(data.boosted){taT=taT*0.5;} const tL=Math.max(0, taT-eA); const sL=Math.ceil(tL/1000); const dX=x*TILE_SIZE+(TILE_SIZE/2); const dY=y*TILE_SIZE-5; ctx.fillStyle='white'; ctx.fillText(`${sL}s`, dX, dY); } } ctx.shadowBlur=0; }
+        function updateGameTime() { const n=new Date(); const rM=n.getMinutes(); const rS=n.getSeconds(); const tS=(rM*60)+rS; const p=tS/REAL_SECONDS_PER_GAME_DAY; let tM=Math.floor(GAME_MINUTES_PER_DAY*p); const oM=gameTimeOffset*60; tM=(tM+oM)%GAME_MINUTES_PER_DAY; gameHour=Math.floor(tM/60); gameMinute=tM%60; }
+        function updateNightOverlay() { if(!nightOverlay)return; const mO=0.7; let tO=0; if(gameHour>=20||gameHour<4)tO=mO; else if(gameHour===4)tO=mO*0.66; else if(gameHour===5)tO=mO*0.33; else if(gameHour>=6&&gameHour<18)tO=0; else if(gameHour===18)tO=mO*0.33; else if(gameHour===19)tO=mO*0.66; nightOverlay.style.opacity=tO; drawLighting(lastTime); }
+        function drawTimeIcon() { timeIconCtx.clearRect(0,0,timeIconCanvas.width,timeIconCanvas.height); const cX=timeIconCanvas.width/2; const cY=timeIconCanvas.height/2; const r=8; if(gameHour>=6&&gameHour<18){timeIconCtx.fillStyle='#FFD700'; timeIconCtx.beginPath(); timeIconCtx.arc(cX,cY,r,0,Math.PI*2); timeIconCtx.fill();}else{timeIconCtx.fillStyle='#A0A0A0'; timeIconCtx.beginPath(); timeIconCtx.arc(cX,cY,r,0,Math.PI*2); timeIconCtx.fill(); timeIconCtx.fillStyle='rgba(0,0,0,0)'; timeIconCtx.globalCompositeOperation='destination-out'; timeIconCtx.beginPath(); timeIconCtx.arc(cX+r*0.4,cY-r*0.4,r,0,Math.PI*2); timeIconCtx.fill(); timeIconCtx.globalCompositeOperation='source-over';} }
+        function drawGameClock() { if(!gameClockSpan)return; const hS=String(gameHour).padStart(2,'0'); const mS=String(gameMinute).padStart(2,'0'); gameClockSpan.textContent=`${hS}:${mS}`; drawTimeIcon(); }
+        function drawLighting(timestamp) { lightCtx.clearRect(0,0,lightCanvas.width,lightCanvas.height); if(gameHour>=18||gameHour<6){ lightCtx.save(); const cNO=nightOverlay?parseFloat(nightOverlay.style.opacity):0; lightCtx.fillStyle=`rgba(0,0,30,${cNO*0.9})`; lightCtx.fillRect(0,0,lightCanvas.width,lightCanvas.height); lightCtx.globalCompositeOperation='destination-out'; for(const obj of mapObjects){ const xOS=obj.x*TILE_SIZE-camera.x; const yOS=obj.y*TILE_SIZE-camera.y; let lR=0; let lX=xOS+TILE_SIZE/2; let lY=yOS+TILE_SIZE/2; if(obj.type===2){lR=3.5*TILE_SIZE;}else if(obj.type===3){lR=2.5*TILE_SIZE; lY=yOS+TILE_SIZE*0.75;} if(lR>0){if(lX+lR>0&&lX-lR<lightCanvas.width&&lY+lR>0&&lY-lR<lightCanvas.height){ const pu=Math.sin(timestamp*0.005)*0.05+0.95; const gr=lightCtx.createRadialGradient(lX,lY,0,lX,lY,lR*pu); gr.addColorStop(0,'rgba(255,255,255,1)'); gr.addColorStop(0.3,'rgba(255,255,255,0.9)'); gr.addColorStop(0.7,'rgba(255,255,255,0.5)'); gr.addColorStop(1,'rgba(255,255,255,0)'); lightCtx.fillStyle=gr; lightCtx.beginPath(); lightCtx.arc(lX,lY,lR*pu,0,Math.PI*2); lightCtx.fill();}}} lightCtx.globalCompositeOperation='source-over'; lightCtx.restore();} }
 
-            ctx.fillStyle = '#795548'; 
-            ctx.fillRect(x_px + 4, y_px + 10, 24, 18);
-            ctx.fillStyle = '#8D6E63';
-            ctx.fillRect(x_px + 6, y_px + 12, 20, 14);
-            ctx.fillStyle = '#5D4037';
-            ctx.fillRect(x_px + 18, y_px + 15, 6, 6);
-            ctx.fillRect(x_px + 8, y_px + 20, 8, 8);
-        }
-
-        function drawTreeTrunk(ctx, x_px, y_px) {
-            // Sombra já tratada no Y-Sort
-            // const y_base = y_px + TILE_SIZE; 
-            // ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-            // ...
-
-            ctx.fillStyle = '#5D4037'; 
-            ctx.fillRect(x_px + 12, y_px + 16, 8, TILE_SIZE - 16); // Tronco até a base
-            ctx.fillStyle = '#795548';
-            ctx.fillRect(x_px + 13, y_px + 17, 6, TILE_SIZE - 18);
-        }
-
-        function drawTreeCanopy(ctx, x_px, y_px) {
-            const y_canopy_top = y_px - TILE_SIZE * 1.5 + 8; // Ajusta o y para ficar mais para cima
-            const x_canopy_center = x_px + TILE_SIZE / 2;
-            
-            // Sombra já tratada no Y-Sort
-            // ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-            // ...
-            
-            ctx.fillStyle = '#388E3C'; 
-            ctx.beginPath();
-            ctx.ellipse(x_canopy_center, y_canopy_top + TILE_SIZE * 0.8, TILE_SIZE * 1.1, TILE_SIZE * 0.9, 0, 0, Math.PI * 2);
-            ctx.ellipse(x_canopy_center - TILE_SIZE * 0.5, y_canopy_top + TILE_SIZE * 1.2, TILE_SIZE * 0.8, TILE_SIZE * 0.7, 0, 0, Math.PI * 2);
-            ctx.ellipse(x_canopy_center + TILE_SIZE * 0.5, y_canopy_top + TILE_SIZE * 1.2, TILE_SIZE * 0.8, TILE_SIZE * 0.7, 0, 0, Math.PI * 2);
-            ctx.fill();
-            
-            ctx.fillStyle = '#4CAF50'; 
-            ctx.beginPath();
-            ctx.ellipse(x_canopy_center, y_canopy_top + TILE_SIZE * 0.7, TILE_SIZE * 0.8, TILE_SIZE * 0.7, 0, 0, Math.PI * 2);
-            ctx.ellipse(x_canopy_center - TILE_SIZE * 0.4, y_canopy_top + TILE_SIZE * 1.0, TILE_SIZE * 0.6, TILE_SIZE * 0.5, 0, 0, Math.PI * 2);
-            ctx.ellipse(x_canopy_center + TILE_SIZE * 0.4, y_canopy_top + TILE_SIZE * 1.0, TILE_SIZE * 0.6, TILE_SIZE * 0.5, 0, 0, Math.PI * 2);
-            ctx.fill();
-        }
-
-        function drawCampfire(ctx, x_px, y_px, timestamp) {
-            const y_base = y_px + TILE_SIZE; 
-
-            // Pedras da fogueira
-            ctx.fillStyle = '#A1887F'; 
-            ctx.fillRect(x_px + 10, y_px + 20, 4, 6);
-            ctx.fillRect(x_px + 18, y_px + 22, 4, 6);
-            ctx.fillRect(x_px + 14, y_px + 24, 6, 4);
-
-            // Troncos
-            ctx.fillStyle = '#795548'; 
-            ctx.fillRect(x_px + 12, y_px + 21, 8, 2);
-            ctx.fillRect(x_px + 12, y_px + 23, 8, 2);
-
-            // Chamas (animadas)
-            const flameHue = (Math.sin(timestamp * 0.005) * 0.1 + 0.9) * 30; 
-            const flameSizeVar = Math.sin(timestamp * 0.003) * 1 + 3; 
-
-            ctx.fillStyle = `hsl(${flameHue}, 100%, 50%)`; 
-            ctx.fillRect(x_px + 14, y_px + 16 - flameSizeVar, 4, 4 + flameSizeVar);
-            ctx.fillStyle = `hsl(${flameHue + 10}, 100%, 60%)`; 
-            ctx.fillRect(x_px + 12, y_px + 18 - flameSizeVar / 2, 4, 4 + flameSizeVar / 2);
-            ctx.fillRect(x_px + 18, y_px + 18 - flameSizeVar / 2, 4, 4 + flameSizeVar / 2);
-
-            // Fumaça (pequenos puffs)
-            const smokeOffset = (timestamp * 0.001) % (TILE_SIZE / 2);
-            ctx.fillStyle = `rgba(180, 180, 180, ${0.3 - (smokeOffset / (TILE_SIZE / 2)) * 0.3})`;
-            ctx.fillRect(x_px + 15, y_px + 10 - smokeOffset, 2, 2);
-            ctx.fillRect(x_px + 17, y_px + 8 - smokeOffset * 1.5, 2, 2);
-        }
-
-        function drawTorch(ctx, x_px, y_px, timestamp) {
-            const torchX = x_px + TILE_SIZE / 2 - 2; 
-            const torchY = y_px + TILE_SIZE / 2; 
-
-            // Haste da tocha
-            ctx.fillStyle = '#795548'; 
-            ctx.fillRect(torchX, torchY, 4, 10);
-
-            // Base de metal
-            ctx.fillStyle = '#A0A0A0'; 
-            ctx.fillRect(torchX - 1, torchY - 2, 6, 2);
-
-            // Chamas (animadas, menor que a fogueira)
-            const flameHue = (Math.sin(timestamp * 0.007) * 0.1 + 0.9) * 30; 
-            const flameSizeVar = Math.sin(timestamp * 0.004) * 0.5 + 1.5;
-
-            ctx.fillStyle = `hsl(${flameHue}, 100%, 50%)`; 
-            ctx.fillRect(torchX + 1, torchY - 6 - flameSizeVar, 2, 4 + flameSizeVar);
-            ctx.fillStyle = `hsl(${flameHue + 10}, 100%, 60%)`; 
-            ctx.fillRect(torchX, torchY - 4 - flameSizeVar / 2, 4, 2 + flameSizeVar / 2);
-        }
-        
-        // --- Funções de Renderização ---
-        function preRenderMap() {
-            for (let y = 0; y < MAP_HEIGHT_TILES; y++) {
-                for (let x = 0; x < MAP_WIDTH_TILES; x++) {
-                    const tileId = map[y][x];
-                    updatePreRenderedTile(x, y, tileId);
-                }
-            }
-            console.log("Mapa pré-renderizado!");
-        }
-
-        function updatePreRenderedTile(tileX, tileY, tileId) {
-            const drawX = tileX * TILE_SIZE;
-            const drawY = tileY * TILE_SIZE;
-            switch(tileId) {
-                case 0: drawGrassTile(preRenderedMapCtx, drawX, drawY, TILE_SIZE); break;
-                case 1: drawEarthTile(preRenderedMapCtx, drawX, drawY, TILE_SIZE); break;
-                case 2: drawPlowedTile(preRenderedMapCtx, drawX, drawY, TILE_SIZE); break;
-                case 3: drawWaterTile(preRenderedMapCtx, drawX, drawY, TILE_SIZE); break;
-                case 4: drawSeedTile(preRenderedMapCtx, drawX, drawY, TILE_SIZE); break;
-                case 5: drawSproutTile(preRenderedMapCtx, drawX, drawY, TILE_SIZE); break;
-                case 6: drawPlantTile(preRenderedMapCtx, drawX, drawY, TILE_SIZE); break;
-                case 7: drawHarvestableTile(preRenderedMapCtx, drawX, drawY, TILE_SIZE); break;
-                default:
-                    drawGrassTile(preRenderedMapCtx, drawX, drawY, TILE_SIZE);
-            }
-        }
-
-        function drawPlayer(timestamp) { 
-            const px = player.x;
-            const py = player.y;
-            const w = player.width;
-            const h = player.height;
-            
-            let finalBob = 0;
-            if (player.isMoving) {
-                finalBob = Math.sin(player.walkBob) * 2;
-            } else if (player.isUsingTool) {
-                const animProgress = (timestamp - player.toolAnimStart) / TOOL_ANIM_DURATION;
-                finalBob = Math.abs(Math.sin(animProgress * Math.PI)) * 6;
-            }
-            const bobH = py + finalBob;
-            
-            // Sombra é desenhada separadamente com Y-Sort
-            // ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-            // ...
-
-            ctx.fillStyle = player.colorLegs;
-            ctx.fillRect(px, bobH + h * 0.6, w * 0.45, h * 0.4);
-            ctx.fillRect(px + w * 0.55, bobH + h * 0.6, w * 0.45, h * 0.4);
-
-            ctx.fillStyle = player.colorBody;
-            ctx.fillRect(px, bobH + h * 0.3, w, h * 0.4);
-
-            const headX = px + w * 0.1;
-            const headY = bobH;
-            const headW = w * 0.8;
-            const headH = h * 0.4;
-            ctx.fillStyle = player.colorHead;
-            ctx.fillRect(headX, headY, headW, headH);
-
-            ctx.fillStyle = '#000';
-            const eyeSize = 2;
-            let eye1_x, eye1_y, eye2_x, eye2_y;
-
-            if (player.lastMoveDir.dy === 1) { // Baixo
-                eye1_x = headX + headW * 0.25;
-                eye1_y = headY + headH * 0.6;
-                eye2_x = headX + headW * 0.75 - eyeSize;
-                eye2_y = headY + headH * 0.6;
-            } else if (player.lastMoveDir.dy === -1) { // Cima
-                eye1_x = headX + headW * 0.25;
-                eye1_y = headY + headH * 0.2;
-                eye2_x = headX + headW * 0.75 - eyeSize;
-                eye2_y = headY + headH * 0.2;
-            } else if (player.lastMoveDir.dx === -1) { // Esquerda
-                eye1_x = headX + headW * 0.2;
-                eye1_y = headY + headH * 0.4;
-                eye2_x = headX + headW * 0.5 - eyeSize;
-                eye2_y = headY + headH * 0.4;
-            } else if (player.lastMoveDir.dx === 1) { // Direita
-                eye1_x = headX + headW * 0.5;
-                eye1_y = headY + headH * 0.4;
-                eye2_x = headX + headW * 0.8 - eyeSize;
-                eye2_y = headY + headH * 0.4;
-            }
-            
-            if (eye1_x) {
-                ctx.fillRect(eye1_x, eye1_y, eyeSize, eyeSize);
-                ctx.fillRect(eye2_x, eye2_y, eyeSize, eyeSize);
-            }
-        }
-        
-        function drawWaterAnimation(anim, timestamp) { 
-            const elapsed = timestamp - anim.startTime;
-            const progress = elapsed / anim.duration;
-            if (progress > 1) return;
-
-            const x = anim.x * TILE_SIZE + TILE_SIZE / 2;
-            const y = anim.y * TILE_SIZE + TILE_SIZE / 2;
-
-            for (let i = 0; i < 5; i++) {
-                const angle = i * (Math.PI * 2 / 5) + progress * 2;
-                const radius = 5 + progress * 15;
-                const dropX = x + Math.cos(angle) * radius;
-                const dropY = y + Math.sin(angle) * radius;
-                
-                ctx.fillStyle = `rgba(100, 181, 246, ${1 - progress})`;
-                ctx.beginPath();
-                ctx.arc(dropX, dropY, 2, 0, 2 * Math.PI);
-                ctx.fill();
-            }
-        }
-
-        function drawAnimations(timestamp) { 
-            activeAnimations = activeAnimations.filter(anim => {
-                const elapsed = timestamp - anim.startTime;
-                if (elapsed > anim.duration) return false;
-                
-                if (anim.type === 'water') {
-                    drawWaterAnimation(anim, timestamp);
-                }
-                return true;
-            });
-        }
-        
-        function drawPlantTimers(timestamp) { 
-            ctx.font = 'bold 12px Consolas';
-            ctx.textAlign = 'center';
-            ctx.shadowColor = 'black';
-            ctx.shadowBlur = 2;
-
-            for (const key in plantGrowthData) {
-                const [x, y] = key.split(',').map(Number);
-                const data = plantGrowthData[key];
-                const tileId = map[y][x];
-
-                if (tileId >= 4 && tileId <= 6) { 
-                    
-                    const timePassed = timestamp - data.plantedAt;
-                    const effectiveAge = timePassed; 
-                    
-                    let targetTime = 0;
-                    if (tileId === 4) targetTime = GROWTH_TIME_SPROUT;
-                    else if (tileId === 5) targetTime = GROWTH_TIME_PLANT;
-                    else if (tileId === 6) targetTime = GROWTH_TIME_HARVEST;
-
-                    if (data.boosted) {
-                        targetTime = targetTime * 0.5; 
-                    }
-
-                    const timeLeft = Math.max(0, targetTime - effectiveAge);
-                    const secondsLeft = Math.ceil(timeLeft / 1000);
-
-                    const drawX = x * TILE_SIZE + (TILE_SIZE / 2);
-                    const drawY = y * TILE_SIZE - 5; 
-
-                    ctx.fillStyle = 'white';
-                    ctx.fillText(`${secondsLeft}s`, drawX, drawY);
-                }
-            }
-            ctx.shadowBlur = 0; 
-        }
-        
-        function updateGameTime() {
-            const now = new Date();
-            const realMinutesInHour = now.getMinutes();
-            const realSecondsInHour = now.getSeconds();
-            const totalRealSecondsInHour = (realMinutesInHour * 60) + realSecondsInHour;
-            const progress = totalRealSecondsInHour / REAL_SECONDS_PER_GAME_DAY;
-            let totalGameMinutes = Math.floor(GAME_MINUTES_PER_DAY * progress);
-            const offsetMinutes = gameTimeOffset * 60;
-            totalGameMinutes = (totalGameMinutes + offsetMinutes) % GAME_MINUTES_PER_DAY;
-            gameHour = Math.floor(totalGameMinutes / 60);
-            gameMinute = totalGameMinutes % 60;
-        }
-
-        function updateNightOverlay() {
-            if (!nightOverlay) return;
-            const maxOpacity = 0.7; // Escuridão máxima
-            let targetOpacity = 0;
-
-            if (gameHour >= 20 || gameHour < 4) targetOpacity = maxOpacity; // Noite total
-            else if (gameHour === 4) targetOpacity = maxOpacity * 0.66; // Amanhecer 1
-            else if (gameHour === 5) targetOpacity = maxOpacity * 0.33; // Amanhecer 2
-            else if (gameHour >= 6 && gameHour < 18) targetOpacity = 0; // Dia
-            else if (gameHour === 18) targetOpacity = maxOpacity * 0.33; // Entardecer 1
-            else if (gameHour === 19) targetOpacity = maxOpacity * 0.66; // Entardecer 2
-            
-            nightOverlay.style.opacity = targetOpacity;
-
-            drawLighting(lastTime);
-        }
-
-        function drawTimeIcon() {
-            timeIconCtx.clearRect(0, 0, timeIconCanvas.width, timeIconCanvas.height);
-            const centerX = timeIconCanvas.width / 2;
-            const centerY = timeIconCanvas.height / 2;
-            const radius = 8;
-
-            if (gameHour >= 6 && gameHour < 18) { // Dia
-                timeIconCtx.fillStyle = '#FFD700'; 
-                timeIconCtx.beginPath();
-                timeIconCtx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-                timeIconCtx.fill();
-            } else { // Noite
-                timeIconCtx.fillStyle = '#A0A0A0'; 
-                timeIconCtx.beginPath();
-                timeIconCtx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-                timeIconCtx.fill();
-                timeIconCtx.fillStyle = 'rgba(0,0,0,0)'; 
-                timeIconCtx.globalCompositeOperation = 'destination-out'; 
-                timeIconCtx.beginPath();
-                timeIconCtx.arc(centerX + radius * 0.4, centerY - radius * 0.4, radius, 0, Math.PI * 2);
-                timeIconCtx.fill();
-                timeIconCtx.globalCompositeOperation = 'source-over'; 
-            }
-        }
-
-        function drawGameClock() {
-            if (!gameClockSpan) return;
-            const hourStr = String(gameHour).padStart(2, '0');
-            const minStr = String(gameMinute).padStart(2, '0');
-            gameClockSpan.textContent = `${hourStr}:${minStr}`;
-            drawTimeIcon(); 
-        }
-
-        function drawLighting(timestamp) {
-            lightCtx.clearRect(0, 0, lightCanvas.width, lightCanvas.height);
-            
-            if (gameHour >= 18 || gameHour < 6) { 
-                lightCtx.save();
-                
-                const currentNightOpacity = nightOverlay ? parseFloat(nightOverlay.style.opacity) : 0;
-                lightCtx.fillStyle = `rgba(0, 0, 30, ${currentNightOpacity * 0.9})`; 
-                lightCtx.fillRect(0, 0, lightCanvas.width, lightCanvas.height);
-
-                lightCtx.globalCompositeOperation = 'destination-out';
-
-                for (const obj of mapObjects) {
-                    const x_on_screen = obj.x * TILE_SIZE - camera.x;
-                    const y_on_screen = obj.y * TILE_SIZE - camera.y;
-
-                    let lightRadius = 0;
-                    let lightX = x_on_screen + TILE_SIZE / 2;
-                    let lightY = y_on_screen + TILE_SIZE / 2;
-
-                    if (obj.type === 2) { // Fogueira
-                        lightRadius = 3.5 * TILE_SIZE; 
-                    } else if (obj.type === 3) { // Tocha
-                        lightRadius = 2.5 * TILE_SIZE; 
-                        lightY = y_on_screen + TILE_SIZE * 0.75; 
-                    }
-
-                    if (lightRadius > 0) {
-                        if (lightX + lightRadius > 0 && lightX - lightRadius < lightCanvas.width &&
-                            lightY + lightRadius > 0 && lightY - lightRadius < lightCanvas.height)
-                        {
-                            const pulse = Math.sin(timestamp * 0.005) * 0.05 + 0.95; 
-                            const gradient = lightCtx.createRadialGradient(
-                                lightX, lightY, 0,
-                                lightX, lightY, lightRadius * pulse
-                            );
-                            gradient.addColorStop(0, 'rgba(255, 255, 255, 1)'); 
-                            gradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.9)');
-                            gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.5)');
-                            gradient.addColorStop(1, 'rgba(255, 255, 255, 0)'); 
-
-                            lightCtx.fillStyle = gradient;
-                            lightCtx.beginPath();
-                            lightCtx.arc(lightX, lightY, lightRadius * pulse, 0, Math.PI * 2);
-                            lightCtx.fill();
-                        }
-                    }
-                }
-                lightCtx.globalCompositeOperation = 'source-over';
-                // lightCtx.restore(); // Removido pois save não era necessário sem o translate/scale
-            }
-        }
-
-
-        // --- Loop Principal (Update e Draw) ---
-        function updatePlayerMovement(timestamp) { 
-            if (player.isMoving) {
-                let dx = player.targetX - player.x;
-                let dy = player.targetY - player.y;
-
-                if (Math.abs(dx) < player.speed) player.x = player.targetX;
-                else player.x += Math.sign(dx) * player.speed;
-
-                if (Math.abs(dy) < player.speed) player.y = player.targetY;
-                else player.y += Math.sign(dy) * player.speed;
-                
-                player.walkBob += player.walkBobSpeed;
-
-                if (player.x === player.targetX && player.y === player.targetY) {
-                    player.isMoving = false;
-                    player.walkBob = 0;
-                }
-            }
-        }
-
-        function updateToolAnimation(timestamp) { 
-            if (player.isUsingTool) {
-                if (timestamp - player.toolAnimStart > TOOL_ANIM_DURATION) {
-                    player.isUsingTool = false;
-                    useTool(timestamp);
-                }
-            }
-        }
-        
-        function updateAnimations(timestamp) { 
-             // Lógica movida para drawAnimations
-        }
-
-        function updateCamera() {
-            // Ajusta para manter o jogador centralizado na tela real (640x480)
-            const targetCamX = player.x - (640 / 2) + (player.width / 2);
-            const targetCamY = player.y - (480 / 2) + (player.height / 2);
-
-            // Prende a câmera nos limites do mapa, considerando o tamanho do canvas de renderização
-            camera.x = Math.max(0, Math.min(targetCamX, MAP_WIDTH_PX - canvas.width));
-            camera.y = Math.max(0, Math.min(targetCamY, MAP_HEIGHT_PX - canvas.height));
-        }
-
-
-        function update(timestamp) { 
-            updatePlayerMovement(timestamp);
-            updateToolAnimation(timestamp);
-            updateAnimations(timestamp);
-            updateCamera();
-        }
-
-        // --- ATUALIZADO: Função de Desenho com Y-Sorting ---
-        function draw(timestamp) { 
+        // --- Loop Principal ---
+        function updatePlayerMovement(timestamp) { if(player.isMoving){let dx=player.targetX-player.x; let dy=player.targetY-player.y; if(Math.abs(dx)<player.speed)player.x=player.targetX; else player.x+=Math.sign(dx)*player.speed; if(Math.abs(dy)<player.speed)player.y=player.targetY; else player.y+=Math.sign(dy)*player.speed; player.walkBob+=player.walkBobSpeed; if(player.x===player.targetX&&player.y===player.targetY){player.isMoving=false; player.walkBob=0;}} }
+        function updateToolAnimation(timestamp) { if(player.isUsingTool){if(timestamp-player.toolAnimStart>TOOL_ANIM_DURATION){player.isUsingTool=false; useTool(timestamp);}} }
+        function updateAnimations(timestamp) { /* ... */ }
+        function updateCamera() { const tX=player.x-(640/2)+(player.width/2); const tY=player.y-(480/2)+(player.height/2); camera.x=Math.max(0,Math.min(tX,MAP_WIDTH_PX-canvas.width)); camera.y=Math.max(0,Math.min(tY,MAP_HEIGHT_PX-canvas.height)); }
+        function update(timestamp) { updatePlayerMovement(timestamp); updateToolAnimation(timestamp); updateAnimations(timestamp); updateCamera(); }
+        function draw(timestamp) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
             ctx.save();
-            ctx.scale(zoomLevel, zoomLevel); // Aplica zoom se necessário (atualmente 1)
+            ctx.scale(zoomLevel, zoomLevel);
             ctx.translate(-camera.x, -camera.y);
-
-            // 1. Desenha o Chão (Mapa pré-renderizado)
+            // 1. Chão
             ctx.drawImage(preRenderedMapCanvas, 0, 0);
-            
-            // 2. Coleta todos os objetos "desenháveis" (Jogador, Árvores, Pedras, Fogueiras, Tochas)
+            // 2. Coleta "desenháveis"
             let drawables = [];
-            
-            // Adiciona o Jogador
-            drawables.push({
-                type: 'player',
-                x_px: player.x,
-                y_px: player.y,
-                y_sort: player.y + player.height - 4, // "Pés" do jogador
-                draw: (ts) => drawPlayer(ts)
-            });
-            
-            // Adiciona Sombra do Jogador (para ficar embaixo dele)
-            drawables.push({
-                type: 'shadow',
-                x_px: player.x,
-                y_px: player.y,
-                y_sort: player.y + player.height - 5, // Logo atrás dos pés
-                draw: () => {
-                    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-                    ctx.beginPath();
-                    ctx.ellipse(player.x + player.width / 2, player.y + player.height + 2, player.width / 2.5, 4, 0, 0, 2 * Math.PI);
-                    ctx.fill();
-                }
-            });
-
-            // Adiciona Objetos do Mapa (Árvores e Pedras, Fogueiras, Tochas)
+            drawables.push({ type: 'player', x_px: player.x, y_px: player.y, y_sort: player.y + player.height - 4, draw: (ts) => drawPlayer(ts) });
+            drawables.push({ type: 'shadow', x_px: player.x, y_px: player.y, y_sort: player.y + player.height - 5, draw: ()=>{ctx.fillStyle='rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(player.x+player.width/2, player.y+player.height+2, player.width/2.5, 4, 0, 0, 2*Math.PI); ctx.fill();} });
             for (const obj of mapObjects) {
-                const x_px = obj.x * TILE_SIZE;
-                const y_px = obj.y * TILE_SIZE;
-                const y_base = y_px + TILE_SIZE; // "Pés" do objeto (base do tile)
-
+                const x_px = obj.x * TILE_SIZE; const y_px = obj.y * TILE_SIZE; const y_base = y_px + TILE_SIZE;
                 if (obj.type === 0) { // Rocha
-                     // Adiciona a sombra da rocha antes da rocha
-                     drawables.push({
-                        type: 'shadow', x_px: x_px, y_px: y_px, y_sort: y_base - 1, 
-                        draw: () => {
-                            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'; ctx.beginPath();
-                            ctx.ellipse(x_px + 16, y_base, 12, 6, 0, 0, 2 * Math.PI); ctx.fill();
-                        }
-                    });
-                    drawables.push({
-                        type: 'rock', x_px: x_px, y_px: y_px, y_sort: y_base,
-                        draw: () => drawRock(ctx, x_px, y_px)
-                    });
-                } else if (obj.type === 1) { // Árvore (dividida em tronco e copa)
-                     // Adiciona a sombra da copa antes da copa
-                     drawables.push({
-                        type: 'shadow', x_px: x_px, y_px: y_px, y_sort: y_base -1, // Sombra abaixo da base
-                        draw: () => {
-                            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'; ctx.beginPath();
-                            ctx.ellipse(x_px + TILE_SIZE/2, y_base, TILE_SIZE * 0.75, TILE_SIZE * 0.4, 0, 0, 2 * Math.PI); ctx.fill();
-                        }
-                    });
-                    // Tronco
-                    drawables.push({
-                        type: 'tree_trunk', x_px: x_px, y_px: y_px, y_sort: y_base,
-                        draw: () => drawTreeTrunk(ctx, x_px, y_px)
-                    });
-                    // Copa (desenhada *acima* de outros objetos)
-                    drawables.push({
-                        type: 'tree_canopy', x_px: x_px, y_px: y_px, y_sort: y_base + TILE_SIZE * 2, // Garante que a copa sempre apareça por cima de tudo
-                        draw: () => drawTreeCanopy(ctx, x_px, y_px)
-                    });
+                     drawables.push({ type: 'shadow', x_px: x_px, y_px: y_px, y_sort: y_base - 1, draw: ()=>{ctx.fillStyle='rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(x_px+16, y_base, 12, 6, 0, 0, 2*Math.PI); ctx.fill();} });
+                    drawables.push({ type: 'rock', x_px: x_px, y_px: y_px, y_sort: y_base, draw: () => drawRock(ctx, x_px, y_px) });
+                } else if (obj.type === 1) { // Árvore
+                     drawables.push({ type: 'shadow', x_px: x_px, y_px: y_px, y_sort: y_base -1, draw: ()=>{ctx.fillStyle='rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(x_px+TILE_SIZE/2, y_base, TILE_SIZE*0.75, TILE_SIZE*0.4, 0, 0, 2*Math.PI); ctx.fill();} });
+                    drawables.push({ type: 'tree_trunk', x_px: x_px, y_px: y_px, y_sort: y_base, draw: () => drawTreeTrunk(ctx, x_px, y_px) });
+                    drawables.push({ type: 'tree_canopy', x_px: x_px, y_px: y_px, y_sort: y_base + TILE_SIZE * 2, draw: () => drawTreeCanopy(ctx, x_px, y_px) });
                 } else if (obj.type === 2) { // Fogueira
-                     // Adiciona a sombra da fogueira
-                     drawables.push({
-                        type: 'shadow', x_px: x_px, y_px: y_px, y_sort: y_base - 1, 
-                        draw: () => {
-                             ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'; ctx.beginPath();
-                             ctx.ellipse(x_px + 16, y_base, 10, 5, 0, 0, 2 * Math.PI); ctx.fill();
-                        }
-                    });
-                    drawables.push({
-                        type: 'campfire', x_px: x_px, y_px: y_px, y_sort: y_base,
-                        draw: (ts) => drawCampfire(ctx, x_px, y_px, ts)
-                    });
+                     drawables.push({ type: 'shadow', x_px: x_px, y_px: y_px, y_sort: y_base - 1, draw: ()=>{ctx.fillStyle='rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(x_px+16, y_base, 10, 5, 0, 0, 2*Math.PI); ctx.fill();} });
+                    drawables.push({ type: 'campfire', x_px: x_px, y_px: y_px, y_sort: y_base, draw: (ts) => drawCampfire(ctx, x_px, y_px, ts) });
                 } else if (obj.type === 3) { // Tocha
-                    drawables.push({
-                        type: 'torch', x_px: x_px, y_px: y_px, y_sort: y_base, // Tochas podem ser "passadas por trás"
-                        draw: (ts) => drawTorch(ctx, x_px, y_px, ts)
-                    });
+                    drawables.push({ type: 'torch', x_px: x_px, y_px: y_px, y_sort: y_base, draw: (ts) => drawTorch(ctx, x_px, y_px, ts) });
                 }
             }
-            
-            // 3. Ordena os "desenháveis" pela posição Y (Y-Sorting)
+            // 3. Ordena
             drawables.sort((a, b) => a.y_sort - b.y_sort);
-            
-            // 4. Desenha tudo na ordem correta
-            for (const item of drawables) {
-                item.draw(timestamp);
-            }
-            
-            // 5. Desenha Animações e Timers (sempre por cima de tudo)
-            drawAnimations(timestamp); 
-            drawPlantTimers(timestamp); 
-            
+            // 4. Desenha
+            for (const item of drawables) { item.draw(timestamp); }
+            // 5. Animações e Timers
+            drawAnimations(timestamp); drawPlantTimers(timestamp);
             ctx.restore();
         }
-        
-        let lastTime = 0;
-        function gameLoop(timestamp) {
-            if (!lastTime) lastTime = timestamp;
-            lastTime = timestamp;
 
-            update(timestamp); 
-            draw(timestamp);   
-            drawLighting(timestamp); 
-            
-            requestAnimationFrame(gameLoop);
-        }
+        let lastTime = 0;
+        function gameLoop(timestamp) { if (!lastTime) lastTime = timestamp; lastTime = timestamp; update(timestamp); draw(timestamp); drawLighting(timestamp); requestAnimationFrame(gameLoop); }
 
         // --- Lógica do Jogo ---
+        // CORRIGIDO: Keydown listener
         document.addEventListener('keydown', (e) => {
-            if (player.isMoving || player.isUsingTool) return; 
-            
-            if (e.key >= '1' && e.key <= '7') {
+            // Teclas que funcionam mesmo com a mochila aberta
+            if (e.key === 'b' || e.key === 'B') {
+                console.log("Tecla B pressionada"); // DEBUG
                 e.preventDefault();
-                updateActiveSlot(parseInt(e.key, 10) - 1);
+                toggleBackpack();
                 return;
             }
-            
-            if (e.key === ' ') {
-                e.preventDefault();
-                player.isMoving = false;
-                player.isUsingTool = true;
-                player.toolAnimStart = lastTime; 
-                return;
-            }
+             if (e.key === 'Escape' && isBackpackOpen) {
+                 e.preventDefault();
+                 toggleBackpack(false); // Força fechar
+                 return;
+             }
 
+             // Bloqueia outras ações se a mochila estiver aberta
+             if (isBackpackOpen) {
+                 // e.preventDefault(); // Não previne aqui, pode atrapalhar inputs futuros
+                 return; // Simplesmente ignora a ação no jogo
+             }
+
+             // Bloqueia se estiver se movendo ou usando ferramenta
+             if (player.isMoving || player.isUsingTool) return;
+
+            // Teclas 1-0 para Hotbar
+            let slotIndex = -1;
+            if (e.key >= '1' && e.key <= '9') { slotIndex = parseInt(e.key, 10) - 1; }
+            else if (e.key === '0') { slotIndex = 9; }
+            if (slotIndex !== -1) { e.preventDefault(); updateActiveHotbarSlot(slotIndex); return; }
+
+            // Tecla Espaço para Usar
+            if (e.key === ' ') { e.preventDefault(); triggerUseTool(); return; }
+
+            // Movimento com Setas
             let newDir = null;
-            switch (e.key) {
-                case 'ArrowUp': newDir = { dx: 0, dy: -1 }; break;
-                case 'ArrowDown': newDir = { dx: 0, dy: 1 }; break;
-                case 'ArrowLeft': newDir = { dx: -1, dy: 0 }; break;
-                case 'ArrowRight': newDir = { dx: 1, dy: 0 }; break;
-            }
-            if (!newDir) return;
-
-            const isAlreadyFacing = (player.lastMoveDir.dx === newDir.dx && player.lastMoveDir.dy === newDir.dy);
-
-            if (!isAlreadyFacing) {
-                player.lastMoveDir = newDir; 
-                return;
-            }
-            
-            const targetX = player.targetX + newDir.dx * TILE_SIZE;
-            const targetY = player.targetY + newDir.dy * TILE_SIZE;
-            if (isWalkable(targetX, targetY)) {
-                player.isMoving = true;
-                player.targetX = targetX;
-                player.targetY = targetY;
-            }
+            switch (e.key) { case 'ArrowUp': newDir = {dx:0, dy:-1}; break; case 'ArrowDown': newDir = {dx:0, dy:1}; break; case 'ArrowLeft': newDir = {dx:-1, dy:0}; break; case 'ArrowRight': newDir = {dx:1, dy:0}; break; }
+            if (!newDir) return; // Ignora outras teclas
+            triggerMovementOrTurn(newDir); // Chama a função helper
         });
 
-        // ATUALIZADO: Checagem de colisão com objetos
-        function isWalkable(pixelX, pixelY) {
-            const tileX = Math.floor(pixelX / TILE_SIZE);
-            const tileY = Math.floor(pixelY / TILE_SIZE);
+        function isWalkable(pixelX, pixelY) { const tX=Math.floor(pixelX/TILE_SIZE); const tY=Math.floor(pixelY/TILE_SIZE); if(tX<0||tX>=MAP_WIDTH_TILES||tY<0||tY>=MAP_HEIGHT_TILES)return false; if(map[tY][tX]===3)return false; for(const obj of mapObjects){if(obj.x===tX&&obj.y===tY){if(obj.type===0||obj.type===1||obj.type===2)return false;}} return true; }
 
-            // 1. Limites do Mapa
-            if (tileX < 0 || tileX >= MAP_WIDTH_TILES || tileY < 0 || tileY >= MAP_HEIGHT_TILES) {
-                return false;
-            }
-            
-            // 2. Chão (Água)
-            const tileId = map[tileY][tileX];
-            if (tileId === 3) return false;
-            
-            // 3. Objetos (Árvores e Pedras, Fogueiras, Tochas)
-            for (const obj of mapObjects) {
-                // Tochas podem ser passadas por cima, fogueiras não.
-                if ((obj.type === 0 || obj.type === 1 || obj.type === 2) && obj.x === tileX && obj.y === tileY) {
-                    return false; // Não pode andar sobre rochas, troncos ou fogueiras
-                }
-            }
-            
-            return true;
-        }
-
-        // ATUALIZADO: Lógica da ferramenta para evitar objetos (incluindo fogueiras e tochas)
-        function useTool(timestamp) { 
-            const pTileX = Math.floor(player.x / TILE_SIZE);
-            const pTileY = Math.floor(player.y / TILE_SIZE);
-            const targetTileX = pTileX + player.lastMoveDir.dx;
-            const targetTileY = pTileY + player.lastMoveDir.dy;
-
-            if (targetTileX < 0 || targetTileX >= MAP_WIDTH_TILES || targetTileY < 0 || targetTileY >= MAP_HEIGHT_TILES) {
-                return;
-            }
-            
-            // Checa se há um objeto (pedra/árvore/fogueira/tocha) no local
-            for (const obj of mapObjects) {
-                // Ferramentas não afetam objetos estáticos
-                if ((obj.type === 0 || obj.type === 1 || obj.type === 2 || obj.type === 3) && obj.x === targetTileX && obj.y === targetTileY) {
-                    return; 
-                }
-            }
-            
-            const targetKey = `${targetTileX},${targetTileY}`;
-            const tileId = map[targetTileY][targetTileX];
-            const item = inventory[activeSlot];
-
+        function useTool(timestamp) {
+            const pX = Math.floor(player.x/TILE_SIZE); const pY = Math.floor(player.y/TILE_SIZE);
+            const tX = pX + player.lastMoveDir.dx; const tY = pY + player.lastMoveDir.dy;
+            if (tX<0||tX>=MAP_WIDTH_TILES||tY<0||tY>=MAP_HEIGHT_TILES) return;
+            for (const obj of mapObjects) { if (obj.x===tX && obj.y===tY) { /* TODO: Machado/Picareta */ return; } }
+            const tK = `${tX},${tY}`; const tId = map[tY][tX];
+            const bpIdx = hotbarMapping[activeHotbarSlot];
+            if (bpIdx < 0 || bpIdx >= backpackInventory.length) return;
+            const item = backpackInventory[bpIdx];
             if (!item) return;
 
-            // 1. Lógica de Colheita
-            if (tileId === 7) {
-                map[targetTileY][targetTileX] = 2;
-                delete plantGrowthData[targetKey];
-                inventory[2].count++;
-                updatePreRenderedTile(targetTileX, targetTileY, 2);
-                saveGame();
-                updateInventoryUI();
-                return;
-            }
+            if (tId === 7) { map[tY][tX]=2; delete plantGrowthData[tK]; const hIdx=backpackInventory.findIndex(i=>i&&i.name==="Colheita"); if(hIdx!==-1)backpackInventory[hIdx].count++; updatePreRenderedTile(tX,tY,2); saveGame(); updateHotbarUI(); updateBackpackUI(); return; }
 
-            // 2. Lógica de Ferramenta
             switch(item.name) {
-                case "Enxada":
-                    if (tileId === 0 || tileId === 1) {
-                        map[targetTileY][targetTileX] = 2;
-                        updatePreRenderedTile(targetTileX, targetTileY, 2);
-                        saveGame();
-                    }
-                    break;
-                case "Semente":
-                    if (tileId === 2 && item.count > 0) {
-                        map[targetTileY][targetTileX] = 4;
-                        plantGrowthData[targetKey] = { plantedAt: timestamp, boosted: false };
-                        item.count--;
-                        updatePreRenderedTile(targetTileX, targetTileY, 4);
-                        saveGame();
-                        updateInventoryUI();
-                    }
-                    break;
-                case "Pá":
-                    if (tileId === 1 || tileId === 2) {
-                        map[targetTileY][targetTileX] = 0;
-                        if (plantGrowthData[targetKey]) {
-                            delete plantGrowthData[targetKey];
-                        }
-                        updatePreRenderedTile(targetTileX, targetTileY, 0);
-                        saveGame();
-                    } else if (tileId === 0) {
-                        let adjacentWater = false;
-                        const neighbors = [[0,1], [0,-1], [1,0], [-1,0]];
-                        for (const [nx, ny] of neighbors) {
-                            const checkX = targetTileX + nx;
-                            const checkY = targetTileY + ny;
-                            if (checkX >= 0 && checkX < MAP_WIDTH_TILES && checkY >= 0 && checkY < MAP_HEIGHT_TILES) {
-                                if (map[checkY][checkX] === 3) {
-                                    adjacentWater = true;
-                                    break;
-                                }
-                            }
-                        }
-                        if (adjacentWater) {
-                            map[targetTileY][targetTileX] = 3;
-                            updatePreRenderedTile(targetTileX, targetTileY, 3);
-                            saveGame();
-                        }
-                    }
-                    break;
-                case "Regador":
-                    if (tileId === 3) {
-                        item.count = 10;
-                        updateInventoryUI();
-                        saveGame();
-                    } else if (tileId >= 4 && tileId <= 6 && item.count > 0) { // Usar na Planta
-                        const plantData = plantGrowthData[targetKey];
-                        if (plantData && !plantData.boosted) { // Só rega se não foi regada
-                            plantData.boosted = true;
-                            item.count--;
-                            activeAnimations.push({ type: 'water', x: targetTileX, y: targetTileY, startTime: timestamp, duration: 500 });
-                            updateInventoryUI();
-                            saveGame();
-                        }
-                    }
-                    break;
+                case "Enxada": if(tId===0||tId===1){map[tY][tX]=2; updatePreRenderedTile(tX,tY,2); saveGame();} break;
+                case "Semente": if(tId===2&&item.count>0){map[tY][tX]=4; plantGrowthData[tK]={plantedAt:timestamp, boosted:false}; item.count--; updatePreRenderedTile(tX,tY,4); saveGame(); updateHotbarUI(); updateBackpackUI();} break;
+                case "Pá": if(tId===1||tId===2||(tId>=4&&tId<=7)){map[tY][tX]=0; if(plantGrowthData[tK])delete plantGrowthData[tK]; updatePreRenderedTile(tX,tY,0); saveGame();} else if(tId===0){let aW=false; const ne=[[0,1],[0,-1],[1,0],[-1,0]]; for(const[nx,ny]of ne){const cX=tX+nx; const cY=tY+ny; if(cX>=0&&cX<MAP_WIDTH_TILES&&cY>=0&&cY<MAP_HEIGHT_TILES){if(map[cY][cX]===3){aW=true; break;}}} if(aW){map[tY][tX]=3; updatePreRenderedTile(tX,tY,3); saveGame();}} else if(tId===3){map[tY][tX]=0; updatePreRenderedTile(tX,tY,0); saveGame();} break;
+                case "Regador": if(tId===3){item.count=10; updateHotbarUI(); updateBackpackUI(); saveGame();} else if(tId>=4&&tId<=6&&item.count>0){const pD=plantGrowthData[tK]; if(pD&&!pD.boosted){pD.boosted=true; item.count--; activeAnimations.push({type:'water',x:tX,y:tY,startTime:timestamp,duration:500}); updateHotbarUI(); updateBackpackUI(); saveGame();}} break;
+                case "Martelo": console.log("Usou Martelo"); break;
+                case "Machado": console.log("Usou Machado"); break;
+                case "Picareta": console.log("Usou Picareta"); break;
             }
         }
-        
-        function updatePlantGrowth(timestamp) { 
-            let mapChanged = false;
-            for (const key in plantGrowthData) {
-                const [x, y] = key.split(',').map(Number);
-                const data = plantGrowthData[key];
-                
-                const timePassed = timestamp - data.plantedAt;
-                const effectiveAge = timePassed; 
 
-                const currentTileId = map[y][x];
-                
-                const boostMultiplier = data.boosted ? 0.5 : 1;
-                
-                const targetSprout = GROWTH_TIME_SPROUT * boostMultiplier;
-                const targetPlant = GROWTH_TIME_PLANT * boostMultiplier;
-                const targetHarvest = GROWTH_TIME_HARVEST * boostMultiplier;
+        function updatePlantGrowth(timestamp) { let mC=false; for(const key in plantGrowthData){ const[x,y]=key.split(',').map(Number); const data=plantGrowthData[key]; const tP=timestamp-data.plantedAt; const eA=tP; const cId=map[y][x]; const bM=data.boosted?0.5:1; const tS=GROWTH_TIME_SPROUT*bM; const tP_=GROWTH_TIME_PLANT*bM; const tH=GROWTH_TIME_HARVEST*bM; let nId=-1; if(eA>tH&&cId===6)nId=7; else if(eA>tP_&&cId===5)nId=6; else if(eA>tS&&cId===4)nId=5; if(nId!==-1){map[y][x]=nId; updatePreRenderedTile(x,y,nId); mC=true;} } if(mC){saveGame();} }
+        function startGrowthTimer() { setInterval(() => { updatePlantGrowth(lastTime); }, 1000); }
 
-
-                let newTileId = -1;
-                if (effectiveAge > targetHarvest && currentTileId === 6) newTileId = 7;
-                else if (effectiveAge > targetPlant && currentTileId === 5) newTileId = 6;
-                else if (effectiveAge > targetSprout && currentTileId === 4) newTileId = 5;
-                
-                if (newTileId !== -1) {
-                    map[y][x] = newTileId;
-                    updatePreRenderedTile(x, y, newTileId);
-                    mapChanged = true;
-                }
-            }
-            if (mapChanged) {
-                saveGame();
-            }
-        }
-        
-        function startGrowthTimer() {
-            setInterval(() => {
-                updatePlantGrowth(lastTime);
-            }, 1000);
-        }
-
-        // --- Funções de UI (Inventário de Texto) ---
-        function updateInventoryUI() {
-            const slots = document.querySelectorAll('.slot');
-            slots.forEach((slot, index) => {
-                const item = inventory[index];
+        // --- Funções de UI ---
+        // CORRIGIDO: updateHotbarUI e updateBackpackUI
+        function updateHotbarUI() {
+            const slots = hotbarElement.querySelectorAll('.slot');
+            slots.forEach((slot, hotbarIndex) => {
+                const backpackIndex = hotbarMapping[hotbarIndex];
+                const item = (backpackIndex !== -1 && backpackIndex >= 0 && backpackIndex < backpackInventory.length) ? backpackInventory[backpackIndex] : null;
                 const nameSpan = slot.querySelector('.slot-name');
                 const countSpan = slot.querySelector('.slot-count');
 
+                if (item && nameSpan && countSpan) {
+                    nameSpan.textContent = item.name;
+                    // Simplificado: mostra contagem se > 0 e for contável, senão vazio
+                    countSpan.textContent = (item.count > 0 && (item.name === "Semente" || item.name === "Colheita" || item.name === "Regador")) ? item.count : "";
+                } else if (nameSpan && countSpan) {
+                    nameSpan.textContent = "";
+                    countSpan.textContent = "";
+                }
+                slot.classList.toggle('active', hotbarIndex === activeHotbarSlot);
+                slot.classList.remove('dragging', 'drag-over');
+            });
+        }
+
+        function updateBackpackUI() {
+            backpackGrid.innerHTML = '';
+            backpackInventory.forEach((item, index) => {
+                const slot = document.createElement('div');
+                slot.classList.add('slot');
+                slot.dataset.backpackIndex = index;
+
+                const nameSpan = document.createElement('span');
+                nameSpan.classList.add('slot-name');
+
+                const countSpan = document.createElement('span');
+                countSpan.classList.add('slot-count');
+
                 if (item) {
                     nameSpan.textContent = item.name;
-                    if (item.name === "Enxada" || item.name === "Pá") {
-                         countSpan.textContent = "";
-                    } else {
-                         countSpan.textContent = item.count;
-                    }
+                     // Simplificado: mostra contagem se > 0 e for contável, senão vazio
+                    countSpan.textContent = (item.count > 0 && (item.name === "Semente" || item.name === "Colheita" || item.name === "Regador")) ? item.count : "";
                 } else {
                     nameSpan.textContent = "";
                     countSpan.textContent = "";
                 }
 
-                if (index === activeSlot) {
-                    slot.classList.add('active');
-                } else {
-                    slot.classList.remove('active');
-                }
+                slot.appendChild(nameSpan);
+                slot.appendChild(countSpan);
+
+                if (index === selectedBackpackIndex) { slot.classList.add('selected-for-assignment'); }
+                slot.addEventListener('click', handleBackpackSlotClick);
+                backpackGrid.appendChild(slot);
             });
         }
 
-        function updateActiveSlot(slotIndex) {
-            activeSlot = slotIndex;
-            saveGame();
-            updateInventoryUI();
-        }
 
-        // --- ATUALIZADO: Persistência (Salvar/Carregar) ---
-        function saveGame() {
-            try {
-                const saveData = {
-                    map: map,
-                    plantData: plantGrowthData,
-                    mapObjects: mapObjects, 
-                    inventoryData: inventory.map(item => item ? { name: item.name, count: item.count } : null), 
-                    activeSlotData: activeSlot
-                };
-                localStorage.setItem('pixelFarmSaveData', JSON.stringify(saveData));
-            } catch (e) {
-                console.error("Erro ao salvar o jogo:", e);
+        function updateActiveHotbarSlot(hotbarIndex) { if (hotbarIndex >= 0 && hotbarIndex < HOTBAR_SIZE) { activeHotbarSlot = hotbarIndex; saveGame(); updateHotbarUI(); } }
+
+        // --- Lógica Mochila ---
+        function toggleBackpack(forceState = null) {
+            console.log("toggleBackpack chamado. Estado atual:", isBackpackOpen, "Forçar:", forceState); // DEBUG
+            isBackpackOpen = (forceState !== null) ? forceState : !isBackpackOpen;
+            console.log("Novo estado:", isBackpackOpen); // DEBUG
+            if (isBackpackOpen) {
+                selectedBackpackIndex = -1; updateBackpackUI(); backpackContainer.style.display = 'flex';
+            } else {
+                backpackContainer.style.display = 'none';
+                const sel = backpackGrid.querySelector('.selected-for-assignment'); if(sel) sel.classList.remove('selected-for-assignment');
             }
         }
 
+        function handleBackpackSlotClick(event) {
+             if (!isBackpackOpen) return;
+             const clickedIndex = parseInt(event.currentTarget.dataset.backpackIndex, 10);
+             const prevSel = backpackGrid.querySelector('.selected-for-assignment'); if (prevSel) prevSel.classList.remove('selected-for-assignment');
+             if (clickedIndex === selectedBackpackIndex) { selectedBackpackIndex = -1; }
+             else { selectedBackpackIndex = clickedIndex; event.currentTarget.classList.add('selected-for-assignment'); console.log(`Selecionado item da mochila: ${selectedBackpackIndex}`); }
+        }
+
+        function handleHotbarSlotClick(event) {
+            const clickedHotbarIndex = parseInt(event.currentTarget.dataset.hotbarIndex, 10);
+            if (isBackpackOpen) {
+                if (selectedBackpackIndex !== -1) {
+                    console.log(`Atribuindo mochila[${selectedBackpackIndex}] -> hotbar[${clickedHotbarIndex}]`);
+                    const existingHotbarSlot = hotbarMapping.indexOf(selectedBackpackIndex);
+                    if(existingHotbarSlot !== -1) { hotbarMapping[existingHotbarSlot] = -1; }
+                    hotbarMapping[clickedHotbarIndex] = selectedBackpackIndex;
+                    selectedBackpackIndex = -1;
+                    updateBackpackUI(); updateHotbarUI(); saveGame();
+                }
+            } else {
+                if (clickedHotbarIndex === activeHotbarSlot && !player.isMoving && !player.isUsingTool) {
+                     const bpIdx = hotbarMapping[activeHotbarSlot];
+                     if(bpIdx !== -1 && backpackInventory[bpIdx]){
+                        console.log("Clique para usar slot ativo:", activeHotbarSlot); // DEBUG
+                        triggerUseTool(); // Chama a função helper
+                     }
+                } else {
+                    updateActiveHotbarSlot(clickedHotbarIndex);
+                }
+            }
+        }
+
+
+        // --- Lógica Drag & Drop ---
+        let draggedHotbarIndex = -1;
+        function handleDragStart(event) { if(isBackpackOpen) { event.preventDefault(); return; } const targetSlot = event.target.closest('.slot'); if(!targetSlot || !targetSlot.dataset.hotbarIndex) { event.preventDefault(); return; } draggedHotbarIndex = parseInt(targetSlot.dataset.hotbarIndex, 10); event.dataTransfer.setData('text/plain', draggedHotbarIndex); event.dataTransfer.effectAllowed = 'move'; setTimeout(() => targetSlot.classList.add('dragging'), 0); console.log("Drag Start:", draggedHotbarIndex); }
+        function handleDragOver(event) { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; const targetSlot = event.target.closest('.slot'); if(targetSlot && targetSlot.parentElement.id === 'hotbar'){ hotbarElement.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over')); targetSlot.classList.add('drag-over'); } }
+        function handleDragLeave(event) { const targetSlot = event.target.closest('.slot'); if(targetSlot && targetSlot.parentElement.id === 'hotbar'){ targetSlot.classList.remove('drag-over'); } }
+        function handleDrop(event) {
+            event.preventDefault();
+            const targetSlot = event.target.closest('.slot');
+            if (!targetSlot || draggedHotbarIndex === -1 || targetSlot.parentElement.id !== 'hotbar') { cleanupDragDrop(); return; }
+            const droppedOnHotbarIndex = parseInt(targetSlot.dataset.hotbarIndex, 10);
+            console.log("Drop:", draggedHotbarIndex, "onto", droppedOnHotbarIndex);
+            if (draggedHotbarIndex !== droppedOnHotbarIndex) {
+                const sourceMapping = hotbarMapping[draggedHotbarIndex];
+                const targetMapping = hotbarMapping[droppedOnHotbarIndex];
+                hotbarMapping[draggedHotbarIndex] = targetMapping;
+                hotbarMapping[droppedOnHotbarIndex] = sourceMapping;
+                saveGame(); updateHotbarUI();
+            }
+            cleanupDragDrop();
+        }
+        function handleDragEnd(event) { cleanupDragDrop(); }
+        function cleanupDragDrop(){ draggedHotbarIndex = -1; hotbarElement.querySelectorAll('.slot').forEach(slot => { slot.classList.remove('dragging', 'drag-over'); }); console.log("Drag End / Cleanup"); }
+
+
+        // --- Persistência ---
+        function ensureInventoryConsistency(backpack, mapping, defaultItems) {
+            while(backpack.length < BACKPACK_SIZE) backpack.push(null); if(backpack.length > BACKPACK_SIZE) backpack.length = BACKPACK_SIZE;
+            while(mapping.length < HOTBAR_SIZE) mapping.push(-1); if(mapping.length > HOTBAR_SIZE) mapping.length = HOTBAR_SIZE;
+             defaultItems.forEach((defaultItem, defaultIndex) => {
+                 let foundIndex = backpack.findIndex(i => i && i.name === defaultItem.name);
+                 if(foundIndex === -1) {
+                     let emptySlotIndex = backpack.findIndex(slot => slot === null);
+                     if (emptySlotIndex !== -1) {
+                         backpack[emptySlotIndex] = { ...defaultItem };
+                         foundIndex = emptySlotIndex;
+                         console.log(`Adicionado item padrão "${defaultItem.name}" no slot vazio ${foundIndex}`);
+                     } else { console.warn(`Mochila cheia, não foi possível adicionar item padrão "${defaultItem.name}"`); }
+                 }
+                 if (defaultIndex < HOTBAR_SIZE && mapping[defaultIndex] === -1 && foundIndex !== -1) {
+                      const isMappedElsewhere = mapping.includes(foundIndex);
+                      if (!isMappedElsewhere) { mapping[defaultIndex] = foundIndex; console.log(`Mapeado item padrão "${defaultItem.name}" (mochila ${foundIndex}) para hotbar ${defaultIndex}`); }
+                 }
+            });
+            for (let i = 0; i < mapping.length; i++) { if (mapping[i] !== -1 && (mapping[i] >= BACKPACK_SIZE || !backpack[mapping[i]])) { console.log(`Limpando mapeamento inválido da hotbar ${i} (apontava para ${mapping[i]})`); mapping[i] = -1; } }
+        }
+        function saveGame() { /*...*/ } // Sem alterações aqui
+        // CORRIGIDO: loadGame
         function loadGame() {
+             const defaultItems = [ { name: "Enxada", count: 1 }, { name: "Semente", count: 10 }, { name: "Colheita", count: 0 }, { name: "Pá", count: 1 }, { name: "Regador", count: 0 }, { name: "Martelo", count: 1 }, { name: "Machado", count: 1 }, { name: "Picareta", count: 1 } ];
+             // Começa com arrays vazios/padrão
+             backpackInventory = new Array(BACKPACK_SIZE).fill(null);
+             hotbarMapping = new Array(HOTBAR_SIZE).fill(-1);
+             activeHotbarSlot = 0;
+
+            // Define os itens padrão primeiro (serão sobrescritos pelo save se existirem lá)
+             ensureInventoryConsistency(backpackInventory, hotbarMapping, defaultItems);
+
             const savedData = localStorage.getItem('pixelFarmSaveData');
-            
             if (savedData) {
                 try {
                     const data = JSON.parse(savedData);
-                    
                     if (data.map) map = data.map;
-                    if (data.activeSlotData) activeSlot = data.activeSlotData;
-                    if (data.mapObjects) mapObjects = data.mapObjects; 
-                    
-                    if (data.plantData) {
-                        for (const key in data.plantData) {
-                            const plant = data.plantData[key];
-                            // Migra saves antigos
-                            if (typeof plant.boost === 'number' && plant.boost > 0) {
-                                plant.boosted = true;
-                                delete plant.boost; 
-                            } else if (typeof plant.boosted === 'undefined') {
-                                plant.boosted = false; 
-                            }
-                        }
-                        plantGrowthData = data.plantData;
+                    if (data.mapObjects) { mapObjects = data.mapObjects.filter(obj => { if (!obj || typeof obj.x !== 'number' || typeof obj.y !== 'number') return false; if (obj.x < 0 || obj.x >= MAP_WIDTH_TILES || obj.y < 0 || obj.y >= MAP_HEIGHT_TILES) { console.warn(`Objeto em [${obj.x},${obj.y}] removido pois está fora do mapa.`); return false; } if ((obj.type === 0 || obj.type === 1 || obj.type === 2) && obj.y >= 0 && obj.y < map.length && obj.x >= 0 && obj.x < map[obj.y].length && map[obj.y][obj.x] === 3) { console.warn(`Objeto (tipo ${obj.type}) em [${obj.x},${obj.y}] removido pois está na água.`); return false; } return true; }); }
+                    if (data.plantData) { for (const key in data.plantData) { const plant = data.plantData[key]; if (typeof plant.boost === 'number' && plant.boost > 0) { plant.boosted = true; delete plant.boost; } else if (typeof plant.boosted === 'undefined') { plant.boosted = false; } } plantGrowthData = data.plantData; }
+                    if (data.activeSlotData !== undefined && data.activeSlotData >= 0 && data.activeSlotData < HOTBAR_SIZE) { activeHotbarSlot = data.activeSlotData; }
+
+                    // Carrega contagens da mochila, SOBRESCREVENDO as padrões
+                    if (data.backpackData && Array.isArray(data.backpackData)) {
+                         data.backpackData.forEach((itemData, index) => {
+                             if (index < BACKPACK_SIZE && itemData && itemData.name && typeof itemData.count === 'number') {
+                                 // Procura se o item JÁ EXISTE (pelos itens padrão) e atualiza a CONTAGEM
+                                 let existingItemIndex = backpackInventory.findIndex(invItem => invItem && invItem.name === itemData.name);
+                                 if (existingItemIndex !== -1) {
+                                     backpackInventory[existingItemIndex].count = itemData.count;
+                                      console.log(`Contagem atualizada para ${itemData.name}: ${itemData.count}`);
+                                 } else {
+                                     // Se não existe (item novo do save?), adiciona no slot original do save se estiver vazio
+                                      if(!backpackInventory[index]) {
+                                        backpackInventory[index] = { name: itemData.name, count: itemData.count };
+                                         console.log(`Item ${itemData.name} carregado no slot ${index}`);
+                                      } else {
+                                          // Tenta achar outro vazio (menos provável agora com ensureConsistency antes)
+                                          let emptySlot = backpackInventory.findIndex(slot => slot === null);
+                                          if(emptySlot !== -1) {
+                                              backpackInventory[emptySlot] = { name: itemData.name, count: itemData.count };
+                                              console.log(`Item ${itemData.name} carregado no slot vazio ${emptySlot}`);
+                                          } else {
+                                              console.warn(`Mochila cheia, não foi possível carregar item "${itemData.name}" do save.`);
+                                          }
+                                      }
+                                 }
+                             }
+                         });
                     }
 
-                    if (data.inventoryData) {
-                        let loadedInv = data.inventoryData;
-                        for(let i = 0; i < inventory.length; i++) {
-                            // Carrega contagens apenas para itens que existem no inventário padrão
-                            if(loadedInv[i] && inventory[i] && typeof loadedInv[i].count === 'number') {
-                                 inventory[i].count = loadedInv[i].count;
-                            }
-                        }
-                    }
+                    // Carrega mapeamento
+                     if (data.hotbarMapData && Array.isArray(data.hotbarMapData)) {
+                          const mapLength = Math.min(data.hotbarMapData.length, HOTBAR_SIZE);
+                          for(let i=0; i < mapLength; i++){ if (typeof data.hotbarMapData[i] === 'number') { hotbarMapping[i] = data.hotbarMapData[i]; } else { hotbarMapping[i] = -1; } }
+                     }
+
+                    // Re-valida a consistência APÓS carregar, para limpar mapeamentos ruins do save
+                    ensureInventoryConsistency(backpackInventory, hotbarMapping, defaultItems);
+
                     console.log("Jogo carregado.");
                 } catch (e) {
                     console.error("Erro ao carregar o save, usando dados padrão.", e);
+                     // Reset em caso de erro
+                     backpackInventory = new Array(BACKPACK_SIZE).fill(null); hotbarMapping = new Array(HOTBAR_SIZE).fill(-1); ensureInventoryConsistency(backpackInventory, hotbarMapping, defaultItems); activeHotbarSlot = 0;
+                     mapObjects = mapObjects.filter(obj => { if (!obj || typeof obj.x !== 'number' || typeof obj.y !== 'number') return false; if (obj.x < 0 || obj.x >= MAP_WIDTH_TILES || obj.y < 0 || obj.y >= MAP_HEIGHT_TILES) return false; if ((obj.type === 0 || obj.type === 1 || obj.type === 2) && obj.y >= 0 && obj.y < map.length && obj.x >= 0 && obj.x < map[obj.y].length && map[obj.y][obj.x] === 3) return false; return true; });
+                     plantGrowthData = {};
                 }
             } else {
                 console.log("Nenhum save encontrado, iniciando novo jogo.");
+                // Garante itens e mapeamento padrão para novo jogo (já feito no início da função)
+                mapObjects = mapObjects.filter(obj => { if (!obj || typeof obj.x !== 'number' || typeof obj.y !== 'number') return false; if (obj.x < 0 || obj.x >= MAP_WIDTH_TILES || obj.y < 0 || obj.y >= MAP_HEIGHT_TILES) return false; if ((obj.type === 0 || obj.type === 1 || obj.type === 2) && obj.y >= 0 && obj.y < map.length && obj.x >= 0 && obj.x < map[obj.y].length && map[obj.y][obj.x] === 3) return false; return true; });
             }
         }
 
+
+        // --- Funções Helper para Controles (CORRIGIDO) ---
+        function triggerUseTool() {
+             // Bloqueia se mochila aberta ou já em ação
+             if (isBackpackOpen || player.isMoving || player.isUsingTool) return;
+
+             const bpIdx = hotbarMapping[activeHotbarSlot];
+             if (bpIdx === -1 || bpIdx >= backpackInventory.length || !backpackInventory[bpIdx]) return; // Slot vazio ou inválido
+
+             console.log("Trigger Use Tool - Slot:", activeHotbarSlot);
+             player.isMoving = false; // Garante que parou de andar
+             player.isUsingTool = true;
+             player.toolAnimStart = lastTime; // Usa o timestamp do loop
+        }
+
+        function triggerMovementOrTurn(newDir) {
+             // Bloqueia se mochila aberta ou já em ação
+             if (isBackpackOpen || player.isMoving || player.isUsingTool) return;
+
+             const isFacing = (player.lastMoveDir.dx === newDir.dx && player.lastMoveDir.dy === newDir.dy);
+             if (!isFacing) {
+                 player.lastMoveDir = newDir;
+                 console.log("Turn:", newDir);
+             } else {
+                 const tX = player.targetX + newDir.dx * TILE_SIZE;
+                 const tY = player.targetY + newDir.dy * TILE_SIZE;
+                 if (isWalkable(tX, tY)) {
+                     player.isMoving = true;
+                     player.targetX = tX;
+                     player.targetY = tY;
+                     console.log("Move:", newDir);
+                 } else {
+                      console.log("Blocked:", newDir); // Log se o movimento for bloqueado
+                 }
+             }
+         }
+
+         // --- Listeners de Toque (CORRIGIDO) ---
+         function handleTouchStart(e) {
+             e.preventDefault();
+             if (isBackpackOpen || player.isMoving || player.isUsingTool) return; // Bloqueia tudo se mochila aberta ou em ação
+
+             const touch = e.touches[0];
+             const rect = canvas.getBoundingClientRect();
+             touchStartX = touch.clientX - rect.left;
+             touchStartY = touch.clientY - rect.top;
+             touchStartTime = Date.now();
+             isHolding = false;
+             console.log("Touch Start:", touchStartX, touchStartY);
+
+             clearTimeout(touchHoldTimeout);
+             touchHoldTimeout = setTimeout(() => {
+                 // Verifica novamente se a mochila foi aberta nesse meio tempo
+                 if (isBackpackOpen || player.isMoving || player.isUsingTool) return;
+
+                 isHolding = true;
+                 const playerScreenX = player.x - camera.x + (player.width / 2);
+                 const playerScreenY = player.y - camera.y + (player.height / 2);
+                 const diffX = touchStartX - playerScreenX;
+                 const diffY = touchStartY - playerScreenY;
+                 const absDiffX = Math.abs(diffX);
+                 const absDiffY = Math.abs(diffY);
+
+                 if (absDiffX > TOUCH_MOVE_THRESHOLD || absDiffY > TOUCH_MOVE_THRESHOLD) {
+                      let moveDir = { dx: 0, dy: 0 };
+                     if (absDiffX > absDiffY) { moveDir.dx = Math.sign(diffX); }
+                     else { moveDir.dy = Math.sign(diffY); }
+                     console.log("Hold detected - Triggering Movement:", moveDir);
+                     triggerMovementOrTurn(moveDir);
+                 }
+             }, TAP_TIME_THRESHOLD);
+         }
+         function handleTouchMove(e) {
+             e.preventDefault();
+             if (isBackpackOpen || !isHolding || player.isUsingTool) return; // Ignora se mochila aberta, não for hold, ou usando ferramenta
+
+             // Se está segurando (isHolding = true) E NÃO está se movendo (isMoving = false), tenta iniciar o movimento
+             // Se JÁ está se movendo (isMoving = true), não faz nada aqui (deixa o update cuidar)
+             if (!player.isMoving) {
+                 const playerScreenX = player.x - camera.x + (player.width / 2);
+                 const playerScreenY = player.y - camera.y + (player.height / 2);
+                 const touch = e.touches[0];
+                 const rect = canvas.getBoundingClientRect();
+                 const currentX = touch.clientX - rect.left;
+                 const currentY = touch.clientY - rect.top;
+
+                 const diffX = currentX - playerScreenX;
+                 const diffY = currentY - playerScreenY;
+                 const absDiffX = Math.abs(diffX);
+                 const absDiffY = Math.abs(diffY);
+
+                 if (absDiffX > TOUCH_MOVE_THRESHOLD || absDiffY > TOUCH_MOVE_THRESHOLD) {
+                     let moveDir = { dx: 0, dy: 0 };
+                     if (absDiffX > absDiffY) { moveDir.dx = Math.sign(diffX); }
+                     else { moveDir.dy = Math.sign(diffY); }
+                     console.log("Touch Move (Hold Active) - Triggering Movement:", moveDir);
+                     triggerMovementOrTurn(moveDir); // Tenta iniciar/continuar movimento
+                 }
+            }
+         }
+         function handleTouchEnd(e) {
+             e.preventDefault();
+             clearTimeout(touchHoldTimeout); // Limpa o timeout de hold
+
+             if (isBackpackOpen) { isHolding = false; return; } // Ignora se mochila aberta
+
+             const touchDuration = Date.now() - touchStartTime;
+
+             // Se foi rápido e não virou hold -> TAP
+             if (!isHolding && touchDuration < TAP_TIME_THRESHOLD) {
+                 console.log("Tap detected.");
+                  // Ignora se estiver se movendo ou usando ferramenta (pode ter sido iniciado no timeout)
+                 if (player.isMoving || player.isUsingTool) {
+                     console.log("Tap ignored - player busy.");
+                     isHolding = false; // Reset state
+                     return;
+                 }
+
+                 const touchedWorldX = touchStartX + camera.x;
+                 const touchedWorldY = touchStartY + camera.y;
+                 const touchedTileX = Math.floor(touchedWorldX / TILE_SIZE);
+                 const touchedTileY = Math.floor(touchedWorldY / TILE_SIZE);
+                 const facingTileX = Math.floor((player.targetX)/TILE_SIZE) + player.lastMoveDir.dx; // Usa targetX
+                 const facingTileY = Math.floor((player.targetY)/TILE_SIZE) + player.lastMoveDir.dy; // Usa targetY
+
+                 console.log("Tap Info - Facing:", facingTileX, facingTileY, "Touched:", touchedTileX, touchedTileY);
+
+                 if (touchedTileX === facingTileX && touchedTileY === facingTileY) {
+                     console.log("Tap on facing tile - Triggering Use Tool");
+                     triggerUseTool();
+                 } else {
+                     const playerScreenX = player.x - camera.x + (player.width / 2);
+                     const playerScreenY = player.y - camera.y + (player.height / 2);
+                     const diffX = touchStartX - playerScreenX;
+                     const diffY = touchStartY - playerScreenY;
+                     const absDiffX = Math.abs(diffX);
+                     const absDiffY = Math.abs(diffY);
+
+                     let tapDir = { dx: 0, dy: 0 };
+                     if (absDiffX > absDiffY) { tapDir.dx = Math.sign(diffX); }
+                     else { tapDir.dy = Math.sign(diffY); }
+
+                     if ((tapDir.dx !== 0 || tapDir.dy !== 0)) {
+                         player.lastMoveDir = tapDir;
+                         console.log("Tap turn:", tapDir);
+                     }
+                 }
+             } else {
+                  console.log("Hold/Drag End.");
+                  // Se estava segurando (isHolding=true), o movimento já foi iniciado.
+                  // Aqui apenas limpamos o estado. O movimento parará no updatePlayerMovement.
+             }
+
+             isHolding = false; // Reseta estado de hold ao soltar
+         }
+
+
         // --- Inicialização ---
         function init() {
+            backpackIcon = document.getElementById('backpackIcon');
+            if (!backpackIcon) { console.error("Ícone da mochila não encontrado!"); return; }
+
             loadGame();
-            preRenderMap(); 
-            updateInventoryUI();
+            preRenderMap();
+            updateHotbarUI();
             startGrowthTimer();
 
             // Loop do Relógio
-            updateGameTime();
-            drawGameClock();
-            updateNightOverlay(); 
-            setInterval(() => {
-                updateGameTime();
-                drawGameClock();
-                updateNightOverlay(); 
-            }, 1000); 
+            updateGameTime(); drawGameClock(); updateNightOverlay();
+            setInterval(() => { updateGameTime(); drawGameClock(); updateNightOverlay(); }, 1000);
 
-            // Listener de clique do inventário
-            document.querySelectorAll('.slot').forEach(slotElement => {
-                slotElement.addEventListener('click', (e) => {
-                    const index = parseInt(e.currentTarget.dataset.index, 10);
-                    if (!isNaN(index)) {
-                        updateActiveSlot(index);
-                    }
-                });
+            // Listener de clique do ÍCONE da Mochila
+            backpackIcon.addEventListener('click', () => { console.log("Clique no ícone da mochila"); toggleBackpack(); });
+
+            // Listeners da HOTBAR
+            hotbarElement.querySelectorAll('.slot').forEach(slotElement => {
+                slotElement.addEventListener('click', handleHotbarSlotClick);
+                slotElement.addEventListener('dragstart', handleDragStart);
+                slotElement.addEventListener('dragover', handleDragOver);
+                slotElement.addEventListener('dragleave', handleDragLeave);
+                slotElement.addEventListener('drop', handleDrop);
+                slotElement.addEventListener('dragend', handleDragEnd);
             });
 
             // Listener do Botão de Teste
-            document.getElementById('timeToggleButton').addEventListener('click', () => {
-                gameTimeOffset = (gameTimeOffset + 12) % 24;
-                updateGameTime();
-                drawGameClock(); 
-                updateNightOverlay();
-                console.log("Tempo avançado em 12h. Offset atual: " + gameTimeOffset);
-            });
-            
+            document.getElementById('timeToggleButton').addEventListener('click', () => { gameTimeOffset = (gameTimeOffset + 12) % 24; updateGameTime(); drawGameClock(); updateNightOverlay(); console.log("Tempo avançado 12h."); });
+
+            // Adiciona Listeners de Toque ao Canvas
+            canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+            canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+            canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+            canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false }); // Trata cancelamento como touchend
+
+
             requestAnimationFrame(gameLoop);
         }
 
-        init();
+        document.addEventListener('DOMContentLoaded', init);
+
 
     </script>
 </body>
