@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Farm Game</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #333;
+            color: white;
+        }
+        canvas {
+            border: 2px solid #000;
+            background-color: #000;
+            image-rendering: pixelated; /* Mantém o visual pixel art ao escalar */
+            /* Janela de jogo mantida em 640x480 */
+            width: 640px; /* Largura de exibição */
+            height: 480px; /* Altura de exibição */
+        }
+        h1 {
+            margin: 10px;
+        }
+        p {
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Mini Fazenda Pixelada</h1>
+    <!-- Canvas mantido em 640x480 -->
+    <canvas id="gameCanvas" width="640" height="480"></canvas>
+    <p>Use as setas (↑, ↓, ←, →) para mover.</p>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // --- Configurações do Jogo ---
+        const TILE_SIZE = 32; // Tamanho de cada tile
+        const TOOL_ANIM_DURATION = 30; // Duração da animação da ferramenta (em frames)
+        
+        // --- NOVO: Constantes de Crescimento (em milissegundos) ---
+        // (Valores curtos para teste. Aumente-os para o jogo final)
+        const GROWTH_TIME_SPROUT = 10000;  // 10 segundos para virar muda
+        const GROWTH_TIME_PLANT = 20000;   // 20 segundos para virar planta
+        const GROWTH_TIME_HARVEST = 30000; // 30 segundos para colheita
+
+        // Tamanho da tela em tiles (baseado no canvas 640x480)
+        const SCREEN_TILES_X = canvas.width / TILE_SIZE; // 20 tiles
+        const SCREEN_TILES_Y = canvas.height / TILE_SIZE; // 15 tiles
+
+        // --- Mapa do Jogo ---
+        // 0 = Grama, 1 = Terra, 2 = Arado, 3 = Água
+        // --- NOVOS IDs ---
+        // 4 = Semente (antigo "Plantado")
+        // 5 = Muda
+        // 6 = Planta
+        // 7 = Pronta para Colheita
+        
+        // --- NOVO: Definir dimensões primeiro ---
+        const MAP_WIDTH_TILES = 25;
+        const MAP_HEIGHT_TILES = 25;
+        
+        // Mapa GRANDE (25x25) - MUDADO PARA 'let'
+        let map = [
+            [0, 0, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 3, 3, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 3, 3, 0, 0, 0, 0, 0, 1, 4, 4, 2, 4, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 3, 3, 0, 0, 0, 0, 0, 1, 4, 1, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 3, 3, 0, 3, 0, 0, 1, 2, 1, 1, 4, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 3, 3, 3, 3, 0, 0, 1, 4, 4, 2, 4, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 3, 3, 3, 3, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        ];
+        
+        // --- NOVO: Carregar mapa e dados de crescimento ---
+        let plantGrowthData = {}; // Objeto para { "x,y": timestamp }
+        const savedData = localStorage.getItem('pixelFarmSaveData');
+        
+        if (savedData) {
+            try {
+                const loadedData = JSON.parse(savedData);
+                
+                // Checagem de formato antigo (só o array do mapa) vs novo (objeto)
+                if (Array.isArray(loadedData)) {
+                    console.warn("Save de formato antigo detectado. Carregando apenas o mapa.");
+                    if (loadedData.length === MAP_HEIGHT_TILES && loadedData[0].length === MAP_WIDTH_TILES) {
+                        map = loadedData;
+                    }
+                    // plantGrowthData continua vazio {}
+
+                } else if (loadedData.map && loadedData.growthData) {
+                    // Formato novo (objeto com map e growthData)
+                    if (loadedData.map.length === MAP_HEIGHT_TILES && loadedData.map[0].length === MAP_WIDTH_TILES) {
+                        map = loadedData.map;
+                        plantGrowthData = loadedData.growthData;
+                    } else {
+                        console.warn("Mapa salvo com dimensões incorretas. Resetando.");
+                        localStorage.removeItem('pixelFarmSaveData');
+                    }
+                } else {
+                     console.warn("Dados salvos corrompidos. Resetando.");
+                     localStorage.removeItem('pixelFarmSaveData');
+                }
+                
+            } catch (e) {
+                console.error("Erro ao carregar dados salvos:", e);
+                localStorage.removeItem('pixelFarmSaveData');
+            }
+        }
+        // --- Fim da Carga ---
+        
+        // const MAP_WIDTH_TILES = map[0].length; // REMOVIDO (movido para cima)
+        // const MAP_HEIGHT_TILES = map.length; // REMOVIDO (movido para cima)
+        
+        const MAP_WIDTH_PX = MAP_WIDTH_TILES * TILE_SIZE;
+        const MAP_HEIGHT_PX = MAP_HEIGHT_TILES * TILE_SIZE;
+
+        // --- Jogador ---
+        const player = {
+            x: 11 * TILE_SIZE, // Posição inicial ajustada para o mapa grande
+            y: 11 * TILE_SIZE,
+            width: 20,
+            height: 28,
+            colorHead: '#FFDAB9', // Cor da pele
+            colorBody: '#007BFF', // Cor da roupa (azul)
+            colorLegs: '#0056B3', // Cor das pernas (azul escuro)
+            speed: 2, // Velocidade de interpolação
+            isMoving: false,
+            targetX: 11 * TILE_SIZE,
+            targetY: 11 * TILE_SIZE,
+            walkBob: 0, // Animação de "balanço"
+            walkBobSpeed: 0.15,
+            isUsingTool: false, // Novo: Estado da ferramenta
+            toolAnimTimer: 0, // Novo: Timer da animação
+            lastMoveDir: { dx: 0, dy: 1 } // Novo: Para onde o jogador "olha" (padrão: baixo)
+        };
+        
+        // --- Câmera Restaurada ---
+        const camera = {
+            x: 0,
+            y: 0
+        };
+
+        // --- Pré-renderização do Mapa ---
+        // Canvas "invisível" ajustado para o tamanho do mapa GRANDE
+        const preRenderedMapCanvas = document.createElement('canvas');
+        preRenderedMapCanvas.width = MAP_WIDTH_PX;
+        preRenderedMapCanvas.height = MAP_HEIGHT_PX;
+        const preRenderedMapCtx = preRenderedMapCanvas.getContext('2d');
+
+        // --- Funções de Desenho dos Tiles (Processual) ---
+        function drawGrassTile(ctx, x, y, size) {
+            ctx.fillStyle = '#558B2F'; // Verde escuro
+            ctx.fillRect(x, y, size, size);
+
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+            const pixelSize = 4;
+            for (let ty = 0; ty < size; ty += pixelSize * 2) {
+                for (let tx = 0; tx < size; tx += pixelSize * 2) {
+                     ctx.fillRect(x + tx, y + ty, pixelSize, pixelSize);
+                     ctx.fillRect(x + tx + pixelSize, y + ty + pixelSize, pixelSize, pixelSize);
+                }
+            }
+        }
+
+        function drawEarthTile(ctx, x, y, size) {
+            ctx.fillStyle = '#8D6E63'; // Marrom
+            ctx.fillRect(x, y, size, size);
+
+            // "Pedrinhas"
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.fillRect(x + 5, y + 10, 4, 4);
+            ctx.fillRect(x + 15, y + 25, 4, 4);
+            ctx.fillRect(x + 22, y + 8, 4, 4);
+            
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.fillRect(x + 8, y + 20, 3, 3);
+            ctx.fillRect(x + 18, y + 5, 3, 3);
+            ctx.fillRect(x + 25, y + 15, 3, 3);
+        }
+
+        function drawPlowedTile(ctx, x, y, size) {
+            ctx.fillStyle = '#5D4037'; // Marrom escuro
+            ctx.fillRect(x, y, size, size);
+
+            ctx.fillStyle = '#A1887F'; // Marrom claro (sulcos)
+            const furrowHeight = 4;
+            const spacing = 10;
+            for (let fy = 2; fy < size; fy += spacing) {
+                ctx.fillRect(x, y + fy, size, furrowHeight);
+            }
+        }
+        
+        // --- NOVAS FUNÇÕES DE TILE ---
+        function drawWaterTile(ctx, x, y, size) {
+            ctx.fillStyle = '#1976D2'; // Azul escuro
+            ctx.fillRect(x, y, size, size);
+
+            // Brilhos
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.fillRect(x + 5, y + 8, 10, 4);
+            ctx.fillRect(x + 18, y + 20, 8, 4);
+            ctx.fillRect(x + 10, y + 15, 6, 3);
+        }
+
+        // Renomeado de drawPlantedTile para drawSeedTile (Estágio 1)
+        function drawSeedTile(ctx, x, y, size) {
+            // Base de terra arada
+            ctx.fillStyle = '#5D4037'; // Marrom escuro
+            ctx.fillRect(x, y, size, size);
+
+            ctx.fillStyle = '#A1887F'; // Marrom claro (sulcos)
+            const furrowHeight = 4;
+            const spacing = 10;
+            for (let fy = 2; fy < size; fy += spacing) {
+                ctx.fillRect(x, y + fy, size, furrowHeight);
+            }
+            
+            // Sementes (pontinhos)
+            ctx.fillStyle = '#A1887F'; // Cor de semente
+            ctx.fillRect(x + 8, y + 6, 3, 3); // Semente 1
+            ctx.fillRect(x + 20, y + 16, 3, 3); // Semente 2
+            ctx.fillRect(x + 12, y + 26, 3, 3); // Semente 3
+        }
+
+        // --- NOVAS FUNÇÕES DE DESENHO DE PLANTA ---
+
+        // drawSproutTile (Estágio 2)
+        function drawSproutTile(ctx, x, y, size) {
+            drawPlowedTile(ctx, x, y, size); // Desenha a terra como base
+            
+            // Broto pequeno
+            ctx.fillStyle = '#8BC34A'; // Verde claro
+            ctx.fillRect(x + 13, y + 10, 6, 8); // Um brotinho
+            ctx.fillRect(x + 15, y + 8, 2, 4); // Folhinha
+        }
+
+        // drawPlantTile (Estágio 3)
+        function drawPlantTile(ctx, x, y, size) {
+            drawPlowedTile(ctx, x, y, size); // Desenha a terra como base
+            
+            // Planta média
+            ctx.fillStyle = '#4CAF50'; // Verde médio
+            ctx.fillRect(x + 12, y + 8, 8, 16); // Caule
+            ctx.fillRect(x + 8, y + 12, 4, 8); // Folha esq
+            ctx.fillRect(x + 20, y + 12, 4, 8); // Folha dir
+        }
+
+        // drawHarvestableTile (Estágio 4)
+        function drawHarvestableTile(ctx, x, y, size) {
+            drawPlowedTile(ctx, x, y, size); // Desenha a terra como base
+            
+            // Planta grande
+            ctx.fillStyle = '#388E3C'; // Verde escuro
+            ctx.fillRect(x + 10, y + 5, 12, 22); // Planta
+            ctx.fillRect(x + 6, y + 10, 4, 12); // Folha esq
+            ctx.fillRect(x + 22, y + 10, 4, 12); // Folha dir
+
+            // Fruto (ex: tomate/maçã)
+            ctx.fillStyle = '#E53935'; // Vermelho
+            ctx.fillRect(x + 14, y + 14, 4, 4); 
+            ctx.fillRect(x + 10, y + 18, 4, 4);
+            ctx.fillRect(x + 18, y + 18, 4, 4);
+        }
+        // --- FIM DAS NOVAS FUNÇÕES ---
+
+        // --- Função para desenhar o mapa no canvas invisível ---
+        function preRenderMap() {
+            console.log("Pré-renderizando o mapa...");
+            for (let y = 0; y < MAP_HEIGHT_TILES; y++) {
+                for (let x = 0; x < MAP_WIDTH_TILES; x++) {
+                    const tileId = map[y][x];
+                    const drawX = x * TILE_SIZE;
+                    const drawY = y * TILE_SIZE;
+                    
+                    switch(tileId) {
+                        case 0: // <-- CORRIGIDO: Adicionado caso 0
+                            drawGrassTile(preRenderedMapCtx, drawX, drawY, TILE_SIZE);
+                            break;
+                        case 1: // <-- CORRIGIDO: Adicionado caso 1
+                            drawEarthTile(preRenderedMapCtx, drawX, drawY, TILE_SIZE);
+                            break;
+                        case 2: // <-- CORRIGIDO: Adicionado caso 2
+                            drawPlowedTile(preRenderedMapCtx, drawX, drawY, TILE_SIZE);
+                            break;
+                        case 3:
+                            drawWaterTile(preRenderedMapCtx, drawX, drawY, TILE_SIZE);
+                            break;
+                        case 4: // Atualizado
+                            drawSeedTile(preRenderedMapCtx, drawX, drawY, TILE_SIZE);
+                            break;
+                        case 5: // NOVO
+                            drawSproutTile(preRenderedMapCtx, drawX, drawY, TILE_SIZE);
+                            break;
+                        case 6: // NOVO
+                            drawPlantTile(preRenderedMapCtx, drawX, drawY, TILE_SIZE);
+                            break;
+                        case 7: // NOVO
+                            drawHarvestableTile(preRenderedMapCtx, drawX, drawY, TILE_SIZE);
+                            break;
+                        default:
+                            // Mudado de rosa para grama para evitar erros visuais
+                            drawGrassTile(preRenderedMapCtx, drawX, drawY, TILE_SIZE);
+                    }
+                }
+            }
+            console.log("Mapa pré-renderizado!");
+        }
+
+        // --- Loop Principal do Jogo ---
+        function update() {
+            if (player.isMoving) {
+                // Move o jogador em direção ao alvo
+                let dx = player.targetX - player.x;
+                let dy = player.targetY - player.y;
+
+                if (Math.abs(dx) < player.speed) {
+                    player.x = player.targetX;
+                } else {
+                    player.x += Math.sign(dx) * player.speed;
+                }
+
+                if (Math.abs(dy) < player.speed) {
+                    player.y = player.targetY;
+                } else {
+                    player.y += Math.sign(dy) * player.speed;
+                }
+                
+                // Animação de balanço
+                player.walkBob += player.walkBobSpeed;
+
+                // Verifica se chegou ao destino
+                if (player.x === player.targetX && player.y === player.targetY) {
+                    player.isMoving = false;
+                    player.walkBob = 0; // Reseta o balanço
+                }
+            } else if (player.isUsingTool) {
+                // Animação da ferramenta
+                player.toolAnimTimer--;
+                if (player.toolAnimTimer <= 0) {
+                    player.isUsingTool = false;
+                    useTool(); // Executa a ação da ferramenta
+                }
+            }
+            
+            // --- Atualização da Câmera (Restaurada) ---
+            // Centraliza a câmera no jogador
+            // Usa o canvas.width (640) e canvas.height (480)
+            camera.x = player.x - (canvas.width / 2);
+            camera.y = player.y - (canvas.height / 2);
+
+            // Prende a câmera nos limites do mapa (MAP_WIDTH_PX é 800)
+            camera.x = Math.max(0, Math.min(camera.x, MAP_WIDTH_PX - canvas.width));
+            camera.y = Math.max(0, Math.min(camera.y, MAP_HEIGHT_PX - canvas.height));
+        }
+
+        function draw() {
+            // Limpa a tela visível
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // --- Lógica da Câmera (Restaurada) ---
+            ctx.save();
+            ctx.translate(-camera.x, -camera.y);
+
+            // 1. Desenha o Mapa (a partir da imagem pré-renderizada)
+            ctx.drawImage(preRenderedMapCanvas, 0, 0);
+
+            // 2. Desenha o Jogador
+            drawPlayer();
+            
+            // Restaura o canvas
+            ctx.restore();
+        }
+        
+        function drawPlayer() {
+            const px = player.x;
+            const py = player.y;
+            const w = player.width;
+            const h = player.height;
+            
+            // Animação de balanço
+            let finalBob = 0;
+            if (player.isMoving) {
+                finalBob = Math.sin(player.walkBob) * 2; // Balanço de caminhada
+            } else if (player.isUsingTool) {
+                // Animação da ferramenta (um "solavanco" para baixo)
+                const animProgress = (TOOL_ANIM_DURATION - player.toolAnimTimer) / TOOL_ANIM_DURATION;
+                // Um único "pulo" (0 -> 6 -> 0)
+                finalBob = Math.abs(Math.sin(animProgress * Math.PI)) * 6;
+            }
+            const bobH = py + finalBob; // Posição Y com balanço
+            
+            // Sombra
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.beginPath();
+            ctx.ellipse(px + w / 2, py + h + 2, w / 2.5, 4, 0, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Pernas
+            ctx.fillStyle = player.colorLegs;
+            ctx.fillRect(px, bobH + h * 0.6, w * 0.45, h * 0.4); // Perna esquerda
+            ctx.fillRect(px + w * 0.55, bobH + h * 0.6, w * 0.45, h * 0.4); // Perna direita
+
+            // Corpo (Jardineira)
+            ctx.fillStyle = player.colorBody;
+            ctx.fillRect(px, bobH + h * 0.3, w, h * 0.4);
+
+            // Cabeça
+            const headX = px + w * 0.1;
+            const headY = bobH;
+            const headW = w * 0.8;
+            const headH = h * 0.4;
+            ctx.fillStyle = player.colorHead;
+            ctx.fillRect(headX, headY, headW, headH);
+
+            // --- NOVO: Olhos para indicar a direção ---
+            ctx.fillStyle = '#000'; // Cor dos olhos
+            const eyeSize = 2; // Tamanho dos olhos (2x2 pixels)
+            let eye1_x, eye1_y, eye2_x, eye2_y;
+
+            if (player.lastMoveDir.dy === 1) { // Olhando para Baixo
+                eye1_x = headX + headW * 0.25;
+                eye1_y = headY + headH * 0.6;
+                eye2_x = headX + headW * 0.75 - eyeSize;
+                eye2_y = headY + headH * 0.6;
+            } else if (player.lastMoveDir.dy === -1) { // Olhando para Cima
+                eye1_x = headX + headW * 0.25;
+                eye1_y = headY + headH * 0.2;
+                eye2_x = headX + headW * 0.75 - eyeSize;
+                eye2_y = headY + headH * 0.2;
+            } else if (player.lastMoveDir.dx === -1) { // Olhando para Esquerda
+                eye1_x = headX + headW * 0.2;
+                eye1_y = headY + headH * 0.4;
+                eye2_x = headX + headW * 0.5 - eyeSize;
+                eye2_y = headY + headH * 0.4;
+            } else if (player.lastMoveDir.dx === 1) { // Olhando para Direita
+                eye1_x = headX + headW * 0.5;
+                eye1_y = headY + headH * 0.4;
+                eye2_x = headX + headW * 0.8 - eyeSize;
+                eye2_y = headY + headH * 0.4;
+            }
+            
+            // Desenha os olhos
+            if (eye1_x) { // Só desenha se uma direção for definida
+                ctx.fillRect(eye1_x, eye1_y, eyeSize, eyeSize);
+                ctx.fillRect(eye2_x, eye2_y, eyeSize, eyeSize);
+            }
+            // --- Fim da adição dos Olhos ---
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- Controles ---
+        document.addEventListener('keydown', (e) => {
+            // Ignora input se já estiver se movendo OU usando ferramenta
+            if (player.isMoving || player.isUsingTool) {
+                return; 
+            }
+            
+            // --- Novo: Ação da Ferramenta ---
+            if (e.key === ' ') {
+                e.preventDefault();
+                player.isMoving = false; // Garante que parou
+                player.isUsingTool = true;
+                player.toolAnimTimer = TOOL_ANIM_DURATION;
+                return; // Não faz mais nada
+            }
+            // ---------------------------
+
+            // --- LÓGICA DE MOVIMENTO ATUALIZADA ---
+            let newDir = null;
+
+            switch (e.key) {
+                case 'ArrowUp':
+                    newDir = { dx: 0, dy: -1 }; // Tenta olhar/mover para cima
+                    break;
+                case 'ArrowDown':
+                    newDir = { dx: 0, dy: 1 }; // Tenta olhar/mover para baixo
+                    break;
+                case 'ArrowLeft':
+                    newDir = { dx: -1, dy: 0 }; // Tenta olhar/mover para esquerda
+                    break;
+                case 'ArrowRight':
+                    newDir = { dx: 1, dy: 0 }; // Tenta olhar/mover para direita
+                    break;
+            }
+
+            if (!newDir) {
+                return; // Não é uma tecla de seta
+            }
+
+            // Compara a nova direção com a última direção
+            const isAlreadyFacing = (player.lastMoveDir.dx === newDir.dx && player.lastMoveDir.dy === newDir.dy);
+
+            // 1. Se NÃO estiver olhando para essa direção, apenas vira o personagem
+            if (!isAlreadyFacing) {
+                player.lastMoveDir = newDir;
+                return; // Não se move
+            }
+            
+            // 2. Se JÁ ESTIVER olhando, tenta se mover
+            // (Usa targetX/Y que é a posição "travada" no grid, e não player.x/y que é a posição interpolada)
+            const targetX = player.targetX + newDir.dx * TILE_SIZE;
+            const targetY = player.targetY + newDir.dy * TILE_SIZE;
+
+            if (isWalkable(targetX, targetY)) {
+                player.isMoving = true;
+                player.targetX = targetX;
+                player.targetY = targetY;
+            }
+            // --- FIM DA LÓGICA ATUALIZADA ---
+        });
+
+        function isWalkable(pixelX, pixelY) {
+            // Converte pixels para coordenadas de tile
+            const tileX = Math.floor(pixelX / TILE_SIZE);
+            const tileY = Math.floor(pixelY / TILE_SIZE);
+
+            // Verifica limites do mapa
+            if (tileX < 0 || tileX >= MAP_WIDTH_TILES || tileY < 0 || tileY >= MAP_HEIGHT_TILES) {
+                return false;
+            }
+            
+            // --- NOVA CHECAGEM ---
+            const tileId = map[tileY][tileX];
+            if (tileId === 3) { // 3 é Água
+                return false; // Não pode andar na água
+            }
+            // ---------------------
+
+            return true;
+        }
+
+        // --- Novas Funções ---
+        function useTool() {
+            // Pega o tile à frente do jogador
+            const pTileX = Math.floor(player.x / TILE_SIZE);
+            const pTileY = Math.floor(player.y / TILE_SIZE);
+            
+            const targetTileX = pTileX + player.lastMoveDir.dx;
+            const targetTileY = pTileY + player.lastMoveDir.dy; // <-- CORRIGIDO: Linha Faltando
+
+            // --- CORRIGIDO: Adicionada verificação de limites ---
+            if (targetTileX < 0 || targetTileX >= MAP_WIDTH_TILES || targetTileY < 0 || targetTileY >= MAP_HEIGHT_TILES) {
+                return; // Não faz nada se for fora do mapa
+            }
+
+            const tileId = map[targetTileY][targetTileX]; // <-- CORRIGIDO: Linha Faltando
+            // --- Fim da Correção ---
+
+            // --- CORRIGIDO: Adicionado o bloco IF principal ---
+            // Lógica da ferramenta: Arar
+            // 0 (Grama) -> 2 (Arado)
+            // 1 (Terra) -> 2 (Arado)
+            if (tileId === 0 || tileId === 1) {
+                map[targetTileY][targetTileX] = 2; // Vira solo arado
+                saveGame(); // Salva o jogo
+                updatePreRenderedTile(targetTileX, targetTileY, 2);
+            }
+            // 2 (Arado) -> 4 (Semente)
+            else if (tileId === 2) { // <-- Este 'else if' agora é válido
+                map[targetTileY][targetTileX] = 4; // Vira Semente
+                
+                // --- NOVO: Registra o tempo de plantio ---
+                plantGrowthData[`${targetTileX},${targetTileY}`] = Date.now();
+                // ------------------------------------
+                
+                saveGame(); // Salva o jogo
+                
+                // Atualiza o pre-render
+                updatePreRenderedTile(targetTileX, targetTileY, 4);
+            }
+            // --- NOVO: Lógica de Colheita ---
+            // 7 (Pronta para Colheita) -> 2 (Arado)
+            else if (tileId === 7) {
+                map[targetTileY][targetTileX] = 2; // Volta a ser Arado
+                
+                // --- NOVO: Remove do sistema de crescimento ---
+                delete plantGrowthData[`${targetTileX},${targetTileY}`];
+                // ---------------------------------------
+                
+                saveGame(); // Salva o jogo
+
+                // Atualiza o pre-render
+                updatePreRenderedTile(targetTileX, targetTileY, 2);
+            }
+        }
+
+        // --- NOVO: Função para salvar o jogo (mapa e crescimento) ---
+        function saveGame() {
+            try {
+                const dataToSave = {
+                    map: map,
+                    growthData: plantGrowthData
+                };
+                localStorage.setItem('pixelFarmSaveData', JSON.stringify(dataToSave));
+            } catch (e) {
+                console.error("Erro ao salvar o jogo:", e);
+            }
+        }
+        // --- Fim da função Salvar ---
+
+        // Atualiza um único tile no canvas de pré-renderização (Otimização)
+        function updatePreRenderedTile(tileX, tileY, tileId) {
+            const drawX = tileX * TILE_SIZE;
+            const drawY = tileY * TILE_SIZE;
+
+            switch(tileId) {
+                case 0:
+                    drawGrassTile(preRenderedMapCtx, drawX, drawY, TILE_SIZE);
+                    break;
+                case 1:
+                    drawEarthTile(preRenderedMapCtx, drawX, drawY, TILE_SIZE);
+                    break;
+                case 2:
+                    drawPlowedTile(preRenderedMapCtx, drawX, drawY, TILE_SIZE);
+                    break;
+                case 3:
+                    drawWaterTile(preRenderedMapCtx, drawX, drawY, TILE_SIZE);
+                    break;
+                case 4: // Atualizado
+                    drawSeedTile(preRenderedMapCtx, drawX, drawY, TILE_SIZE);
+                    break;
+                case 5: // NOVO
+                    drawSproutTile(preRenderedMapCtx, drawX, drawY, TILE_SIZE);
+                    break;
+                case 6: // NOVO
+                    drawPlantTile(preRenderedMapCtx, drawX, drawY, TILE_SIZE);
+                    break;
+                case 7: // NOVO
+                    drawHarvestableTile(preRenderedMapCtx, drawX, drawY, TILE_SIZE);
+                    break;
+                default:
+                    preRenderedMapCtx.fillStyle = '#FF00FF';
+                    preRenderedMapCtx.fillRect(drawX, drawY, TILE_SIZE);
+            }
+        }
+        // -----------------------
+
+
+        // --- NOVO: Sistema de Crescimento (Loop de Tempo) ---
+        function growPlants() {
+            const currentTime = Date.now();
+            let mapChanged = false; // Flag para salvar o jogo apenas se algo crescer
+
+            // Itera sobre todas as plantas registradas
+            for (const key in plantGrowthData) {
+                const plantTimestamp = plantGrowthData[key];
+                const age = currentTime - plantTimestamp;
+
+                const [x, y] = key.split(',').map(Number);
+                const currentTileId = map[y][x];
+
+                let newTileId = -1;
+
+                // Lógica de progressão de estágio
+                // Importante checar o tile atual para não re-processar
+                if (age > GROWTH_TIME_HARVEST && currentTileId === 6) {
+                    // Estágio 3 -> 4: Colheita
+                    newTileId = 7;
+                } else if (age > GROWTH_TIME_PLANT && currentTileId === 5) {
+                    // Estágio 2 -> 3: Planta
+                    newTileId = 6;
+                } else if (age > GROWTH_TIME_SPROUT && currentTileId === 4) {
+                    // Estágio 1 -> 2: Muda
+                    newTileId = 5;
+                }
+                
+                if (newTileId !== -1) {
+                    map[y][x] = newTileId;
+                    updatePreRenderedTile(x, y, newTileId);
+                    mapChanged = true;
+                }
+            }
+
+            if (mapChanged) {
+                saveGame(); // Salva o jogo se alguma planta cresceu
+            }
+        }
+        // --- Fim do Sistema de Crescimento ---
+
+
+        // --- Inicia o Jogo ---
+        // Desenha o mapa no canvas invisível UMA VEZ
+        preRenderMap();
+        
+        // Inicia o loop do jogo
+        requestAnimationFrame(gameLoop);
+        
+        // --- NOVO: Inicia o "tick" de crescimento ---
+        setInterval(growPlants, 1000); // Verifica o crescimento a cada segundo
+    </script>
+
+</body>
+</html>
+
+
+
+
