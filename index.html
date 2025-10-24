@@ -268,6 +268,23 @@
              background-color: #777;
         }
 
+        /* --- Tooltip de Descrição do Item --- */
+        #itemTooltip {
+            position: fixed; /* Posição relativa à janela do navegador */
+            display: none;   /* Começa escondido */
+            background-color: rgba(20, 20, 20, 0.9);
+            border: 1px solid #999;
+            border-radius: 5px;
+            padding: 8px 12px;
+            color: #E0E0E0;
+            font-size: 0.9em;
+            max-width: 220px;
+            z-index: 100; /* Fica em cima de tudo */
+            pointer-events: none; /* Impede que o tooltip intercepte eventos do mouse */
+            text-align: left;
+            box-shadow: 2px 2px 8px rgba(0,0,0,0.6);
+        }
+
     </style>
 </head>
 <body>
@@ -319,6 +336,8 @@
         <input type="range" id="timeRangeSlider" min="0" max="23" step="1" value="0">
     </div>
 
+    <div id="itemTooltip"></div>
+
     <script>
         // --- Configurações Iniciais ---
         const canvas = document.getElementById('gameCanvas');
@@ -334,6 +353,7 @@
         const hotbarElement = document.getElementById('hotbar');
         let backpackIcon = null; // Definido dentro de init()
         let timeRangeSlider = null; // Definido dentro de init()
+        let itemTooltip = null; // Definido dentro de init()
 
         ctx.imageSmoothingEnabled = false;
         timeIconCtx.imageSmoothingEnabled = false;
@@ -496,6 +516,19 @@
         let activeAnimations = [];
 
         // --- Variáveis de Tempo ---
+        const itemDescriptions = {
+            "Enxada": "<strong>Enxada</strong><br>Prepara a terra para o plantio em tiles de grama ou terra.",
+            "Semente": "<strong>Semente</strong><br>Plante em solo arado para cultivar. A colheita pode render mais sementes.",
+            "Colheita": "<strong>Colheita</strong><br>O fruto do seu trabalho. Um dia, talvez possa ser vendido.",
+            "Pá": "<strong>Pá</strong><br>Remove plantações, cercas e outros erros. Transforma grama em terra ou água (perto de água).",
+            "Regador": "<strong>Regador</strong><br>Acelera o crescimento das plantas. Recarregue na água.",
+            "Martelo": "<strong>Martelo</strong><br>Constrói cercas em tiles de grama ou terra, consumindo madeira.",
+            "Machado": "<strong>Machado</strong><br>Corta árvores para obter madeira.",
+            "Picareta": "<strong>Picareta</strong><br>Quebra pedras para obter minerais.",
+            "Pedra": "<strong>Pedra</strong><br>Material de construção básico, obtido de rochas.",
+            "Madeira": "<strong>Madeira</strong><br>Material de construção básico, obtido de árvores."
+        };
+
         let gameHour = 0; let gameMinute = 0; let gameTimeOffset = 0;
         const GAME_MINUTES_PER_DAY = 1440; const REAL_SECONDS_PER_GAME_DAY = 3600;
 
@@ -912,10 +945,47 @@
 
                 if (index === selectedBackpackIndex) { slot.classList.add('selected-for-assignment'); }
                 slot.addEventListener('click', handleBackpackSlotClick);
+                // Adiciona listeners para o tooltip
+                slot.addEventListener('mouseover', showTooltip);
+                slot.addEventListener('mouseout', hideTooltip);
+                slot.addEventListener('mousemove', updateTooltipPosition);
                 backpackGrid.appendChild(slot);
             });
         }
 
+        // --- Lógica do Tooltip ---
+        function showTooltip(event) {
+            const slot = event.currentTarget;
+            let itemName = null;
+
+            if (slot.parentElement.id === 'hotbar') {
+                const hotbarIndex = parseInt(slot.dataset.hotbarIndex, 10);
+                const backpackIndex = hotbarMapping[hotbarIndex];
+                if (backpackIndex !== -1 && backpackInventory[backpackIndex]) {
+                    itemName = backpackInventory[backpackIndex].name;
+                }
+            } else if (slot.parentElement.id === 'backpackGrid') {
+                const backpackIndex = parseInt(slot.dataset.backpackIndex, 10);
+                if (backpackInventory[backpackIndex]) {
+                    itemName = backpackInventory[backpackIndex].name;
+                }
+            }
+
+            if (itemName && itemDescriptions[itemName]) {
+                itemTooltip.innerHTML = itemDescriptions[itemName];
+                itemTooltip.style.display = 'block';
+                updateTooltipPosition(event);
+            }
+        }
+
+        function hideTooltip() {
+            itemTooltip.style.display = 'none';
+        }
+
+        function updateTooltipPosition(event) {
+            itemTooltip.style.left = `${event.clientX + 15}px`;
+            itemTooltip.style.top = `${event.clientY + 15}px`;
+        }
 
         function updateActiveHotbarSlot(hotbarIndex) { if (hotbarIndex >= 0 && hotbarIndex < HOTBAR_SIZE) { activeHotbarSlot = hotbarIndex; saveGame(); updateHotbarUI(); } }
 
@@ -1299,6 +1369,8 @@
             if (!backpackIcon) { console.error("Ícone da mochila não encontrado!"); return; }
             timeRangeSlider = document.getElementById('timeRangeSlider');
             if (!timeRangeSlider) { console.error("Slider de tempo não encontrado!"); return; }
+            itemTooltip = document.getElementById('itemTooltip');
+            if (!itemTooltip) { console.error("Elemento do tooltip não encontrado!"); return; }
 
             loadGame();
             generateWaterSpritesheet();
@@ -1324,6 +1396,10 @@
                 slotElement.addEventListener('dragleave', handleDragLeave);
                 slotElement.addEventListener('drop', handleDrop);
                 slotElement.addEventListener('dragend', handleDragEnd);
+                // Adiciona listeners para o tooltip
+                slotElement.addEventListener('mouseover', showTooltip);
+                slotElement.addEventListener('mouseout', hideTooltip);
+                slotElement.addEventListener('mousemove', updateTooltipPosition);
             });
 
             // Listener do Slider de Tempo
