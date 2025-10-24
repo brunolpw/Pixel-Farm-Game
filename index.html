@@ -505,6 +505,9 @@
         function updatePlayerMovement(timestamp) { if(player.isMoving){let dx=player.targetX-player.x; let dy=player.targetY-player.y; if(Math.abs(dx)<player.speed)player.x=player.targetX; else player.x+=Math.sign(dx)*player.speed; if(Math.abs(dy)<player.speed)player.y=player.targetY; else player.y+=Math.sign(dy)*player.speed; player.walkBob+=player.walkBobSpeed; if(player.x===player.targetX&&player.y===player.targetY){player.isMoving=false; player.walkBob=0;}} }
         function updateToolAnimation(timestamp) { if(player.isUsingTool){if(timestamp-player.toolAnimStart>TOOL_ANIM_DURATION){player.isUsingTool=false; useTool(timestamp);}} }
         function updateAnimations(timestamp) { /* ... */ }
+        function updatePlayerMovement(timestamp) { if(player.isMoving){let dx=player.targetX-player.x; let dy=player.targetY-player.y; if(Math.abs(dx)<player.speed)player.x=player.targetX; else player.x+=Math.sign(dx)*player.speed; if(Math.abs(dy)<player.speed)player.y=player.targetY; else player.y+=Math.sign(dy)*player.speed; player.walkBob+=player.walkBobSpeed; if(player.x===player.targetX&&player.y===player.targetY){player.isMoving=false; player.walkBob=0; saveGame();}} }
+        function updateToolAnimation(timestamp) { if(player.isUsingTool){if(timestamp-player.toolAnimStart>TOOL_ANIM_DURATION){player.isUsingTool=false; useTool(timestamp);}} }
+        function updateAnimations(timestamp) { /* ... */ }
         function updateCamera() { const tX=player.x-(640/2)+(player.width/2); const tY=player.y-(480/2)+(player.height/2); camera.x=Math.max(0,Math.min(tX,MAP_WIDTH_PX-canvas.width)); camera.y=Math.max(0,Math.min(tY,MAP_HEIGHT_PX-canvas.height)); }
         function update(timestamp) { updatePlayerMovement(timestamp); updateToolAnimation(timestamp); updateAnimations(timestamp); updateCamera(); }
         function draw(timestamp) {
@@ -774,77 +777,75 @@
             });
             for (let i = 0; i < mapping.length; i++) { if (mapping[i] !== -1 && (mapping[i] >= BACKPACK_SIZE || !backpack[mapping[i]])) { console.log(`Limpando mapeamento inválido da hotbar ${i} (apontava para ${mapping[i]})`); mapping[i] = -1; } }
         }
-        function saveGame() { /*...*/ } // Sem alterações aqui
+        function saveGame() {
+            const saveData = {
+                player: {
+                    x: player.x,
+                    y: player.y,
+                    lastMoveDir: { dx: player.lastMoveDir.dx, dy: player.lastMoveDir.dy }
+                },
+                map: map,
+                mapObjects: mapObjects,
+                plantData: plantGrowthData,
+                backpackData: backpackInventory,
+                hotbarMapData: hotbarMapping,
+                activeSlotData: activeHotbarSlot,
+                gameTimeOffset: gameTimeOffset
+            };
+            localStorage.setItem('pixelFarmSaveData', JSON.stringify(saveData));
+            console.log("Jogo salvo!");
+        }
         // CORRIGIDO: loadGame
         function loadGame() {
-             const defaultItems = [ { name: "Enxada", count: 1 }, { name: "Semente", count: 10 }, { name: "Colheita", count: 0 }, { name: "Pá", count: 1 }, { name: "Regador", count: 0 }, { name: "Martelo", count: 1 }, { name: "Machado", count: 1 }, { name: "Picareta", count: 1 } ];
-             // Começa com arrays vazios/padrão
-             backpackInventory = new Array(BACKPACK_SIZE).fill(null);
-             hotbarMapping = new Array(HOTBAR_SIZE).fill(-1);
-             activeHotbarSlot = 0;
-
-            // Define os itens padrão primeiro (serão sobrescritos pelo save se existirem lá)
-             ensureInventoryConsistency(backpackInventory, hotbarMapping, defaultItems);
+            const defaultItems = [ { name: "Enxada", count: 1 }, { name: "Semente", count: 10 }, { name: "Colheita", count: 0 }, { name: "Pá", count: 1 }, { name: "Regador", count: 0 }, { name: "Martelo", count: 1 }, { name: "Machado", count: 1 }, { name: "Picareta", count: 1 } ];
 
             const savedData = localStorage.getItem('pixelFarmSaveData');
             if (savedData) {
                 try {
                     const data = JSON.parse(savedData);
+                    // Carrega TUDO do save primeiro
                     if (data.map) map = data.map;
+                    if (data.player) {
+                        if (typeof data.player.x === 'number') player.x = data.player.x;
+                        if (typeof data.player.y === 'number') player.y = data.player.y;
+                        if (data.player.lastMoveDir && typeof data.player.lastMoveDir.dx === 'number' && typeof data.player.lastMoveDir.dy === 'number') {
+                            player.lastMoveDir = { dx: data.player.lastMoveDir.dx, dy: data.player.lastMoveDir.dy };
+                        }
+                        // Garante que o player não comece se movendo ou com target diferente
+                        player.targetX = player.x;
+                        player.targetY = player.y;
+                        player.isMoving = false;
+                    }
                     if (data.mapObjects) { mapObjects = data.mapObjects.filter(obj => { if (!obj || typeof obj.x !== 'number' || typeof obj.y !== 'number') return false; if (obj.x < 0 || obj.x >= MAP_WIDTH_TILES || obj.y < 0 || obj.y >= MAP_HEIGHT_TILES) { console.warn(`Objeto em [${obj.x},${obj.y}] removido pois está fora do mapa.`); return false; } if ((obj.type === 0 || obj.type === 1 || obj.type === 2) && obj.y >= 0 && obj.y < map.length && obj.x >= 0 && obj.x < map[obj.y].length && map[obj.y][obj.x] === 3) { console.warn(`Objeto (tipo ${obj.type}) em [${obj.x},${obj.y}] removido pois está na água.`); return false; } return true; }); }
                     if (data.plantData) { for (const key in data.plantData) { const plant = data.plantData[key]; if (typeof plant.boost === 'number' && plant.boost > 0) { plant.boosted = true; delete plant.boost; } else if (typeof plant.boosted === 'undefined') { plant.boosted = false; } } plantGrowthData = data.plantData; }
                     if (data.activeSlotData !== undefined && data.activeSlotData >= 0 && data.activeSlotData < HOTBAR_SIZE) { activeHotbarSlot = data.activeSlotData; }
 
-                    // Carrega contagens da mochila, SOBRESCREVENDO as padrões
-                    if (data.backpackData && Array.isArray(data.backpackData)) {
-                         data.backpackData.forEach((itemData, index) => {
-                             if (index < BACKPACK_SIZE && itemData && itemData.name && typeof itemData.count === 'number') {
-                                 // Procura se o item JÁ EXISTE (pelos itens padrão) e atualiza a CONTAGEM
-                                 let existingItemIndex = backpackInventory.findIndex(invItem => invItem && invItem.name === itemData.name);
-                                 if (existingItemIndex !== -1) {
-                                     backpackInventory[existingItemIndex].count = itemData.count;
-                                      console.log(`Contagem atualizada para ${itemData.name}: ${itemData.count}`);
-                                 } else {
-                                     // Se não existe (item novo do save?), adiciona no slot original do save se estiver vazio
-                                      if(!backpackInventory[index]) {
-                                        backpackInventory[index] = { name: itemData.name, count: itemData.count };
-                                         console.log(`Item ${itemData.name} carregado no slot ${index}`);
-                                      } else {
-                                          // Tenta achar outro vazio (menos provável agora com ensureConsistency antes)
-                                          let emptySlot = backpackInventory.findIndex(slot => slot === null);
-                                          if(emptySlot !== -1) {
-                                              backpackInventory[emptySlot] = { name: itemData.name, count: itemData.count };
-                                              console.log(`Item ${itemData.name} carregado no slot vazio ${emptySlot}`);
-                                          } else {
-                                              console.warn(`Mochila cheia, não foi possível carregar item "${itemData.name}" do save.`);
-                                          }
-                                      }
-                                 }
-                             }
-                         });
-                    }
+                    // Carrega inventário e hotbar do save, ou usa arrays vazios se não existirem
+                    backpackInventory = (data.backpackData && Array.isArray(data.backpackData)) ? data.backpackData : new Array(BACKPACK_SIZE).fill(null);
+                    hotbarMapping = (data.hotbarMapData && Array.isArray(data.hotbarMapData)) ? data.hotbarMapData : new Array(HOTBAR_SIZE).fill(-1);
 
-                    // Carrega mapeamento
-                     if (data.hotbarMapData && Array.isArray(data.hotbarMapData)) {
-                          const mapLength = Math.min(data.hotbarMapData.length, HOTBAR_SIZE);
-                          for(let i=0; i < mapLength; i++){ if (typeof data.hotbarMapData[i] === 'number') { hotbarMapping[i] = data.hotbarMapData[i]; } else { hotbarMapping[i] = -1; } }
-                     }
+                    if (typeof data.gameTimeOffset === 'number') { gameTimeOffset = data.gameTimeOffset; }
 
                     // Re-valida a consistência APÓS carregar, para limpar mapeamentos ruins do save
+                    // e adicionar itens padrão caso o save seja de uma versão antiga.
                     ensureInventoryConsistency(backpackInventory, hotbarMapping, defaultItems);
 
                     console.log("Jogo carregado.");
                 } catch (e) {
                     console.error("Erro ao carregar o save, usando dados padrão.", e);
-                     // Reset em caso de erro
-                     backpackInventory = new Array(BACKPACK_SIZE).fill(null); hotbarMapping = new Array(HOTBAR_SIZE).fill(-1); ensureInventoryConsistency(backpackInventory, hotbarMapping, defaultItems); activeHotbarSlot = 0;
+                     // Reset em caso de erro de parse - cria um jogo novo
+                     backpackInventory = new Array(BACKPACK_SIZE).fill(null); hotbarMapping = new Array(HOTBAR_SIZE).fill(-1); ensureInventoryConsistency(backpackInventory, hotbarMapping, defaultItems); activeHotbarSlot = 0; gameTimeOffset = 0;
                      mapObjects = mapObjects.filter(obj => { if (!obj || typeof obj.x !== 'number' || typeof obj.y !== 'number') return false; if (obj.x < 0 || obj.x >= MAP_WIDTH_TILES || obj.y < 0 || obj.y >= MAP_HEIGHT_TILES) return false; if ((obj.type === 0 || obj.type === 1 || obj.type === 2) && obj.y >= 0 && obj.y < map.length && obj.x >= 0 && obj.x < map[obj.y].length && map[obj.y][obj.x] === 3) return false; return true; });
                      plantGrowthData = {};
                 }
             } else {
                 console.log("Nenhum save encontrado, iniciando novo jogo.");
                 // Garante itens e mapeamento padrão para novo jogo (já feito no início da função)
+                backpackInventory = new Array(BACKPACK_SIZE).fill(null);
+                hotbarMapping = new Array(HOTBAR_SIZE).fill(-1);
+                activeHotbarSlot = 0;
                 mapObjects = mapObjects.filter(obj => { if (!obj || typeof obj.x !== 'number' || typeof obj.y !== 'number') return false; if (obj.x < 0 || obj.x >= MAP_WIDTH_TILES || obj.y < 0 || obj.y >= MAP_HEIGHT_TILES) return false; if ((obj.type === 0 || obj.type === 1 || obj.type === 2) && obj.y >= 0 && obj.y < map.length && obj.x >= 0 && obj.x < map[obj.y].length && map[obj.y][obj.x] === 3) return false; return true; });
+                ensureInventoryConsistency(backpackInventory, hotbarMapping, defaultItems);
             }
         }
 
@@ -1021,6 +1022,7 @@
             // Loop do Relógio
             updateGameTime(); drawGameClock(); updateNightOverlay();
             setInterval(() => { updateGameTime(); drawGameClock(); updateNightOverlay(); }, 1000);
+            setInterval(saveGame, 30000); // Salva o jogo a cada 30 segundos
 
             // Listener de clique do ÍCONE da Mochila
             backpackIcon.addEventListener('click', () => { console.log("Clique no ícone da mochila"); toggleBackpack(); });
