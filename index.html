@@ -384,8 +384,9 @@
         let player = {
             x: 11 * TILE_SIZE, y: 11 * TILE_SIZE, width: 20, height: 28,
             colorHead: '#FFDAB9', colorBody: '#007BFF', colorLegs: '#0056B3',
-            speed: 2, isMoving: false, targetX: 11 * TILE_SIZE, targetY: 11 * TILE_SIZE,
-            walkBob: 0, walkBobSpeed: 0.15, isUsingTool: false, toolAnimStart: 0,
+            speed: 2, isMoving: false, targetX: 11 * TILE_SIZE, targetY: 11 * TILE_SIZE, 
+            path: [], // Para o movimento point-and-click
+            walkBob: 0, walkBobSpeed: 0.15, isUsingTool: false, toolAnimStart: 0, toolTarget: null,
             lastMoveDir: { dx: 0, dy: 1 }
         };
 
@@ -686,6 +687,17 @@
                 ctx.strokeRect(x_px + 1, y_px + 1, TILE_SIZE - 2, TILE_SIZE - 2);
             }
         }
+        function drawPathIndicator(timestamp) {
+            if (player.path.length > 0) {
+                const finalTarget = player.path[player.path.length - 1];
+                const x_px = finalTarget.x * TILE_SIZE;
+                const y_px = finalTarget.y * TILE_SIZE;
+                const size = 10 + Math.sin(timestamp * 0.005) * 4; // Animação pulsante
+                ctx.strokeStyle = 'rgba(255, 255, 100, 0.9)';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(x_px + (TILE_SIZE - size) / 2, y_px + (TILE_SIZE - size) / 2, size, size);
+            }
+        }
         function drawAnimations(timestamp) { activeAnimations=activeAnimations.filter(an=>{const el=timestamp-an.startTime; if(el>an.duration)return false; if(an.type==='water'){drawWaterAnimation(an, timestamp);} return true;}); }
         function drawPlantTimers(timestamp) { ctx.font='bold 12px Consolas'; ctx.textAlign='center'; ctx.shadowColor='black'; ctx.shadowBlur=2; for(const key in plantGrowthData){ const[x,y]=key.split(',').map(Number); const data=plantGrowthData[key]; const tId=map[y][x]; if(tId>=4&&tId<=6){ const tP=timestamp-data.plantedAt; const eA=tP; let taT=0; if(tId===4)taT=GROWTH_TIME_SPROUT; else if(tId===5)taT=GROWTH_TIME_PLANT; else if(tId===6)taT=GROWTH_TIME_HARVEST; if(data.boosted){taT=taT*0.5;} const tL=Math.max(0, taT-eA); const sL=Math.ceil(tL/1000); const dX=x*TILE_SIZE+(TILE_SIZE/2); const dY=y*TILE_SIZE-5; ctx.fillStyle='white'; ctx.fillText(`${sL}s`, dX, dY); } } ctx.shadowBlur=0; }
         function updateGameTime() {
@@ -699,8 +711,41 @@
         function drawTimeIcon() { timeIconCtx.clearRect(0,0,timeIconCanvas.width,timeIconCanvas.height); const cX=timeIconCanvas.width/2; const cY=timeIconCanvas.height/2; const r=8; if(gameHour>=6&&gameHour<18){timeIconCtx.fillStyle='#FFD700'; timeIconCtx.beginPath(); timeIconCtx.arc(cX,cY,r,0,Math.PI*2); timeIconCtx.fill();}else{timeIconCtx.fillStyle='#A0A0A0'; timeIconCtx.beginPath(); timeIconCtx.arc(cX,cY,r,0,Math.PI*2); timeIconCtx.fill(); timeIconCtx.fillStyle='rgba(0,0,0,0)'; timeIconCtx.globalCompositeOperation='destination-out'; timeIconCtx.beginPath(); timeIconCtx.arc(cX+r*0.4,cY-r*0.4,r,0,Math.PI*2); timeIconCtx.fill(); timeIconCtx.globalCompositeOperation='source-over';} }
         function drawGameClock() { if(!gameClockSpan)return; const hS=String(gameHour).padStart(2,'0'); const mS=String(gameMinute).padStart(2,'0'); gameClockSpan.textContent=`${hS}:${mS}`; drawTimeIcon(); }
         function drawLighting(timestamp) { lightCtx.clearRect(0,0,lightCanvas.width,lightCanvas.height); if(gameHour>=18||gameHour<6){ lightCtx.save(); const cNO=nightOverlay?parseFloat(nightOverlay.style.opacity):0; lightCtx.fillStyle=`rgba(0,0,30,${cNO*0.9})`; lightCtx.fillRect(0,0,lightCanvas.width,lightCanvas.height); lightCtx.globalCompositeOperation='destination-out'; for(const obj of mapObjects){ const xOS=obj.x*TILE_SIZE-camera.x; const yOS=obj.y*TILE_SIZE-camera.y; let lR=0; let lX=xOS+TILE_SIZE/2; let lY=yOS+TILE_SIZE/2; if(obj.type===2){lR=3.5*TILE_SIZE;}else if(obj.type===3){lR=2.5*TILE_SIZE; lY=yOS+TILE_SIZE*0.75;} if(lR>0){if(lX+lR>0&&lX-lR<lightCanvas.width&&lY+lR>0&&lY-lR<lightCanvas.height){ const pu=Math.sin(timestamp*0.005)*0.05+0.95; const gr=lightCtx.createRadialGradient(lX,lY,0,lX,lY,lR*pu); gr.addColorStop(0,'rgba(255,255,255,1)'); gr.addColorStop(0.3,'rgba(255,255,255,0.9)'); gr.addColorStop(0.7,'rgba(255,255,255,0.5)'); gr.addColorStop(1,'rgba(255,255,255,0)'); lightCtx.fillStyle=gr; lightCtx.beginPath(); lightCtx.arc(lX,lY,lR*pu,0,Math.PI*2); lightCtx.fill();}}} lightCtx.globalCompositeOperation='source-over'; lightCtx.restore();} }
+        
+        function updatePlayerMovement(timestamp) {
+            // Se não está se movendo, verifica se há um caminho a seguir
+            if (!player.isMoving && player.path.length > 0) {
+                const nextTile = player.path.shift(); // Pega o próximo tile do caminho
+                const nextTargetX = nextTile.x * TILE_SIZE;
+                const nextTargetY = nextTile.y * TILE_SIZE;
 
-        function updatePlayerMovement(timestamp) { if(player.isMoving){let dx=player.targetX-player.x; let dy=player.targetY-player.y; if(Math.abs(dx)<player.speed)player.x=player.targetX; else player.x+=Math.sign(dx)*player.speed; if(Math.abs(dy)<player.speed)player.y=player.targetY; else player.y+=Math.sign(dy)*player.speed; player.walkBob+=player.walkBobSpeed; if(player.x===player.targetX&&player.y===player.targetY){player.isMoving=false; player.walkBob=0; saveGame();}} }
+                // Define a direção do movimento para a animação do personagem
+                const dx = nextTargetX - player.x;
+                const dy = nextTargetY - player.y;
+                if (Math.abs(dx) > Math.abs(dy)) { player.lastMoveDir = { dx: Math.sign(dx), dy: 0 }; }
+                else { player.lastMoveDir = { dx: 0, dy: Math.sign(dy) }; }
+
+                player.targetX = nextTargetX;
+                player.targetY = nextTargetY;
+                player.isMoving = true;
+            }
+
+            // Lógica de movimento suave para o próximo tile
+            if (player.isMoving) {
+                let dx = player.targetX - player.x;
+                let dy = player.targetY - player.y;
+                if (Math.abs(dx) < player.speed) player.x = player.targetX; else player.x += Math.sign(dx) * player.speed;
+                if (Math.abs(dy) < player.speed) player.y = player.targetY; else player.y += Math.sign(dy) * player.speed;
+                player.walkBob += player.walkBobSpeed;
+                if (player.x === player.targetX && player.y === player.targetY) {
+                    player.isMoving = false;
+                    player.walkBob = 0;
+                    if (player.path.length === 0) { // Chegou ao destino final
+                        saveGame();
+                    }
+                }
+            }
+        }
         function updateToolAnimation(timestamp) { if(player.isUsingTool){if(timestamp-player.toolAnimStart>TOOL_ANIM_DURATION){player.isUsingTool=false; useTool(timestamp);}} }
         function updateAnimations(timestamp) { /* ... */ }
         function updateCamera() { const tX=player.x-(640/2)+(player.width/2); const tY=player.y-(480/2)+(player.height/2); camera.x=Math.max(0,Math.min(tX,MAP_WIDTH_PX-canvas.width)); camera.y=Math.max(0,Math.min(tY,MAP_HEIGHT_PX-canvas.height)); }
@@ -754,6 +799,7 @@
             // 5. Animações e Timers
             drawAnimations(timestamp); drawPlantTimers(timestamp);
             drawTileSelector();
+            drawPathIndicator(timestamp);
             ctx.restore();
         }
 
@@ -793,6 +839,7 @@
 
             // Tecla Espaço para Usar
             if (e.key === ' ') { e.preventDefault(); triggerUseTool(); return; }
+            player.path = []; // Qualquer tecla de movimento cancela o caminho do mouse
 
             // Movimento com Setas
             let newDir = null;
@@ -1212,10 +1259,11 @@
         function triggerMovementOrTurn(newDir) {
              // Bloqueia se mochila aberta ou já em ação
              if (isBackpackOpen || player.isMoving || player.isUsingTool) return;
+             player.path = []; // Movimento manual cancela o caminho do mouse
 
              const isFacing = (player.lastMoveDir.dx === newDir.dx && player.lastMoveDir.dy === newDir.dy);
              if (!isFacing) {
-                 player.lastMoveDir = newDir;
+                 player.lastMoveDir = newDir; 
                  console.log("Turn:", newDir);
              } else {
                  const tX = player.targetX + newDir.dx * TILE_SIZE;
@@ -1350,6 +1398,46 @@
              isHolding = false; // Reseta estado de hold ao soltar
          }
 
+        function findPath(startX, startY, endX, endY) {
+            let path = [];
+            let currentX = startX;
+            let currentY = startY;
+            const MAX_STEPS = 100; // Prevenção de loop infinito
+            let steps = 0;
+
+            while ((currentX !== endX || currentY !== endY) && steps < MAX_STEPS) {
+                const dx = endX - currentX;
+                const dy = endY - currentY;
+                let nextX = currentX;
+                let nextY = currentY;
+
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    nextX += Math.sign(dx);
+                } else {
+                    nextY += Math.sign(dy);
+                }
+
+                if (isWalkable(nextX * TILE_SIZE, nextY * TILE_SIZE)) {
+                    currentX = nextX;
+                    currentY = nextY;
+                    path.push({ x: currentX, y: currentY });
+                } else {
+                    // Tenta mover na outra direção se a principal estiver bloqueada
+                    if (Math.abs(dx) > Math.abs(dy)) { // Tentou X, agora tenta Y
+                        if (isWalkable(startX * TILE_SIZE, (currentY + Math.sign(dy)) * TILE_SIZE)) {
+                             currentY += Math.sign(dy); path.push({ x: currentX, y: currentY });
+                        } else break; // Bloqueado
+                    } else { // Tentou Y, agora tenta X
+                        if (isWalkable((currentX + Math.sign(dx)) * TILE_SIZE, startY * TILE_SIZE)) {
+                            currentX += Math.sign(dx); path.push({ x: currentX, y: currentY });
+                        } else break; // Bloqueado
+                    }
+                }
+                steps++;
+            }
+            return path;
+        }
+
         function handleCanvasClick(event) {
             // Ignora o clique se a mochila estiver aberta ou o jogador estiver ocupado
             if (isBackpackOpen || player.isMoving || player.isUsingTool) return;
@@ -1372,6 +1460,11 @@
             // Permite o uso se a distância for pequena (adjacente ou diagonal)
             if (dist < 1.5) {
                 triggerUseTool({ x: clickedTileX, y: clickedTileY });
+            } else {
+                // Se for um tile caminhável, encontra um caminho
+                if (isWalkable(clickedTileX * TILE_SIZE, clickedTileY * TILE_SIZE)) {
+                    player.path = findPath(playerTileX, playerTileY, clickedTileX, clickedTileY);
+                }
             }
         }
 
