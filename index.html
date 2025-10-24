@@ -595,14 +595,37 @@
         function useTool(timestamp) {
             const pX = Math.floor(player.x/TILE_SIZE); const pY = Math.floor(player.y/TILE_SIZE);
             const tX = pX + player.lastMoveDir.dx; const tY = pY + player.lastMoveDir.dy;
-            if (tX<0||tX>=MAP_WIDTH_TILES||tY<0||tY>=MAP_HEIGHT_TILES) return;
-            for (const obj of mapObjects) { if (obj.x===tX && obj.y===tY) { /* TODO: Machado/Picareta */ return; } }
-            const tK = `${tX},${tY}`; const tId = map[tY][tX];
+            if (tX < 0 || tX >= MAP_WIDTH_TILES || tY < 0 || tY >= MAP_HEIGHT_TILES) return;
+
             const bpIdx = hotbarMapping[activeHotbarSlot];
             if (bpIdx < 0 || bpIdx >= backpackInventory.length) return;
             const item = backpackInventory[bpIdx];
             if (!item) return;
-            
+
+            // Verifica se há um objeto no tile alvo
+            const objectIndex = mapObjects.findIndex(obj => obj.x === tX && obj.y === tY);
+            if (objectIndex !== -1) {
+                const targetObject = mapObjects[objectIndex];
+                if (item.name === "Picareta" && targetObject.type === 0) { // Rocha
+                    mapObjects.splice(objectIndex, 1); // Remove a rocha
+                    const stoneIdx = backpackInventory.findIndex(i => i && i.name === "Pedra");
+                    if (stoneIdx !== -1) {
+                        backpackInventory[stoneIdx].count++;
+                    }
+                    console.log("Rocha quebrada!");
+                    saveGame();
+                    updateHotbarUI();
+                    updateBackpackUI();
+                    return; // Ação concluída
+                }
+                // TODO: Adicionar lógica para Machado vs Árvore aqui
+                return; // Impede o uso da ferramenta no chão se houver um objeto
+            }
+
+            // Se não houver objeto, continua com a lógica para o chão
+            const tK = `${tX},${tY}`;
+            const tId = map[tY][tX];
+
             // Lógica de Colheita
             if (tId === 7) {
                 map[tY][tX] = 2; // Volta para solo arado
@@ -615,15 +638,15 @@
                 updatePreRenderedTile(tX, tY, 2);
                 saveGame(); updateHotbarUI(); updateBackpackUI(); return;
             }
-            
-            switch(item.name) {
-                case "Enxada": if(tId===0||tId===1){map[tY][tX]=2; updatePreRenderedTile(tX,tY,2); saveGame();} break;
-                case "Semente": if(tId===2&&item.count>0){map[tY][tX]=4; plantGrowthData[tK]={plantedAt:timestamp, boosted:false}; item.count--; updatePreRenderedTile(tX,tY,4); saveGame(); updateHotbarUI(); updateBackpackUI();} break;
-                case "Pá": if(tId===1||tId===2||(tId>=4&&tId<=7)){map[tY][tX]=0; if(plantGrowthData[tK])delete plantGrowthData[tK]; updatePreRenderedTile(tX,tY,0); saveGame();} else if(tId===0){let aW=false; const ne=[[0,1],[0,-1],[1,0],[-1,0]]; for(const[nx,ny]of ne){const cX=tX+nx; const cY=tY+ny; if(cX>=0&&cX<MAP_WIDTH_TILES&&cY>=0&&cY<MAP_HEIGHT_TILES){if(map[cY][cX]===3){aW=true; break;}}} if(aW){map[tY][tX]=3; updatePreRenderedTile(tX,tY,3); saveGame();}} else if(tId===3){map[tY][tX]=0; updatePreRenderedTile(tX,tY,0); saveGame();} break;
-                case "Regador": if(tId===3){item.count=10; updateHotbarUI(); updateBackpackUI(); saveGame();} else if(tId>=4&&tId<=6&&item.count>0){const pD=plantGrowthData[tK]; if(pD&&!pD.boosted){pD.boosted=true; item.count--; activeAnimations.push({type:'water',x:tX,y:tY,startTime:timestamp,duration:500}); updateHotbarUI(); updateBackpackUI(); saveGame();}} break;
+
+            switch (item.name) {
+                case "Enxada": if (tId === 0 || tId === 1) { map[tY][tX] = 2; updatePreRenderedTile(tX, tY, 2); saveGame(); } break;
+                case "Semente": if (tId === 2 && item.count > 0) { map[tY][tX] = 4; plantGrowthData[tK] = { plantedAt: timestamp, boosted: false }; item.count--; updatePreRenderedTile(tX, tY, 4); saveGame(); updateHotbarUI(); updateBackpackUI(); } break;
+                case "Pá": if (tId === 1 || tId === 2 || (tId >= 4 && tId <= 7)) { map[tY][tX] = 0; if (plantGrowthData[tK]) delete plantGrowthData[tK]; updatePreRenderedTile(tX, tY, 0); saveGame(); } else if (tId === 0) { let aW = false; const ne = [[0, 1], [0, -1], [1, 0], [-1, 0]]; for (const [nx, ny] of ne) { const cX = tX + nx; const cY = tY + ny; if (cX >= 0 && cX < MAP_WIDTH_TILES && cY >= 0 && cY < MAP_HEIGHT_TILES) { if (map[cY][cX] === 3) { aW = true; break; } } } if (aW) { map[tY][tX] = 3; updatePreRenderedTile(tX, tY, 3); saveGame(); } } else if (tId === 3) { map[tY][tX] = 0; updatePreRenderedTile(tX, tY, 0); saveGame(); } break;
+                case "Regador": if (tId === 3) { item.count = 10; updateHotbarUI(); updateBackpackUI(); saveGame(); } else if (tId >= 4 && tId <= 6 && item.count > 0) { const pD = plantGrowthData[tK]; if (pD && !pD.boosted) { pD.boosted = true; item.count--; activeAnimations.push({ type: 'water', x: tX, y: tY, startTime: timestamp, duration: 500 }); updateHotbarUI(); updateBackpackUI(); saveGame(); } } break;
                 case "Martelo": console.log("Usou Martelo"); break;
                 case "Machado": console.log("Usou Machado"); break;
-                case "Picareta": console.log("Usou Picareta"); break;
+                case "Picareta": console.log("Usou Picareta no chão"); break; // Ação em objeto já tratada
             }
         }
 
@@ -642,7 +665,7 @@
 
                 if (item && nameSpan && countSpan) {
                     nameSpan.textContent = item.name;
-                    countSpan.textContent = (item.count > 0 && (item.name === "Semente" || item.name === "Colheita" || item.name === "Regador")) ? item.count : "";
+                    countSpan.textContent = (item.count > 0 && ["Semente", "Colheita", "Regador", "Pedra"].includes(item.name)) ? item.count : "";
                 } else if (nameSpan && countSpan) {
                     nameSpan.textContent = "";
                     countSpan.textContent = "";
@@ -667,8 +690,7 @@
 
                 if (item) {
                     nameSpan.textContent = item.name;
-                     // Simplificado: mostra contagem se > 0 e for contável, senão vazio
-                    countSpan.textContent = (item.count > 0 && (item.name === "Semente" || item.name === "Colheita" || item.name === "Regador")) ? item.count : "";
+                    countSpan.textContent = (item.count > 0 && ["Semente", "Colheita", "Regador", "Pedra"].includes(item.name)) ? item.count : "";
                 } else {
                     nameSpan.textContent = "";
                     countSpan.textContent = "";
@@ -797,7 +819,7 @@
         }
         // CORRIGIDO: loadGame
         function loadGame() {
-            const defaultItems = [ { name: "Enxada", count: 1 }, { name: "Semente", count: 10 }, { name: "Colheita", count: 0 }, { name: "Pá", count: 1 }, { name: "Regador", count: 0 }, { name: "Martelo", count: 1 }, { name: "Machado", count: 1 }, { name: "Picareta", count: 1 } ];
+            const defaultItems = [ { name: "Enxada", count: 1 }, { name: "Semente", count: 10 }, { name: "Colheita", count: 0 }, { name: "Pá", count: 1 }, { name: "Regador", count: 0 }, { name: "Martelo", count: 1 }, { name: "Machado", count: 1 }, { name: "Picareta", count: 1 }, { name: "Pedra", count: 0 } ];
 
             const savedData = localStorage.getItem('pixelFarmSaveData');
             if (savedData) {
