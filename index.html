@@ -515,6 +515,8 @@
         let activeHotbarSlot = 0;
         let isBackpackOpen = false;
         let selectedBackpackIndex = -1;
+        let mouseHoverTile = { x: null, y: null };
+
 
         let activeAnimations = [];
 
@@ -664,6 +666,26 @@
         }
         function drawPlayer(timestamp) { const px=player.x; const py=player.y; const w=player.width; const h=player.height; let fB=0; if(player.isMoving){fB=Math.sin(player.walkBob)*2;}else if(player.isUsingTool){const aP=(timestamp-player.toolAnimStart)/TOOL_ANIM_DURATION; fB=Math.abs(Math.sin(aP*Math.PI))*6;} const bH=py+fB; ctx.fillStyle=player.colorLegs; ctx.fillRect(px, bH+h*0.6, w*0.45, h*0.4); ctx.fillRect(px+w*0.55, bH+h*0.6, w*0.45, h*0.4); ctx.fillStyle=player.colorBody; ctx.fillRect(px, bH+h*0.3, w, h*0.4); const hX=px+w*0.1; const hY=bH; const hW=w*0.8; const hH=h*0.4; ctx.fillStyle=player.colorHead; ctx.fillRect(hX, hY, hW, hH); ctx.fillStyle='#000'; const eS=2; let e1x, e1y, e2x, e2y; if(player.lastMoveDir.dy===1){e1x=hX+hW*0.25; e1y=hY+hH*0.6; e2x=hX+hW*0.75-eS; e2y=hY+hH*0.6;}else if(player.lastMoveDir.dy===-1){e1x=hX+hW*0.25; e1y=hY+hH*0.2; e2x=hX+hW*0.75-eS; e2y=hY+hH*0.2;}else if(player.lastMoveDir.dx===-1){e1x=hX+hW*0.2; e1y=hY+hH*0.4; e2x=hX+hW*0.5-eS; e2y=hY+hH*0.4;}else if(player.lastMoveDir.dx===1){e1x=hX+hW*0.5; e1y=hY+hH*0.4; e2x=hX+hW*0.8-eS; e2y=hY+hH*0.4;} if(e1x){ctx.fillRect(e1x, e1y, eS, eS); ctx.fillRect(e2x, e2y, eS, eS);} }
         function drawWaterAnimation(anim, timestamp) { const el=timestamp-anim.startTime; const pr=el/anim.duration; if(pr>1)return; const x=anim.x*TILE_SIZE+TILE_SIZE/2; const y=anim.y*TILE_SIZE+TILE_SIZE/2; for(let i=0; i<5; i++){ const an=i*(Math.PI*2/5)+pr*2; const ra=5+pr*15; const dX=x+Math.cos(an)*ra; const dY=y+Math.sin(an)*ra; ctx.fillStyle=`rgba(100,181,246, ${1-pr})`; ctx.beginPath(); ctx.arc(dX, dY, 2, 0, 2*Math.PI); ctx.fill(); } }
+        function drawTileSelector() {
+            if (mouseHoverTile.x === null || mouseHoverTile.y === null || isBackpackOpen) {
+                return;
+            }
+
+            const playerTileX = Math.floor(player.x / TILE_SIZE);
+            const playerTileY = Math.floor(player.y / TILE_SIZE);
+
+            const dist = Math.sqrt(Math.pow(playerTileX - mouseHoverTile.x, 2) + Math.pow(playerTileY - mouseHoverTile.y, 2));
+
+            // Só mostra o seletor em tiles próximos e interagíveis
+            if (dist < 1.5) {
+                const x_px = mouseHoverTile.x * TILE_SIZE;
+                const y_px = mouseHoverTile.y * TILE_SIZE;
+
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x_px + 1, y_px + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+            }
+        }
         function drawAnimations(timestamp) { activeAnimations=activeAnimations.filter(an=>{const el=timestamp-an.startTime; if(el>an.duration)return false; if(an.type==='water'){drawWaterAnimation(an, timestamp);} return true;}); }
         function drawPlantTimers(timestamp) { ctx.font='bold 12px Consolas'; ctx.textAlign='center'; ctx.shadowColor='black'; ctx.shadowBlur=2; for(const key in plantGrowthData){ const[x,y]=key.split(',').map(Number); const data=plantGrowthData[key]; const tId=map[y][x]; if(tId>=4&&tId<=6){ const tP=timestamp-data.plantedAt; const eA=tP; let taT=0; if(tId===4)taT=GROWTH_TIME_SPROUT; else if(tId===5)taT=GROWTH_TIME_PLANT; else if(tId===6)taT=GROWTH_TIME_HARVEST; if(data.boosted){taT=taT*0.5;} const tL=Math.max(0, taT-eA); const sL=Math.ceil(tL/1000); const dX=x*TILE_SIZE+(TILE_SIZE/2); const dY=y*TILE_SIZE-5; ctx.fillStyle='white'; ctx.fillText(`${sL}s`, dX, dY); } } ctx.shadowBlur=0; }
         function updateGameTime() {
@@ -731,6 +753,7 @@
             for (const item of drawables) { item.draw(timestamp); }
             // 5. Animações e Timers
             drawAnimations(timestamp); drawPlantTimers(timestamp);
+            drawTileSelector();
             ctx.restore();
         }
 
@@ -1352,6 +1375,29 @@
             }
         }
 
+        function handleCanvasMouseMove(event) {
+            if (isBackpackOpen) {
+                mouseHoverTile.x = null;
+                mouseHoverTile.y = null;
+                return;
+            }
+
+            const rect = canvas.getBoundingClientRect();
+            const moveX = event.clientX - rect.left;
+            const moveY = event.clientY - rect.top;
+
+            const worldX = moveX + camera.x;
+            const worldY = moveY + camera.y;
+
+            mouseHoverTile.x = Math.floor(worldX / TILE_SIZE);
+            mouseHoverTile.y = Math.floor(worldY / TILE_SIZE);
+        }
+
+        function handleCanvasMouseLeave() {
+            mouseHoverTile.x = null;
+            mouseHoverTile.y = null;
+        }
+
         function generateWaterSpritesheet() {
             const NUM_FRAMES = 8;
             waterSpritesheetCanvas.width = TILE_SIZE * NUM_FRAMES;
@@ -1462,6 +1508,8 @@
             canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
             canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false }); // Trata cancelamento como touchend
             canvas.addEventListener('click', handleCanvasClick);
+            canvas.addEventListener('mousemove', handleCanvasMouseMove);
+            canvas.addEventListener('mouseleave', handleCanvasMouseLeave);
 
 
             requestAnimationFrame(gameLoop);
