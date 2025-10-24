@@ -119,6 +119,31 @@
             border-color: #aaa;
         }
 
+        #sideMenuIcons {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        /* Ícone de Construção */
+        #constructionIcon {
+            width: 45px;
+            height: 45px;
+            background-color: rgba(68, 68, 68, 0.8);
+            border: 2px solid #888;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            cursor: pointer;
+            transition: background-color 0.2s, border-color 0.2s;
+            user-select: none;
+        }
+        #constructionIcon.active, #constructionIcon:hover {
+            background-color: rgba(102, 102, 102, 0.9);
+            border-color: #FFD700;
+        }
 
         /* Barra de Atalhos (Hotbar) */
         #hotbar {
@@ -365,7 +390,10 @@
         </div>
 
         <div id="bottomUIContainer">
-            <div id="backpackIcon">🎒</div>
+            <div id="sideMenuIcons">
+                <div id="constructionIcon">🔨</div>
+                <div id="backpackIcon">🎒</div>
+            </div>
             <div id="hotbar">
                 <div class="slot" data-hotbar-index="0" draggable="true"> <span class="slot-key">1</span> <span class="slot-name"></span> <span class="slot-sub-action"></span> <span class="slot-count"></span> </div>
                 <div class="slot" data-hotbar-index="1" draggable="true"> <span class="slot-key">2</span> <span class="slot-name"></span> <span class="slot-sub-action"></span> <span class="slot-count"></span> </div>
@@ -405,6 +433,7 @@
         const backpackGrid = document.getElementById('backpackGrid');
         const hotbarElement = document.getElementById('hotbar');
         let backpackIcon = null; // Definido dentro de init()
+        let constructionIcon = null; // Definido dentro de init()
         let timeRangeSlider = null; // Definido dentro de init()
         let itemTooltip = null; // Definido dentro de init()
         let mouseIcon = null; // Definido dentro de init()
@@ -569,6 +598,11 @@
         let isBackpackOpen = false;
         let selectedBackpackIndex = -1;
         let mouseHoverTile = { x: null, y: null };
+        let isConstructionModeActive = false;
+
+        // Mapeamentos e slots ativos para cada modo
+        let constructionHotbarMapping = new Array(HOTBAR_SIZE).fill(-1);
+        let activeConstructionHotbarSlot = 0;
 
 
         let activeAnimations = [];
@@ -867,6 +901,20 @@
                 ctx.strokeRect(x_px + (TILE_SIZE - size) / 2, y_px + (TILE_SIZE - size) / 2, size, size);
             }
         }
+        function drawConstructionGrid() {
+            if (!isConstructionModeActive) return;
+
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.lineWidth = 1;
+
+            const startX = Math.floor(camera.x / TILE_SIZE) * TILE_SIZE;
+            const endX = Math.ceil((camera.x + canvas.width) / TILE_SIZE) * TILE_SIZE;
+            const startY = Math.floor(camera.y / TILE_SIZE) * TILE_SIZE;
+            const endY = Math.ceil((camera.y + canvas.height) / TILE_SIZE) * TILE_SIZE;
+
+            for (let x = startX; x < endX; x += TILE_SIZE) { ctx.beginPath(); ctx.moveTo(x, startY); ctx.lineTo(x, endY); ctx.stroke(); }
+            for (let y = startY; y < endY; y += TILE_SIZE) { ctx.beginPath(); ctx.moveTo(startX, y); ctx.lineTo(endX, y); ctx.stroke(); }
+        }
         function drawAnimations(timestamp) { activeAnimations=activeAnimations.filter(an=>{const el=timestamp-an.startTime; if(el>an.duration)return false; if(an.type==='water'){drawWaterAnimation(an, timestamp);} return true;}); }
         function drawPlantTimers(timestamp) { ctx.font='bold 12px Consolas'; ctx.textAlign='center'; ctx.shadowColor='black'; ctx.shadowBlur=2; for(const key in plantGrowthData){ const[x,y]=key.split(',').map(Number); const data=plantGrowthData[key]; const tId=map[y][x]; if(tId>=4&&tId<=6){ const tP=timestamp-data.plantedAt; const eA=tP; let taT=0; if(tId===4)taT=GROWTH_TIME_SPROUT; else if(tId===5)taT=GROWTH_TIME_PLANT; else if(tId===6)taT=GROWTH_TIME_HARVEST; if(data.boosted){taT=taT*0.5;} const tL=Math.max(0, taT-eA); const sL=Math.ceil(tL/1000); const dX=x*TILE_SIZE+(TILE_SIZE/2); const dY=y*TILE_SIZE-5; ctx.fillStyle='white'; ctx.fillText(`${sL}s`, dX, dY); } } ctx.shadowBlur=0; }
         function updateGameTime() {
@@ -975,6 +1023,7 @@
             drawAnimations(timestamp); drawPlantTimers(timestamp);
             drawTileSelector();
             drawPathIndicator(timestamp);
+            drawConstructionGrid();
             ctx.restore();
         }
 
@@ -1008,7 +1057,7 @@
              if (player.isMoving || player.isUsingTool) return;
 
             // Tecla Ctrl para abrir menu de contexto
-            if (e.key === 'Control') {
+            if (e.key === 'Control' && !isConstructionModeActive) { // Menu de contexto só no modo normal por enquanto
                 e.preventDefault();
                 openContextMenu(activeHotbarSlot);
                 return;
@@ -1059,8 +1108,9 @@
             const tX = (player.toolTarget && player.toolTarget.x !== null) ? player.toolTarget.x : Math.floor(player.x/TILE_SIZE) + player.lastMoveDir.dx;
             const tY = (player.toolTarget && player.toolTarget.y !== null) ? player.toolTarget.y : Math.floor(player.y/TILE_SIZE) + player.lastMoveDir.dy;
             if (tX < 0 || tX >= MAP_WIDTH_TILES || tY < 0 || tY >= MAP_HEIGHT_TILES) return;
-
-            const bpIdx = hotbarMapping[activeHotbarSlot];
+            const currentMapping = isConstructionModeActive ? constructionHotbarMapping : hotbarMapping;
+            const currentSlot = isConstructionModeActive ? activeConstructionHotbarSlot : activeHotbarSlot;
+            const bpIdx = currentMapping[currentSlot];
             if (bpIdx < 0 || bpIdx >= backpackInventory.length) return;
             const item = backpackInventory[bpIdx];
             if (!item) return;
@@ -1281,13 +1331,15 @@
         function updateHotbarUI() {
             const slots = hotbarElement.querySelectorAll('.slot');
             slots.forEach((slot, hotbarIndex) => {
-                const backpackIndex = hotbarMapping[hotbarIndex];
+                const currentMapping = isConstructionModeActive ? constructionHotbarMapping : hotbarMapping;
+                const currentActiveSlot = isConstructionModeActive ? activeConstructionHotbarSlot : activeHotbarSlot;
+                const backpackIndex = currentMapping[hotbarIndex];
                 const item = (backpackIndex !== -1 && backpackIndex >= 0 && backpackIndex < backpackInventory.length) ? backpackInventory[backpackIndex] : null;
                 const nameSpan = slot.querySelector('.slot-name');
                 const subActionSpan = slot.querySelector('.slot-sub-action');
                 const countSpan = slot.querySelector('.slot-count');
 
-                if (item && nameSpan && countSpan && subActionSpan) {
+                if (item && nameSpan && countSpan && subActionSpan && (!isConstructionModeActive || item.name === "Construção")) {
                     nameSpan.textContent = item.name;
                     countSpan.textContent = (item.count > 0 && ["Semente", "Colheita", "Regador", "Pedra", "Madeira", "Cerca", "Muro", "Porta", "Porteira"].includes(item.name)) ? `x${item.count}` : "";
                     
@@ -1307,11 +1359,13 @@
                     } else {
                         subActionSpan.textContent = "";
                     }
-                } else if (nameSpan && countSpan && subActionSpan) {
+                } else {
                     nameSpan.textContent = "";
+                    subActionSpan.textContent = "";
                     countSpan.textContent = "";
                 }
-                slot.classList.toggle('active', hotbarIndex === activeHotbarSlot);
+
+                slot.classList.toggle('active', hotbarIndex === currentActiveSlot);
                 slot.classList.remove('dragging', 'drag-over');
             });
         }
@@ -1470,9 +1524,16 @@
         }
 
         function updateActiveHotbarSlot(hotbarIndex) {
-            if (hotbarIndex >= 0 && hotbarIndex < HOTBAR_SIZE) {
-                if (activeHotbarSlot !== hotbarIndex) player.toolSubAction = null; // Reseta a sub-ação ao trocar de item
-                activeHotbarSlot = hotbarIndex; saveGame(); updateHotbarUI(); }
+            if (hotbarIndex >= 0 && hotbarIndex < HOTBAR_SIZE) { 
+                if (isConstructionModeActive) {
+                    if (activeConstructionHotbarSlot !== hotbarIndex) player.toolSubAction = null;
+                    activeConstructionHotbarSlot = hotbarIndex;
+                } else {
+                    if (activeHotbarSlot !== hotbarIndex) player.toolSubAction = null;
+                    activeHotbarSlot = hotbarIndex;
+                }
+                saveGame(); updateHotbarUI();
+            }
         }
 
         // --- Lógica Mochila ---
@@ -1501,17 +1562,20 @@
             const clickedHotbarIndex = parseInt(event.currentTarget.dataset.hotbarIndex, 10);
             if (isBackpackOpen) {
                 if (selectedBackpackIndex !== -1) {
-                    console.log(`Atribuindo mochila[${selectedBackpackIndex}] -> hotbar[${clickedHotbarIndex}]`);
-                    const existingHotbarSlot = hotbarMapping.indexOf(selectedBackpackIndex);
+                    const currentMapping = isConstructionModeActive ? constructionHotbarMapping : hotbarMapping;
+                    console.log(`Atribuindo mochila[${selectedBackpackIndex}] -> hotbar[${clickedHotbarIndex}] (Modo Construção: ${isConstructionModeActive})`);
+                    const existingHotbarSlot = currentMapping.indexOf(selectedBackpackIndex);
                     if(existingHotbarSlot !== -1) { hotbarMapping[existingHotbarSlot] = -1; }
-                    hotbarMapping[clickedHotbarIndex] = selectedBackpackIndex;
+                    currentMapping[clickedHotbarIndex] = selectedBackpackIndex;
                     selectedBackpackIndex = -1;
                     updateBackpackUI(); updateHotbarUI(); saveGame();
                     closeContextMenu();
                 }
             } else {
-                if (clickedHotbarIndex === activeHotbarSlot && !player.isMoving && !player.isUsingTool) {
-                     const bpIdx = hotbarMapping[activeHotbarSlot];
+                const currentActiveSlot = isConstructionModeActive ? activeConstructionHotbarSlot : activeHotbarSlot;
+                if (clickedHotbarIndex === currentActiveSlot && !player.isMoving && !player.isUsingTool) {
+                     const currentMapping = isConstructionModeActive ? constructionHotbarMapping : hotbarMapping;
+                     const bpIdx = currentMapping[currentActiveSlot];
                      if(bpIdx !== -1 && backpackInventory[bpIdx]){
                         // Se uma sub-ação foi escolhida, usa a ferramenta imediatamente
                         if (player.toolSubAction) {
@@ -1539,10 +1603,11 @@
             const droppedOnHotbarIndex = parseInt(targetSlot.dataset.hotbarIndex, 10);
             console.log("Drop:", draggedHotbarIndex, "onto", droppedOnHotbarIndex);
             if (draggedHotbarIndex !== droppedOnHotbarIndex) {
-                const sourceMapping = hotbarMapping[draggedHotbarIndex];
-                const targetMapping = hotbarMapping[droppedOnHotbarIndex];
-                hotbarMapping[draggedHotbarIndex] = targetMapping;
-                hotbarMapping[droppedOnHotbarIndex] = sourceMapping;
+                const currentMapping = isConstructionModeActive ? constructionHotbarMapping : hotbarMapping;
+                const sourceMapping = currentMapping[draggedHotbarIndex];
+                const targetMapping = currentMapping[droppedOnHotbarIndex];
+                currentMapping[draggedHotbarIndex] = targetMapping;
+                currentMapping[droppedOnHotbarIndex] = sourceMapping;
                 saveGame(); updateHotbarUI();
             }
             cleanupDragDrop();
@@ -1585,6 +1650,8 @@
                 backpackData: backpackInventory,
                 hotbarMapData: hotbarMapping,
                 activeSlotData: activeHotbarSlot,
+                constructionHotbarMapData: constructionHotbarMapping,
+                activeConstructionSlotData: activeConstructionHotbarSlot,
                 gameTimeOffset: gameTimeOffset
             };
             localStorage.setItem('pixelFarmSaveData', JSON.stringify(saveData));
@@ -1618,6 +1685,8 @@
                     // Carrega inventário e hotbar do save, ou usa arrays vazios se não existirem
                     backpackInventory = (data.backpackData && Array.isArray(data.backpackData)) ? data.backpackData : new Array(BACKPACK_SIZE).fill(null);
                     hotbarMapping = (data.hotbarMapData && Array.isArray(data.hotbarMapData)) ? data.hotbarMapData : new Array(HOTBAR_SIZE).fill(-1);
+                    constructionHotbarMapping = (data.constructionHotbarMapData && Array.isArray(data.constructionHotbarMapData)) ? data.constructionHotbarMapData : new Array(HOTBAR_SIZE).fill(-1);
+                    if (data.activeConstructionSlotData !== undefined) activeConstructionHotbarSlot = data.activeConstructionSlotData;
 
                     if (typeof data.gameTimeOffset === 'number') { gameTimeOffset = data.gameTimeOffset; }
 
@@ -1648,10 +1717,12 @@
         // --- Funções Helper para Controles (CORRIGIDO) ---
         function triggerUseTool(targetTile = null) {
              // Bloqueia se mochila aberta ou já em ação
-             if (isBackpackOpen || player.isMoving || player.isUsingTool) return;
+             if (isBackpackOpen || player.isMoving || player.isUsingTool ) return;
              if (isContextMenuOpen) closeContextMenu();
 
-             const bpIdx = hotbarMapping[activeHotbarSlot];
+             const currentMapping = isConstructionModeActive ? constructionHotbarMapping : hotbarMapping;
+             const currentSlot = isConstructionModeActive ? activeConstructionHotbarSlot : activeHotbarSlot;
+             const bpIdx = currentMapping[currentSlot];
             
              if (bpIdx === -1 || bpIdx >= backpackInventory.length || !backpackInventory[bpIdx]) return; // Slot vazio ou inválido
 
@@ -1844,6 +1915,14 @@
                 steps++;
             }
             return path;
+        }
+
+        function toggleConstructionMode() {
+            if (isBackpackOpen) toggleBackpack(false); // Fecha a mochila se estiver aberta
+            if (isContextMenuOpen) closeContextMenu();
+            isConstructionModeActive = !isConstructionModeActive;
+            constructionIcon.classList.toggle('active', isConstructionModeActive);
+            updateHotbarUI();
         }
 
         function isActionable(tileX, tileY) {
@@ -2057,6 +2136,8 @@
             if (!itemTooltip) { console.error("Elemento do tooltip não encontrado!"); return; }
             mouseIcon = document.getElementById('mouseIcon');
             if (!mouseIcon) { console.error("Elemento do ícone do mouse não encontrado!"); return; }
+            constructionIcon = document.getElementById('constructionIcon');
+            if (!constructionIcon) { console.error("Ícone de construção não encontrado!"); return; }
             contextMenu = document.getElementById('contextMenu');
             if (!contextMenu) { console.error("Elemento do menu de contexto não encontrado!"); return; }
 
@@ -2075,6 +2156,7 @@
 
             // Listener de clique do ÍCONE da Mochila
             backpackIcon.addEventListener('click', () => { console.log("Clique no ícone da mochila"); toggleBackpack(); });
+            constructionIcon.addEventListener('click', toggleConstructionMode);
 
             // Listeners da HOTBAR
             hotbarElement.querySelectorAll('.slot').forEach(slotElement => {
