@@ -382,6 +382,9 @@
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
         ];
         const MAP_WIDTH_TILES = map[0].length; const MAP_HEIGHT_TILES = map.length;
@@ -434,7 +437,38 @@
         function drawHarvestableTile(ctx, x, y, size) { drawPlowedTile(ctx, x, y, size); ctx.fillStyle = '#388E3C'; ctx.fillRect(x+10, y+5, 12, 22); ctx.fillRect(x+6, y+10, 4, 12); ctx.fillRect(x+22, y+10, 4, 12); ctx.fillStyle = '#E53935'; ctx.fillRect(x+14, y+14, 4, 4); ctx.fillRect(x+10, y+18, 4, 4); ctx.fillRect(x+18, y+18, 4, 4); }
         function drawRock(ctx, x_px, y_px) { ctx.fillStyle='#795548'; ctx.fillRect(x_px+4, y_px+10, 24, 18); ctx.fillStyle='#8D6E63'; ctx.fillRect(x_px+6, y_px+12, 20, 14); ctx.fillStyle='#5D4037'; ctx.fillRect(x_px+18, y_px+15, 6, 6); ctx.fillRect(x_px+8, y_px+20, 8, 8); }
         function drawTreeTrunk(ctx, x_px, y_px) { ctx.fillStyle='#5D4037'; ctx.fillRect(x_px+12, y_px+16, 8, TILE_SIZE-16); ctx.fillStyle='#795548'; ctx.fillRect(x_px+13, y_px+17, 6, TILE_SIZE-18); }
-        function drawTreeCanopy(ctx, x_px, y_px) { const yT=y_px-TILE_SIZE*1.5+8; const xC=x_px+TILE_SIZE/2; ctx.fillStyle='#388E3C'; ctx.beginPath(); ctx.ellipse(xC, yT+TILE_SIZE*0.8, TILE_SIZE*1.1, TILE_SIZE*0.9, 0, 0, Math.PI*2); ctx.ellipse(xC-TILE_SIZE*0.5, yT+TILE_SIZE*1.2, TILE_SIZE*0.8, TILE_SIZE*0.7, 0, 0, Math.PI*2); ctx.ellipse(xC+TILE_SIZE*0.5, yT+TILE_SIZE*1.2, TILE_SIZE*0.8, TILE_SIZE*0.7, 0, 0, Math.PI*2); ctx.fill(); ctx.fillStyle='#4CAF50'; ctx.beginPath(); ctx.ellipse(xC, yT+TILE_SIZE*0.7, TILE_SIZE*0.8, TILE_SIZE*0.7, 0, 0, Math.PI*2); ctx.ellipse(xC-TILE_SIZE*0.4, yT+TILE_SIZE*1.0, TILE_SIZE*0.6, TILE_SIZE*0.5, 0, 0, Math.PI*2); ctx.ellipse(xC+TILE_SIZE*0.4, yT+TILE_SIZE*1.0, TILE_SIZE*0.6, TILE_SIZE*0.5, 0, 0, Math.PI*2); ctx.fill(); }
+        function drawTreeCanopy(ctx, x_px, y_px) {
+            const yT = y_px - TILE_SIZE * 1.5 + 8;
+            const xC = x_px + TILE_SIZE / 2;
+            
+            // Verifica se o jogador está atrás da árvore
+            const isPlayerBehind = player.y < y_px + TILE_SIZE && 
+                                  player.y + player.height > y_px - TILE_SIZE && 
+                                  player.x + player.width > x_px - TILE_SIZE && 
+                                  player.x < x_px + TILE_SIZE * 2;
+
+            // Define a opacidade baseada na posição do jogador
+            ctx.globalAlpha = isPlayerBehind ? 0.3 : 1.0;
+
+            // Desenha a copa mais escura
+            ctx.fillStyle = '#388E3C';
+            ctx.beginPath();
+            ctx.ellipse(xC, yT + TILE_SIZE * 0.8, TILE_SIZE * 1.1, TILE_SIZE * 0.9, 0, 0, Math.PI * 2);
+            ctx.ellipse(xC - TILE_SIZE * 0.5, yT + TILE_SIZE * 1.2, TILE_SIZE * 0.8, TILE_SIZE * 0.7, 0, 0, Math.PI * 2);
+            ctx.ellipse(xC + TILE_SIZE * 0.5, yT + TILE_SIZE * 1.2, TILE_SIZE * 0.8, TILE_SIZE * 0.7, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Desenha a copa mais clara
+            ctx.fillStyle = '#4CAF50';
+            ctx.beginPath();
+            ctx.ellipse(xC, yT + TILE_SIZE * 0.7, TILE_SIZE * 0.8, TILE_SIZE * 0.7, 0, 0, Math.PI * 2);
+            ctx.ellipse(xC - TILE_SIZE * 0.4, yT + TILE_SIZE * 1.0, TILE_SIZE * 0.6, TILE_SIZE * 0.5, 0, 0, Math.PI * 2);
+            ctx.ellipse(xC + TILE_SIZE * 0.4, yT + TILE_SIZE * 1.0, TILE_SIZE * 0.6, TILE_SIZE * 0.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Restaura a opacidade original
+            ctx.globalAlpha = 1.0;
+        }
         function drawCampfire(ctx, x_px, y_px, timestamp) { ctx.fillStyle='#A1887F'; ctx.fillRect(x_px+10, y_px+20, 4, 6); ctx.fillRect(x_px+18, y_px+22, 4, 6); ctx.fillRect(x_px+14, y_px+24, 6, 4); ctx.fillStyle='#795548'; ctx.fillRect(x_px+12, y_px+21, 8, 2); ctx.fillRect(x_px+12, y_px+23, 8, 2); const fH=(Math.sin(timestamp*0.005)*0.1+0.9)*30; const fS=Math.sin(timestamp*0.003)*1+3; ctx.fillStyle=`hsl(${fH}, 100%, 50%)`; ctx.fillRect(x_px+14, y_px+16-fS, 4, 4+fS); ctx.fillStyle=`hsl(${fH+10}, 100%, 60%)`; ctx.fillRect(x_px+12, y_px+18-fS/2, 4, 4+fS/2); ctx.fillRect(x_px+18, y_px+18-fS/2, 4, 4+fS/2); const sO=(timestamp*0.001)%(TILE_SIZE/2); ctx.fillStyle=`rgba(180,180,180, ${0.3-(sO/(TILE_SIZE/2))*0.3})`; ctx.fillRect(x_px+15, y_px+10-sO, 2, 2); ctx.fillRect(x_px+17, y_px+8-sO*1.5, 2, 2); }
         function drawTorch(ctx, x_px, y_px, timestamp) { const tX=x_px+TILE_SIZE/2-2; const tY=y_px+TILE_SIZE/2; ctx.fillStyle='#795548'; ctx.fillRect(tX, tY, 4, 10); ctx.fillStyle='#A0A0A0'; ctx.fillRect(tX-1, tY-2, 6, 2); const fH=(Math.sin(timestamp*0.007)*0.1+0.9)*30; const fS=Math.sin(timestamp*0.004)*0.5+1.5; ctx.fillStyle=`hsl(${fH}, 100%, 50%)`; ctx.fillRect(tX+1, tY-6-fS, 2, 4+fS); ctx.fillStyle=`hsl(${fH+10}, 100%, 60%)`; ctx.fillRect(tX, tY-4-fS/2, 4, 2+fS/2); }
         function preRenderMap() { for(let y=0; y<MAP_HEIGHT_TILES; y++){ for(let x=0; x<MAP_WIDTH_TILES; x++){ updatePreRenderedTile(x, y, map[y][x]); } } console.log("Mapa pré-renderizado!"); }
@@ -793,6 +827,7 @@
              if (isBackpackOpen || player.isMoving || player.isUsingTool) return;
 
              const bpIdx = hotbarMapping[activeHotbarSlot];
+            
              if (bpIdx === -1 || bpIdx >= backpackInventory.length || !backpackInventory[bpIdx]) return; // Slot vazio ou inválido
 
              console.log("Trigger Use Tool - Slot:", activeHotbarSlot);
