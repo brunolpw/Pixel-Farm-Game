@@ -368,8 +368,14 @@
 
         let camera = { x: 0, y: 0 };
 
+        // --- Geração do Mapa ---
+        const MAP_WIDTH_TILES = 50;
+        const MAP_HEIGHT_TILES = 50;
+        const BORDER_SIZE = 5;
+
         // 0=Grama, 1=Terra, 2=Arado, 3=Água, 4=Semente, 5=Muda, 6=Planta, 7=Colheita
-        let map = [
+        // Layout do mapa original (para ser "colado" no mapa maior)
+        const originalMapLayout = [
             [0,0,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
             [0,0,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
             [0,0,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
@@ -399,19 +405,86 @@
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
         ];
-        const MAP_WIDTH_TILES = map[0].length; const MAP_HEIGHT_TILES = map.length;
+        const originalMapWidth = originalMapLayout[0].length;
+        const originalMapHeight = originalMapLayout.length;
+
+        // Calcula o deslocamento para centralizar o mapa antigo
+        const mapOffsetX = Math.floor((MAP_WIDTH_TILES - originalMapWidth) / 2);
+        const mapOffsetY = Math.floor((MAP_HEIGHT_TILES - originalMapHeight) / 2);
+
+        let map = [];
+        for (let y = 0; y < MAP_HEIGHT_TILES; y++) {
+            let row = [];
+            for (let x = 0; x < MAP_WIDTH_TILES; x++) {
+                // Adiciona a borda de água
+                if (x < BORDER_SIZE || x >= MAP_WIDTH_TILES - BORDER_SIZE || y < BORDER_SIZE || y >= MAP_HEIGHT_TILES - BORDER_SIZE) {
+                    row.push(3); // Água
+                } else {
+                    // Verifica se estamos na área do mapa antigo
+                    const oldX = x - mapOffsetX;
+                    const oldY = y - mapOffsetY;
+                    if (oldY >= 0 && oldY < originalMapHeight && oldX >= 0 && oldX < originalMapWidth) {
+                        row.push(originalMapLayout[oldY][oldX]);
+                    } else {
+                        row.push(0); // Grama para o resto
+                    }
+                }
+            }
+            map.push(row);
+        }
+
         const MAP_WIDTH_PX = MAP_WIDTH_TILES * TILE_SIZE; const MAP_HEIGHT_PX = MAP_HEIGHT_TILES * TILE_SIZE;
 
         let plantGrowthData = {};
 
         // type: 0=Rocha, 1=Árvore, 2=Fogueira, 3=Tocha
+        // As coordenadas são ajustadas com o offset para centralizar
         let mapObjects = [
-            { type: 1, x: 4, y: 7 }, { type: 1, x: 6, y: 10 }, { type: 1, x: 18, y: 8 }, { type: 1, x: 20, y: 12 }, { type: 1, x: 22, y: 5 },
-            { type: 0, x: 5, y: 8 }, { type: 0, x: 19, y: 6 }, { type: 0, x: 21, y: 11 }, { type: 0, x: 23, y: 14 }, { type: 0, x: 17, y: 13 },
-            { type: 2, x: 13, y: 12 }, { type: 2, x: 8, y: 18 },
-            { type: 3, x: 16, y: 1 }, { type: 3, x: 1, y: 15 }, { type: 3, x: 23, y: 1 }, { type: 3, x: 12, y: 24 },
+            // Árvores
+            { type: 1, x: 4 + mapOffsetX, y: 7 + mapOffsetY }, { type: 1, x: 6 + mapOffsetX, y: 10 + mapOffsetY }, { type: 1, x: 18 + mapOffsetX, y: 8 + mapOffsetY }, { type: 1, x: 20 + mapOffsetX, y: 12 + mapOffsetY }, { type: 1, x: 22 + mapOffsetX, y: 5 + mapOffsetY },
+            { type: 1, x: 2 + mapOffsetX, y: 15 + mapOffsetY }, { type: 1, x: 10 + mapOffsetX, y: 20 + mapOffsetY }, { type: 1, x: 15 + mapOffsetX, y: 25 + mapOffsetY }, { type: 1, x: 23 + mapOffsetX, y: 20 + mapOffsetY }, { type: 1, x: 5 + mapOffsetX, y: 22 + mapOffsetY },
+            // Rochas
+            { type: 0, x: 5 + mapOffsetX, y: 8 + mapOffsetY }, { type: 0, x: 19 + mapOffsetX, y: 6 + mapOffsetY }, { type: 0, x: 21 + mapOffsetX, y: 11 + mapOffsetY }, { type: 0, x: 23 + mapOffsetX, y: 14 + mapOffsetY }, { type: 0, x: 17 + mapOffsetX, y: 13 + mapOffsetY },
+            { type: 0, x: 8 + mapOffsetX, y: 16 + mapOffsetY }, { type: 0, x: 12 + mapOffsetX, y: 22 + mapOffsetY }, { type: 0, x: 1 + mapOffsetX, y: 20 + mapOffsetY }, { type: 0, x: 16 + mapOffsetX, y: 18 + mapOffsetY }, { type: 0, x: 20 + mapOffsetX, y: 26 + mapOffsetY },
+            // Fogueiras e Tochas
+            { type: 2, x: 13 + mapOffsetX, y: 12 + mapOffsetY }, { type: 2, x: 8 + mapOffsetX, y: 18 + mapOffsetY },
+            { type: 3, x: 16 + mapOffsetX, y: 1 + mapOffsetY }, { type: 3, x: 1 + mapOffsetX, y: 15 + mapOffsetY }, { type: 3, x: 23 + mapOffsetX, y: 1 + mapOffsetY }, { type: 3, x: 12 + mapOffsetX, y: 24 + mapOffsetY },
         ];
 
+        // Adiciona as novas áreas de recursos densos (também com offset)
+        // Floresta Densa (originalmente em x: 30-38, y: 5-15)
+        for (let y = 5; y <= 15; y++) {
+            for (let x = 30; x <= 38; x++) {
+                mapObjects.push({ type: 1, x: x + mapOffsetX, y: y + mapOffsetY });
+            }
+        }
+
+        // Campo de Rochas (originalmente em x: 5-15, y: 30-38)
+        for (let y = 30; y <= 38; y++) {
+            for (let x = 5; x <= 15; x++) {
+                mapObjects.push({ type: 0, x: x + mapOffsetX, y: y + mapOffsetY });
+            }
+        }
+
+        // --- Adiciona um cercadinho pré-construído perto da fazenda ---
+        const fenceStartX = 20;
+        const fenceStartY = 13;
+        const fenceEndX = 27;
+        const fenceEndY = 20;
+        const gateX = 23; // Posição X do portão
+
+        // Paredes superior e inferior (com um portão na inferior)
+        for (let x = fenceStartX; x <= fenceEndX; x++) {
+            mapObjects.push({ type: 4, x: x, y: fenceStartY });
+            if (x < gateX || x > gateX + 1) { // Deixa um espaço de 2 tiles para o portão
+                mapObjects.push({ type: 4, x: x, y: fenceEndY });
+            }
+        }
+        // Paredes laterais (sem os cantos para não duplicar)
+        for (let y = fenceStartY + 1; y < fenceEndY; y++) {
+            mapObjects.push({ type: 4, x: fenceStartX, y: y });
+            mapObjects.push({ type: 4, x: fenceEndX, y: y });
+        }
 
         // --- Estrutura de Inventário ---
         let backpackInventory = new Array(BACKPACK_SIZE).fill(null);
@@ -483,6 +556,21 @@
         }
         function drawCampfire(ctx, x_px, y_px, timestamp) { ctx.fillStyle='#A1887F'; ctx.fillRect(x_px+10, y_px+20, 4, 6); ctx.fillRect(x_px+18, y_px+22, 4, 6); ctx.fillRect(x_px+14, y_px+24, 6, 4); ctx.fillStyle='#795548'; ctx.fillRect(x_px+12, y_px+21, 8, 2); ctx.fillRect(x_px+12, y_px+23, 8, 2); const fH=(Math.sin(timestamp*0.005)*0.1+0.9)*30; const fS=Math.sin(timestamp*0.003)*1+3; ctx.fillStyle=`hsl(${fH}, 100%, 50%)`; ctx.fillRect(x_px+14, y_px+16-fS, 4, 4+fS); ctx.fillStyle=`hsl(${fH+10}, 100%, 60%)`; ctx.fillRect(x_px+12, y_px+18-fS/2, 4, 4+fS/2); ctx.fillRect(x_px+18, y_px+18-fS/2, 4, 4+fS/2); const sO=(timestamp*0.001)%(TILE_SIZE/2); ctx.fillStyle=`rgba(180,180,180, ${0.3-(sO/(TILE_SIZE/2))*0.3})`; ctx.fillRect(x_px+15, y_px+10-sO, 2, 2); ctx.fillRect(x_px+17, y_px+8-sO*1.5, 2, 2); }
         function drawTorch(ctx, x_px, y_px, timestamp) { const tX=x_px+TILE_SIZE/2-2; const tY=y_px+TILE_SIZE/2; ctx.fillStyle='#795548'; ctx.fillRect(tX, tY, 4, 10); ctx.fillStyle='#A0A0A0'; ctx.fillRect(tX-1, tY-2, 6, 2); const fH=(Math.sin(timestamp*0.007)*0.1+0.9)*30; const fS=Math.sin(timestamp*0.004)*0.5+1.5; ctx.fillStyle=`hsl(${fH}, 100%, 50%)`; ctx.fillRect(tX+1, tY-6-fS, 2, 4+fS); ctx.fillStyle=`hsl(${fH+10}, 100%, 60%)`; ctx.fillRect(tX, tY-4-fS/2, 4, 2+fS/2); }
+        function drawFence(ctx, x_px, y_px, x_tile, y_tile) {
+            // Verifica se há cercas vizinhas para conectar
+            const hasNeighborLeft = mapObjects.some(o => o.type === 4 && o.x === x_tile - 1 && o.y === y_tile);
+            const hasNeighborRight = mapObjects.some(o => o.type === 4 && o.x === x_tile + 1 && o.y === y_tile);
+
+            ctx.fillStyle = '#8D6E63'; // Cor da madeira da cerca
+            // Poste principal (sempre desenhado)
+            ctx.fillRect(x_px + 14, y_px + 4, 4, 24);
+
+            // Conexões horizontais
+            if (hasNeighborLeft) { ctx.fillRect(x_px, y_px + 8, 14, 4); ctx.fillRect(x_px, y_px + 18, 14, 4); }
+            if (hasNeighborRight) { ctx.fillRect(x_px + 18, y_px + 8, 14, 4); ctx.fillRect(x_px + 18, y_px + 18, 14, 4); }
+            // Se não tem vizinhos horizontais, desenha as barras curtas no próprio poste
+            if (!hasNeighborLeft && !hasNeighborRight) { ctx.fillRect(x_px + 10, y_px + 8, 12, 4); ctx.fillRect(x_px + 10, y_px + 18, 12, 4); }
+        }
         function preRenderMap() { for(let y=0; y<MAP_HEIGHT_TILES; y++){ for(let x=0; x<MAP_WIDTH_TILES; x++){ updatePreRenderedTile(x, y, map[y][x]); } } console.log("Mapa pré-renderizado!"); }
         function updatePreRenderedTile(tileX, tileY, tileId) { const dX=tileX*TILE_SIZE; const dY=tileY*TILE_SIZE; switch(tileId){ case 0: drawGrassTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break; case 1: drawEarthTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break; case 2: drawPlowedTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break; case 3: drawWaterTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break; case 4: drawSeedTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break; case 5: drawSproutTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break; case 6: drawPlantTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break; case 7: drawHarvestableTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break; default: drawGrassTile(preRenderedMapCtx, dX, dY, TILE_SIZE); } }
         function drawPlayer(timestamp) { const px=player.x; const py=player.y; const w=player.width; const h=player.height; let fB=0; if(player.isMoving){fB=Math.sin(player.walkBob)*2;}else if(player.isUsingTool){const aP=(timestamp-player.toolAnimStart)/TOOL_ANIM_DURATION; fB=Math.abs(Math.sin(aP*Math.PI))*6;} const bH=py+fB; ctx.fillStyle=player.colorLegs; ctx.fillRect(px, bH+h*0.6, w*0.45, h*0.4); ctx.fillRect(px+w*0.55, bH+h*0.6, w*0.45, h*0.4); ctx.fillStyle=player.colorBody; ctx.fillRect(px, bH+h*0.3, w, h*0.4); const hX=px+w*0.1; const hY=bH; const hW=w*0.8; const hH=h*0.4; ctx.fillStyle=player.colorHead; ctx.fillRect(hX, hY, hW, hH); ctx.fillStyle='#000'; const eS=2; let e1x, e1y, e2x, e2y; if(player.lastMoveDir.dy===1){e1x=hX+hW*0.25; e1y=hY+hH*0.6; e2x=hX+hW*0.75-eS; e2y=hY+hH*0.6;}else if(player.lastMoveDir.dy===-1){e1x=hX+hW*0.25; e1y=hY+hH*0.2; e2x=hX+hW*0.75-eS; e2y=hY+hH*0.2;}else if(player.lastMoveDir.dx===-1){e1x=hX+hW*0.2; e1y=hY+hH*0.4; e2x=hX+hW*0.5-eS; e2y=hY+hH*0.4;}else if(player.lastMoveDir.dx===1){e1x=hX+hW*0.5; e1y=hY+hH*0.4; e2x=hX+hW*0.8-eS; e2y=hY+hH*0.4;} if(e1x){ctx.fillRect(e1x, e1y, eS, eS); ctx.fillRect(e2x, e2y, eS, eS);} }
@@ -501,10 +589,6 @@
         function drawGameClock() { if(!gameClockSpan)return; const hS=String(gameHour).padStart(2,'0'); const mS=String(gameMinute).padStart(2,'0'); gameClockSpan.textContent=`${hS}:${mS}`; drawTimeIcon(); }
         function drawLighting(timestamp) { lightCtx.clearRect(0,0,lightCanvas.width,lightCanvas.height); if(gameHour>=18||gameHour<6){ lightCtx.save(); const cNO=nightOverlay?parseFloat(nightOverlay.style.opacity):0; lightCtx.fillStyle=`rgba(0,0,30,${cNO*0.9})`; lightCtx.fillRect(0,0,lightCanvas.width,lightCanvas.height); lightCtx.globalCompositeOperation='destination-out'; for(const obj of mapObjects){ const xOS=obj.x*TILE_SIZE-camera.x; const yOS=obj.y*TILE_SIZE-camera.y; let lR=0; let lX=xOS+TILE_SIZE/2; let lY=yOS+TILE_SIZE/2; if(obj.type===2){lR=3.5*TILE_SIZE;}else if(obj.type===3){lR=2.5*TILE_SIZE; lY=yOS+TILE_SIZE*0.75;} if(lR>0){if(lX+lR>0&&lX-lR<lightCanvas.width&&lY+lR>0&&lY-lR<lightCanvas.height){ const pu=Math.sin(timestamp*0.005)*0.05+0.95; const gr=lightCtx.createRadialGradient(lX,lY,0,lX,lY,lR*pu); gr.addColorStop(0,'rgba(255,255,255,1)'); gr.addColorStop(0.3,'rgba(255,255,255,0.9)'); gr.addColorStop(0.7,'rgba(255,255,255,0.5)'); gr.addColorStop(1,'rgba(255,255,255,0)'); lightCtx.fillStyle=gr; lightCtx.beginPath(); lightCtx.arc(lX,lY,lR*pu,0,Math.PI*2); lightCtx.fill();}}} lightCtx.globalCompositeOperation='source-over'; lightCtx.restore();} }
 
-        // --- Loop Principal ---
-        function updatePlayerMovement(timestamp) { if(player.isMoving){let dx=player.targetX-player.x; let dy=player.targetY-player.y; if(Math.abs(dx)<player.speed)player.x=player.targetX; else player.x+=Math.sign(dx)*player.speed; if(Math.abs(dy)<player.speed)player.y=player.targetY; else player.y+=Math.sign(dy)*player.speed; player.walkBob+=player.walkBobSpeed; if(player.x===player.targetX&&player.y===player.targetY){player.isMoving=false; player.walkBob=0;}} }
-        function updateToolAnimation(timestamp) { if(player.isUsingTool){if(timestamp-player.toolAnimStart>TOOL_ANIM_DURATION){player.isUsingTool=false; useTool(timestamp);}} }
-        function updateAnimations(timestamp) { /* ... */ }
         function updatePlayerMovement(timestamp) { if(player.isMoving){let dx=player.targetX-player.x; let dy=player.targetY-player.y; if(Math.abs(dx)<player.speed)player.x=player.targetX; else player.x+=Math.sign(dx)*player.speed; if(Math.abs(dy)<player.speed)player.y=player.targetY; else player.y+=Math.sign(dy)*player.speed; player.walkBob+=player.walkBobSpeed; if(player.x===player.targetX&&player.y===player.targetY){player.isMoving=false; player.walkBob=0; saveGame();}} }
         function updateToolAnimation(timestamp) { if(player.isUsingTool){if(timestamp-player.toolAnimStart>TOOL_ANIM_DURATION){player.isUsingTool=false; useTool(timestamp);}} }
         function updateAnimations(timestamp) { /* ... */ }
@@ -535,6 +619,8 @@
                     drawables.push({ type: 'campfire', x_px: x_px, y_px: y_px, y_sort: y_base, draw: (ts) => drawCampfire(ctx, x_px, y_px, ts) });
                 } else if (obj.type === 3) { // Tocha
                     drawables.push({ type: 'torch', x_px: x_px, y_px: y_px, y_sort: y_base, draw: (ts) => drawTorch(ctx, x_px, y_px, ts) });
+                } else if (obj.type === 4) { // Cerca
+                    drawables.push({ type: 'fence', x_px: x_px, y_px: y_px, y_sort: y_base, draw: () => drawFence(ctx, x_px, y_px, obj.x, obj.y) });
                 }
             }
             // 3. Ordena
@@ -590,8 +676,6 @@
             triggerMovementOrTurn(newDir); // Chama a função helper
         });
 
-        function isWalkable(pixelX, pixelY) { const tX=Math.floor(pixelX/TILE_SIZE); const tY=Math.floor(pixelY/TILE_SIZE); if(tX<0||tX>=MAP_WIDTH_TILES||tY<0||tY>=MAP_HEIGHT_TILES)return false; if(map[tY][tX]===3)return false; for(const obj of mapObjects){if(obj.x===tX&&obj.y===tY){if(obj.type===0||obj.type===1||obj.type===2)return false;}} return true; }
-
         function useTool(timestamp) {
             const pX = Math.floor(player.x/TILE_SIZE); const pY = Math.floor(player.y/TILE_SIZE);
             const tX = pX + player.lastMoveDir.dx; const tY = pY + player.lastMoveDir.dy;
@@ -609,13 +693,10 @@
                 if (item.name === "Picareta" && targetObject.type === 0) { // Rocha
                     mapObjects.splice(objectIndex, 1); // Remove a rocha
                     const stoneIdx = backpackInventory.findIndex(i => i && i.name === "Pedra");
-                    const stoneGained = Math.floor(Math.random() * 11) + 5; // Ganho de 5 a 15 pedras
                     if (stoneIdx !== -1) {
                         backpackInventory[stoneIdx].count++;
-                        backpackInventory[stoneIdx].count += stoneGained;
                     }
                     console.log("Rocha quebrada!");
-                    console.log(`Rocha quebrada! Ganhou ${stoneGained} pedras.`);
                     saveGame();
                     updateHotbarUI();
                     updateBackpackUI();
@@ -624,13 +705,10 @@
                 if (item.name === "Machado" && targetObject.type === 1) { // Árvore
                     mapObjects.splice(objectIndex, 1); // Remove a árvore
                     const woodIdx = backpackInventory.findIndex(i => i && i.name === "Madeira");
-                    const woodGained = Math.floor(Math.random() * 11) + 5; // Ganho de 5 a 15 madeiras
                     if (woodIdx !== -1) {
                         backpackInventory[woodIdx].count++;
-                        backpackInventory[woodIdx].count += woodGained;
                     }
                     console.log("Árvore cortada!");
-                    console.log(`Árvore cortada! Ganhou ${woodGained} madeiras.`);
                     saveGame();
                     updateHotbarUI();
                     updateBackpackUI();
@@ -667,6 +745,8 @@
                 case "Picareta": console.log("Usou Picareta no chão"); break; // Ação em objeto já tratada
             }
         }
+
+        function isWalkable(pixelX, pixelY) { const tX=Math.floor(pixelX/TILE_SIZE); const tY=Math.floor(pixelY/TILE_SIZE); if(tX<0||tX>=MAP_WIDTH_TILES||tY<0||tY>=MAP_HEIGHT_TILES)return false; if(map[tY][tX]===3)return false; for(const obj of mapObjects){if(obj.x===tX&&obj.y===tY){if(obj.type===0||obj.type===1||obj.type===2||obj.type===4)return false;}} return true; }
 
         function updatePlantGrowth(timestamp) { let mC=false; for(const key in plantGrowthData){ const[x,y]=key.split(',').map(Number); const data=plantGrowthData[key]; const tP=timestamp-data.plantedAt; const eA=tP; const cId=map[y][x]; const bM=data.boosted?0.5:1; const tS=GROWTH_TIME_SPROUT*bM; const tP_=GROWTH_TIME_PLANT*bM; const tH=GROWTH_TIME_HARVEST*bM; let nId=-1; if(eA>tH&&cId===6)nId=7; else if(eA>tP_&&cId===5)nId=6; else if(eA>tS&&cId===4)nId=5; if(nId!==-1){map[y][x]=nId; updatePreRenderedTile(x,y,nId); mC=true;} } if(mC){saveGame();} }
         function startGrowthTimer() { setInterval(() => { updatePlantGrowth(lastTime); }, 1000); }
