@@ -225,6 +225,14 @@
             pointer-events: none;
         }
 
+        .slot-sub-action {
+            font-size: 9px;
+            color: #B2DFDB; /* Ciano claro */
+            font-style: italic;
+            margin-top: 1px;
+            pointer-events: none;
+        }
+
         #hotbar .slot-key {
             position: absolute;
             top: 1px;
@@ -359,16 +367,16 @@
         <div id="bottomUIContainer">
             <div id="backpackIcon">🎒</div>
             <div id="hotbar">
-                <div class="slot" data-hotbar-index="0" draggable="true"> <span class="slot-key">1</span> <span class="slot-name"></span> <span class="slot-count"></span> </div>
-                <div class="slot" data-hotbar-index="1" draggable="true"> <span class="slot-key">2</span> <span class="slot-name"></span> <span class="slot-count"></span> </div>
-                <div class="slot" data-hotbar-index="2" draggable="true"> <span class="slot-key">3</span> <span class="slot-name"></span> <span class="slot-count"></span> </div>
-                <div class="slot" data-hotbar-index="3" draggable="true"> <span class="slot-key">4</span> <span class="slot-name"></span> <span class="slot-count"></span> </div>
-                <div class="slot" data-hotbar-index="4" draggable="true"> <span class="slot-key">5</span> <span class="slot-name"></span> <span class="slot-count"></span> </div>
-                <div class="slot" data-hotbar-index="5" draggable="true"> <span class="slot-key">6</span> <span class="slot-name"></span> <span class="slot-count"></span> </div>
-                <div class="slot" data-hotbar-index="6" draggable="true"> <span class="slot-key">7</span> <span class="slot-name"></span> <span class="slot-count"></span> </div>
-                <div class="slot" data-hotbar-index="7" draggable="true"> <span class="slot-key">8</span> <span class="slot-name"></span> <span class="slot-count"></span> </div>
-                <div class="slot" data-hotbar-index="8" draggable="true"> <span class="slot-key">9</span> <span class="slot-name"></span> <span class="slot-count"></span> </div>
-                <div class="slot" data-hotbar-index="9" draggable="true"> <span class="slot-key">0</span> <span class="slot-name"></span> <span class="slot-count"></span> </div>
+                <div class="slot" data-hotbar-index="0" draggable="true"> <span class="slot-key">1</span> <span class="slot-name"></span> <span class="slot-sub-action"></span> <span class="slot-count"></span> </div>
+                <div class="slot" data-hotbar-index="1" draggable="true"> <span class="slot-key">2</span> <span class="slot-name"></span> <span class="slot-sub-action"></span> <span class="slot-count"></span> </div>
+                <div class="slot" data-hotbar-index="2" draggable="true"> <span class="slot-key">3</span> <span class="slot-name"></span> <span class="slot-sub-action"></span> <span class="slot-count"></span> </div>
+                <div class="slot" data-hotbar-index="3" draggable="true"> <span class="slot-key">4</span> <span class="slot-name"></span> <span class="slot-sub-action"></span> <span class="slot-count"></span> </div>
+                <div class="slot" data-hotbar-index="4" draggable="true"> <span class="slot-key">5</span> <span class="slot-name"></span> <span class="slot-sub-action"></span> <span class="slot-count"></span> </div>
+                <div class="slot" data-hotbar-index="5" draggable="true"> <span class="slot-key">6</span> <span class="slot-name"></span> <span class="slot-sub-action"></span> <span class="slot-count"></span> </div>
+                <div class="slot" data-hotbar-index="6" draggable="true"> <span class="slot-key">7</span> <span class="slot-name"></span> <span class="slot-sub-action"></span> <span class="slot-count"></span> </div>
+                <div class="slot" data-hotbar-index="7" draggable="true"> <span class="slot-key">8</span> <span class="slot-name"></span> <span class="slot-sub-action"></span> <span class="slot-count"></span> </div>
+                <div class="slot" data-hotbar-index="8" draggable="true"> <span class="slot-key">9</span> <span class="slot-name"></span> <span class="slot-sub-action"></span> <span class="slot-count"></span> </div>
+                <div class="slot" data-hotbar-index="9" draggable="true"> <span class="slot-key">0</span> <span class="slot-name"></span> <span class="slot-sub-action"></span> <span class="slot-count"></span> </div>
             </div>
         </div>
 
@@ -997,7 +1005,6 @@
                     mapObjects.splice(objectIndex, 1); // Remove a cerca do mapa
                     addItemToInventory("Cerca", 1); // Adiciona o item Cerca ao inventário
                     console.log("Cerca coletada!");
-                    player.toolSubAction = null; // Reseta a sub-ação
                     saveGame();
                     updateHotbarUI();
                     updateBackpackUI();
@@ -1029,6 +1036,9 @@
                 case "Regador": if (tId === 3) { item.count = 10; updateHotbarUI(); updateBackpackUI(); saveGame(); } else if (tId >= 4 && tId <= 6 && item.count > 0) { const pD = plantGrowthData[tK]; if (pD && !pD.boosted) { pD.boosted = true; item.count--; activeAnimations.push({ type: 'water', x: tX, y: tY, startTime: timestamp, duration: 500 }); updateHotbarUI(); updateBackpackUI(); saveGame(); } } break;
                 case "Martelo":
                     if ((tId === 0 || tId === 1) && objectIndex === -1) { // Pode construir em grama ou terra vazia
+                        // Se a sub-ação for pegar, não faz nada em tile vazio
+                        if (player.toolSubAction === 'pickup_fence') break;
+
                         const fenceItemIdx = backpackInventory.findIndex(i => i && i.name === "Cerca" && i.count > 0);
                         const woodIdx = backpackInventory.findIndex(i => i && i.name === "Madeira" && i.count > 0);
 
@@ -1038,16 +1048,17 @@
                             backpackInventory[woodIdx].count--;
                         } else {
                             console.log("Sem cercas ou madeira para construir.");
-                            return; // Sai se não tiver material
+                            break; // Sai se não tiver material
                         }
 
                         let orientation;
-                        if (player.toolSubAction && player.toolSubAction.includes('fence')) {
+                        if (player.toolSubAction === 'vertical_fence' || player.toolSubAction === 'horizontal_fence') {
+                            // Usa a sub-ação definida
                             orientation = player.toolSubAction === 'vertical_fence' ? 'vertical' : 'horizontal';
                         } else {
+                            // Comportamento padrão se nenhuma sub-ação de construção estiver ativa
                             orientation = (player.lastMoveDir.dx !== 0) ? 'vertical' : 'horizontal';
                         }
-                        player.toolSubAction = null; // Reseta a sub-ação após o uso
 
                         mapObjects.push({ type: 4, x: tX, y: tY, orientation: orientation });
                         console.log("Cerca construída!");
@@ -1074,12 +1085,23 @@
                 const backpackIndex = hotbarMapping[hotbarIndex];
                 const item = (backpackIndex !== -1 && backpackIndex >= 0 && backpackIndex < backpackInventory.length) ? backpackInventory[backpackIndex] : null;
                 const nameSpan = slot.querySelector('.slot-name');
+                const subActionSpan = slot.querySelector('.slot-sub-action');
                 const countSpan = slot.querySelector('.slot-count');
 
-                if (item && nameSpan && countSpan) {
+                if (item && nameSpan && countSpan && subActionSpan) {
                     nameSpan.textContent = item.name;
                     countSpan.textContent = (item.count > 0 && ["Semente", "Colheita", "Regador", "Pedra", "Madeira", "Cerca"].includes(item.name)) ? item.count : "";
-                } else if (nameSpan && countSpan) {
+                    
+                    // Mostra a sub-ação no slot ativo
+                    if (hotbarIndex === activeHotbarSlot && player.toolSubAction) {
+                        if (player.toolSubAction === 'pickup_fence') subActionSpan.textContent = "(Pegar)";
+                        else if (player.toolSubAction === 'vertical_fence') subActionSpan.textContent = "(Vertical)";
+                        else if (player.toolSubAction === 'horizontal_fence') subActionSpan.textContent = "(Horizontal)";
+                        else subActionSpan.textContent = "";
+                    } else {
+                        subActionSpan.textContent = "";
+                    }
+                } else if (nameSpan && countSpan && subActionSpan) {
                     nameSpan.textContent = "";
                     countSpan.textContent = "";
                 }
@@ -1241,7 +1263,11 @@
             closeContextMenu();
         }
 
-        function updateActiveHotbarSlot(hotbarIndex) { if (hotbarIndex >= 0 && hotbarIndex < HOTBAR_SIZE) { activeHotbarSlot = hotbarIndex; saveGame(); updateHotbarUI(); } }
+        function updateActiveHotbarSlot(hotbarIndex) {
+            if (hotbarIndex >= 0 && hotbarIndex < HOTBAR_SIZE) {
+                if (activeHotbarSlot !== hotbarIndex) player.toolSubAction = null; // Reseta a sub-ação ao trocar de item
+                activeHotbarSlot = hotbarIndex; saveGame(); updateHotbarUI(); }
+        }
 
         // --- Lógica Mochila ---
         function toggleBackpack(forceState = null) {
@@ -1626,6 +1652,8 @@
                 if (item.name === "Picareta" && targetObject.type === 0) return true;
                 if (item.name === "Machado" && targetObject.type === 1) return true;
                 if (item.name === "Pá" && targetObject.type === 4) return true;
+                // CORREÇÃO: Ação de pegar cerca com martelo
+                if (item.name === "Martelo" && player.toolSubAction === 'pickup_fence' && targetObject.type === 4) return true;
                 return false;
             }
 
@@ -1636,7 +1664,11 @@
                 case "Semente": return (tId === 2 && item.count > 0);
                 case "Pá": return (tId === 1 || tId === 2 || (tId >= 4 && tId <= 7) || tId === 0 || tId === 3);
                 case "Regador": return (tId === 3 || (tId >= 4 && tId <= 6 && item.count > 0));
-                case "Martelo": return ((tId === 0 || tId === 1) && backpackInventory.some(i => i && i.name === "Madeira" && i.count > 0));
+                case "Martelo":
+                    // Se a sub-ação for pegar, não é acionável em tile vazio
+                    if (player.toolSubAction === 'pickup_fence') return false;
+                    // Para construir, verifica se tem material
+                    return ((tId === 0 || tId === 1) && (backpackInventory.some(i => i && i.name === "Cerca" && i.count > 0) || backpackInventory.some(i => i && i.name === "Madeira" && i.count > 0)));
             }
 
             return false;
