@@ -599,9 +599,20 @@
             if (bpIdx < 0 || bpIdx >= backpackInventory.length) return;
             const item = backpackInventory[bpIdx];
             if (!item) return;
-
-            if (tId === 7) { map[tY][tX]=2; delete plantGrowthData[tK]; const hIdx=backpackInventory.findIndex(i=>i&&i.name==="Colheita"); if(hIdx!==-1)backpackInventory[hIdx].count++; updatePreRenderedTile(tX,tY,2); saveGame(); updateHotbarUI(); updateBackpackUI(); return; }
-
+            
+            // Lógica de Colheita
+            if (tId === 7) {
+                map[tY][tX] = 2; // Volta para solo arado
+                delete plantGrowthData[tK]; // Remove os dados de crescimento da planta
+                const harvestIdx = backpackInventory.findIndex(i => i && i.name === "Colheita");
+                if (harvestIdx !== -1) backpackInventory[harvestIdx].count++; // Adiciona 1 colheita
+                const seedsGained = Math.floor(Math.random() * 4); // 0, 1, 2 ou 3 sementes
+                const seedIdx = backpackInventory.findIndex(i => i && i.name === "Semente");
+                if (seedIdx !== -1) backpackInventory[seedIdx].count += seedsGained; // Adiciona as sementes
+                updatePreRenderedTile(tX, tY, 2);
+                saveGame(); updateHotbarUI(); updateBackpackUI(); return;
+            }
+            
             switch(item.name) {
                 case "Enxada": if(tId===0||tId===1){map[tY][tX]=2; updatePreRenderedTile(tX,tY,2); saveGame();} break;
                 case "Semente": if(tId===2&&item.count>0){map[tY][tX]=4; plantGrowthData[tK]={plantedAt:timestamp, boosted:false}; item.count--; updatePreRenderedTile(tX,tY,4); saveGame(); updateHotbarUI(); updateBackpackUI();} break;
@@ -764,24 +775,6 @@
             for (let i = 0; i < mapping.length; i++) { if (mapping[i] !== -1 && (mapping[i] >= BACKPACK_SIZE || !backpack[mapping[i]])) { console.log(`Limpando mapeamento inválido da hotbar ${i} (apontava para ${mapping[i]})`); mapping[i] = -1; } }
         }
         function saveGame() { /*...*/ } // Sem alterações aqui
-        function saveGame() {
-            const saveData = {
-                player: {
-                    x: player.x,
-                    y: player.y,
-                    lastMoveDir: { dx: player.lastMoveDir.dx, dy: player.lastMoveDir.dy }
-                },
-                map: map,
-                mapObjects: mapObjects,
-                plantData: plantGrowthData,
-                backpackData: backpackInventory,
-                hotbarMapData: hotbarMapping,
-                activeSlotData: activeHotbarSlot,
-                gameTimeOffset: gameTimeOffset
-            };
-            localStorage.setItem('pixelFarmSaveData', JSON.stringify(saveData));
-            console.log("Jogo salvo!");
-        }
         // CORRIGIDO: loadGame
         function loadGame() {
              const defaultItems = [ { name: "Enxada", count: 1 }, { name: "Semente", count: 10 }, { name: "Colheita", count: 0 }, { name: "Pá", count: 1 }, { name: "Regador", count: 0 }, { name: "Martelo", count: 1 }, { name: "Machado", count: 1 }, { name: "Picareta", count: 1 } ];
@@ -798,17 +791,6 @@
                 try {
                     const data = JSON.parse(savedData);
                     if (data.map) map = data.map;
-                    if (data.player) {
-                        if (typeof data.player.x === 'number') player.x = data.player.x;
-                        if (typeof data.player.y === 'number') player.y = data.player.y;
-                        if (data.player.lastMoveDir && typeof data.player.lastMoveDir.dx === 'number' && typeof data.player.lastMoveDir.dy === 'number') {
-                            player.lastMoveDir = { dx: data.player.lastMoveDir.dx, dy: data.player.lastMoveDir.dy };
-                        }
-                        // Garante que o player não comece se movendo ou com target diferente
-                        player.targetX = player.x;
-                        player.targetY = player.y;
-                        player.isMoving = false;
-                    }
                     if (data.mapObjects) { mapObjects = data.mapObjects.filter(obj => { if (!obj || typeof obj.x !== 'number' || typeof obj.y !== 'number') return false; if (obj.x < 0 || obj.x >= MAP_WIDTH_TILES || obj.y < 0 || obj.y >= MAP_HEIGHT_TILES) { console.warn(`Objeto em [${obj.x},${obj.y}] removido pois está fora do mapa.`); return false; } if ((obj.type === 0 || obj.type === 1 || obj.type === 2) && obj.y >= 0 && obj.y < map.length && obj.x >= 0 && obj.x < map[obj.y].length && map[obj.y][obj.x] === 3) { console.warn(`Objeto (tipo ${obj.type}) em [${obj.x},${obj.y}] removido pois está na água.`); return false; } return true; }); }
                     if (data.plantData) { for (const key in data.plantData) { const plant = data.plantData[key]; if (typeof plant.boost === 'number' && plant.boost > 0) { plant.boosted = true; delete plant.boost; } else if (typeof plant.boosted === 'undefined') { plant.boosted = false; } } plantGrowthData = data.plantData; }
                     if (data.activeSlotData !== undefined && data.activeSlotData >= 0 && data.activeSlotData < HOTBAR_SIZE) { activeHotbarSlot = data.activeSlotData; }
@@ -847,9 +829,6 @@
                           const mapLength = Math.min(data.hotbarMapData.length, HOTBAR_SIZE);
                           for(let i=0; i < mapLength; i++){ if (typeof data.hotbarMapData[i] === 'number') { hotbarMapping[i] = data.hotbarMapData[i]; } else { hotbarMapping[i] = -1; } }
                      }
-                    if (typeof data.gameTimeOffset === 'number') {
-                        gameTimeOffset = data.gameTimeOffset;
-                    }
 
                     // Re-valida a consistência APÓS carregar, para limpar mapeamentos ruins do save
                     ensureInventoryConsistency(backpackInventory, hotbarMapping, defaultItems);
@@ -1042,7 +1021,6 @@
             // Loop do Relógio
             updateGameTime(); drawGameClock(); updateNightOverlay();
             setInterval(() => { updateGameTime(); drawGameClock(); updateNightOverlay(); }, 1000);
-            setInterval(saveGame, 30000); // Salva o jogo a cada 30 segundos
 
             // Listener de clique do ÍCONE da Mochila
             backpackIcon.addEventListener('click', () => { console.log("Clique no ícone da mochila"); toggleBackpack(); });
