@@ -511,6 +511,10 @@
         const preRenderedMapCtx = preRenderedMapCanvas.getContext('2d');
         preRenderedMapCtx.imageSmoothingEnabled = false;
 
+        const waterSpritesheetCanvas = document.createElement('canvas');
+        const waterSpritesheetCtx = waterSpritesheetCanvas.getContext('2d');
+        waterSpritesheetCtx.imageSmoothingEnabled = false;
+
         // --- Funções de Desenho ---
         function drawGrassTile(ctx, x, y, size) { ctx.fillStyle = '#558B2F'; ctx.fillRect(x, y, size, size); ctx.fillStyle = 'rgba(255, 255, 255, 0.05)'; const pS = 4; for (let ty=0; ty<size; ty+=pS*2){ for(let tx=0; tx<size; tx+=pS*2){ ctx.fillRect(x+tx, y+ty, pS, pS); ctx.fillRect(x+tx+pS, y+ty+pS, pS, pS); } } }
         function drawEarthTile(ctx, x, y, size) { ctx.fillStyle = '#8D6E63'; ctx.fillRect(x, y, size, size); ctx.fillStyle = 'rgba(0,0,0,0.1)'; ctx.fillRect(x+5, y+10, 4, 4); ctx.fillRect(x+15, y+25, 4, 4); ctx.fillRect(x+22, y+8, 4, 4); ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(x+8, y+20, 3, 3); ctx.fillRect(x+18, y+5, 3, 3); ctx.fillRect(x+25, y+15, 3, 3); }
@@ -574,7 +578,25 @@
             }
         }
         function preRenderMap() { for(let y=0; y<MAP_HEIGHT_TILES; y++){ for(let x=0; x<MAP_WIDTH_TILES; x++){ updatePreRenderedTile(x, y, map[y][x]); } } console.log("Mapa pré-renderizado!"); }
-        function updatePreRenderedTile(tileX, tileY, tileId) { const dX=tileX*TILE_SIZE; const dY=tileY*TILE_SIZE; switch(tileId){ case 0: drawGrassTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break; case 1: drawEarthTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break; case 2: drawPlowedTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break; case 3: drawWaterTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break; case 4: drawSeedTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break; case 5: drawSproutTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break; case 6: drawPlantTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break; case 7: drawHarvestableTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break; default: drawGrassTile(preRenderedMapCtx, dX, dY, TILE_SIZE); } }
+        function updatePreRenderedTile(tileX, tileY, tileId) {
+            const dX=tileX*TILE_SIZE; const dY=tileY*TILE_SIZE;
+            // A água (3) não é pré-renderizada, pois será animada
+            if (tileId === 3) {
+                preRenderedMapCtx.clearRect(dX, dY, TILE_SIZE, TILE_SIZE);
+                return;
+            }
+            switch(tileId){
+                case 0: drawGrassTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break;
+                case 1: drawEarthTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break;
+                case 2: drawPlowedTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break;
+                // case 3: drawWaterTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break; // Removido daqui
+                case 4: drawSeedTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break;
+                case 5: drawSproutTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break;
+                case 6: drawPlantTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break;
+                case 7: drawHarvestableTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break;
+                default: drawGrassTile(preRenderedMapCtx, dX, dY, TILE_SIZE);
+            }
+        }
         function drawPlayer(timestamp) { const px=player.x; const py=player.y; const w=player.width; const h=player.height; let fB=0; if(player.isMoving){fB=Math.sin(player.walkBob)*2;}else if(player.isUsingTool){const aP=(timestamp-player.toolAnimStart)/TOOL_ANIM_DURATION; fB=Math.abs(Math.sin(aP*Math.PI))*6;} const bH=py+fB; ctx.fillStyle=player.colorLegs; ctx.fillRect(px, bH+h*0.6, w*0.45, h*0.4); ctx.fillRect(px+w*0.55, bH+h*0.6, w*0.45, h*0.4); ctx.fillStyle=player.colorBody; ctx.fillRect(px, bH+h*0.3, w, h*0.4); const hX=px+w*0.1; const hY=bH; const hW=w*0.8; const hH=h*0.4; ctx.fillStyle=player.colorHead; ctx.fillRect(hX, hY, hW, hH); ctx.fillStyle='#000'; const eS=2; let e1x, e1y, e2x, e2y; if(player.lastMoveDir.dy===1){e1x=hX+hW*0.25; e1y=hY+hH*0.6; e2x=hX+hW*0.75-eS; e2y=hY+hH*0.6;}else if(player.lastMoveDir.dy===-1){e1x=hX+hW*0.25; e1y=hY+hH*0.2; e2x=hX+hW*0.75-eS; e2y=hY+hH*0.2;}else if(player.lastMoveDir.dx===-1){e1x=hX+hW*0.2; e1y=hY+hH*0.4; e2x=hX+hW*0.5-eS; e2y=hY+hH*0.4;}else if(player.lastMoveDir.dx===1){e1x=hX+hW*0.5; e1y=hY+hH*0.4; e2x=hX+hW*0.8-eS; e2y=hY+hH*0.4;} if(e1x){ctx.fillRect(e1x, e1y, eS, eS); ctx.fillRect(e2x, e2y, eS, eS);} }
         function drawWaterAnimation(anim, timestamp) { const el=timestamp-anim.startTime; const pr=el/anim.duration; if(pr>1)return; const x=anim.x*TILE_SIZE+TILE_SIZE/2; const y=anim.y*TILE_SIZE+TILE_SIZE/2; for(let i=0; i<5; i++){ const an=i*(Math.PI*2/5)+pr*2; const ra=5+pr*15; const dX=x+Math.cos(an)*ra; const dY=y+Math.sin(an)*ra; ctx.fillStyle=`rgba(100,181,246, ${1-pr})`; ctx.beginPath(); ctx.arc(dX, dY, 2, 0, 2*Math.PI); ctx.fill(); } }
         function drawAnimations(timestamp) { activeAnimations=activeAnimations.filter(an=>{const el=timestamp-an.startTime; if(el>an.duration)return false; if(an.type==='water'){drawWaterAnimation(an, timestamp);} return true;}); }
@@ -597,12 +619,24 @@
         function updateCamera() { const tX=player.x-(640/2)+(player.width/2); const tY=player.y-(480/2)+(player.height/2); camera.x=Math.max(0,Math.min(tX,MAP_WIDTH_PX-canvas.width)); camera.y=Math.max(0,Math.min(tY,MAP_HEIGHT_PX-canvas.height)); }
         function update(timestamp) { updatePlayerMovement(timestamp); updateToolAnimation(timestamp); updateAnimations(timestamp); updateCamera(); }
         function draw(timestamp) {
+            const waterAnimFrame = Math.floor(timestamp / 250) % 8; // 8 quadros, muda a cada 250ms
+
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.save();
             ctx.scale(zoomLevel, zoomLevel);
             ctx.translate(-camera.x, -camera.y);
             // 1. Chão
             ctx.drawImage(preRenderedMapCanvas, 0, 0);
+
+            // 1.5. Desenha a água animada
+            for (let y = 0; y < MAP_HEIGHT_TILES; y++) {
+                for (let x = 0; x < MAP_WIDTH_TILES; x++) {
+                    if (map[y][x] === 3) {
+                        ctx.drawImage(waterSpritesheetCanvas, waterAnimFrame * TILE_SIZE, 0, TILE_SIZE, TILE_SIZE, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                    }
+                }
+            }
+
             // 2. Coleta "desenháveis"
             let drawables = [];
             drawables.push({ type: 'player', x_px: player.x, y_px: player.y, y_sort: player.y + player.height - 4, draw: (ts) => drawPlayer(ts) });
@@ -1157,6 +1191,29 @@
              isHolding = false; // Reseta estado de hold ao soltar
          }
 
+        function generateWaterSpritesheet() {
+            const NUM_FRAMES = 8;
+            waterSpritesheetCanvas.width = TILE_SIZE * NUM_FRAMES;
+            waterSpritesheetCanvas.height = TILE_SIZE;
+
+            for (let i = 0; i < NUM_FRAMES; i++) {
+                const x = i * TILE_SIZE;
+                const y = 0;
+                
+                // Base
+                waterSpritesheetCtx.fillStyle = '#1976D2';
+                waterSpritesheetCtx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+
+                // Highlights animados
+                waterSpritesheetCtx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                const yOffset1 = Math.sin((i / NUM_FRAMES) * Math.PI * 2) * 3;
+                const yOffset2 = Math.cos((i / NUM_FRAMES) * Math.PI * 2) * 2;
+                waterSpritesheetCtx.fillRect(x + 5, y + 8 + yOffset1, 10, 4);
+                waterSpritesheetCtx.fillRect(x + 18, y + 20 - yOffset1, 8, 3);
+                waterSpritesheetCtx.fillRect(x + 10, y + 15 + yOffset2, 6, 3);
+            }
+            console.log("Spritesheet de água gerado.");
+        }
 
         // --- Inicialização ---
         function init() {
@@ -1166,6 +1223,7 @@
             if (!timeRangeSlider) { console.error("Slider de tempo não encontrado!"); return; }
 
             loadGame();
+            generateWaterSpritesheet();
             preRenderMap();
             updateHotbarUI();
             startGrowthTimer();
