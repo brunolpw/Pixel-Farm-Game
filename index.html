@@ -576,14 +576,15 @@
             "Machado": "<strong>Machado</strong><br>Corta árvores para obter madeira.",
             "Picareta": "<strong>Picareta</strong><br>Quebra pedras para obter minerais.",
             "Pedra": "<strong>Pedra</strong><br>Material de construção básico, obtido de rochas.",
-            "Madeira": "<strong>Madeira</strong><br>Material de construção básico, obtido de árvores."
+            "Madeira": "<strong>Madeira</strong><br>Material de construção básico, obtido de árvores.",
+            "Cerca": "<strong>Cerca</strong><br>Uma cerca pré-fabricada. Use o Martelo para posicioná-la."
         };
 
         const itemActions = {
             "Martelo": [
                 { label: "Construir Cerca Vertical", action: "set_sub_action", value: "vertical_fence" },
                 { label: "Construir Cerca Horizontal", action: "set_sub_action", value: "horizontal_fence" },
-                { label: "Pegar Cerca", action: "log", value: "Ação 'Pegar Cerca' ainda não implementada." }
+                { label: "Pegar Cerca", action: "set_sub_action", value: "pickup_fence" }
             ],
             "Semente": [
                 { label: "Plantar Tomate", action: "log", value: "Ainda só temos um tipo de semente." },
@@ -992,6 +993,16 @@
                     updateBackpackUI();
                     return; // Ação concluída
                 }
+                if (item.name === "Martelo" && player.toolSubAction === 'pickup_fence' && targetObject.type === 4) {
+                    mapObjects.splice(objectIndex, 1); // Remove a cerca do mapa
+                    addItemToInventory("Cerca", 1); // Adiciona o item Cerca ao inventário
+                    console.log("Cerca coletada!");
+                    player.toolSubAction = null; // Reseta a sub-ação
+                    saveGame();
+                    updateHotbarUI();
+                    updateBackpackUI();
+                    return; // Ação concluída
+                }
 
                 return; // Impede o uso da ferramenta no chão se houver um objeto
             }
@@ -1018,21 +1029,31 @@
                 case "Regador": if (tId === 3) { item.count = 10; updateHotbarUI(); updateBackpackUI(); saveGame(); } else if (tId >= 4 && tId <= 6 && item.count > 0) { const pD = plantGrowthData[tK]; if (pD && !pD.boosted) { pD.boosted = true; item.count--; activeAnimations.push({ type: 'water', x: tX, y: tY, startTime: timestamp, duration: 500 }); updateHotbarUI(); updateBackpackUI(); saveGame(); } } break;
                 case "Martelo":
                     if ((tId === 0 || tId === 1) && objectIndex === -1) { // Pode construir em grama ou terra vazia
-                        const woodIdx = backpackInventory.findIndex(i => i && i.name === "Madeira");
-                        if (woodIdx !== -1 && backpackInventory[woodIdx].count > 0) {
-                            backpackInventory[woodIdx].count--;
-                            // Usa a sub-ação do menu de contexto, se existir, senão usa a direção do jogador
-                            const orientation = (player.toolSubAction === 'vertical_fence' || (player.toolSubAction === null && player.lastMoveDir.dx !== 0)) ? 'vertical' : 'horizontal';
-                            player.toolSubAction = null; // Reseta a sub-ação após o uso
+                        const fenceItemIdx = backpackInventory.findIndex(i => i && i.name === "Cerca" && i.count > 0);
+                        const woodIdx = backpackInventory.findIndex(i => i && i.name === "Madeira" && i.count > 0);
 
-                            mapObjects.push({ type: 4, x: tX, y: tY, orientation: orientation });
-                            console.log("Cerca construída!");
-                            saveGame();
-                            updateHotbarUI();
-                            updateBackpackUI();
+                        if (fenceItemIdx !== -1) { // Prioriza usar cercas prontas
+                            backpackInventory[fenceItemIdx].count--;
+                        } else if (woodIdx !== -1) { // Se não tiver, usa madeira
+                            backpackInventory[woodIdx].count--;
                         } else {
-                            console.log("Sem madeira para construir a cerca.");
+                            console.log("Sem cercas ou madeira para construir.");
+                            return; // Sai se não tiver material
                         }
+
+                        let orientation;
+                        if (player.toolSubAction && player.toolSubAction.includes('fence')) {
+                            orientation = player.toolSubAction === 'vertical_fence' ? 'vertical' : 'horizontal';
+                        } else {
+                            orientation = (player.lastMoveDir.dx !== 0) ? 'vertical' : 'horizontal';
+                        }
+                        player.toolSubAction = null; // Reseta a sub-ação após o uso
+
+                        mapObjects.push({ type: 4, x: tX, y: tY, orientation: orientation });
+                        console.log("Cerca construída!");
+                        saveGame();
+                        updateHotbarUI();
+                        updateBackpackUI();
                     }
                     break;
                 case "Machado": console.log("Usou Machado no chão"); break; // Ação em objeto já tratada
@@ -1057,7 +1078,7 @@
 
                 if (item && nameSpan && countSpan) {
                     nameSpan.textContent = item.name;
-                    countSpan.textContent = (item.count > 0 && ["Semente", "Colheita", "Regador", "Pedra", "Madeira"].includes(item.name)) ? item.count : "";
+                    countSpan.textContent = (item.count > 0 && ["Semente", "Colheita", "Regador", "Pedra", "Madeira", "Cerca"].includes(item.name)) ? item.count : "";
                 } else if (nameSpan && countSpan) {
                     nameSpan.textContent = "";
                     countSpan.textContent = "";
@@ -1082,7 +1103,7 @@
 
                 if (item) {
                     nameSpan.textContent = item.name;
-                    countSpan.textContent = (item.count > 0 && ["Semente", "Colheita", "Regador", "Pedra", "Madeira"].includes(item.name)) ? item.count : "";
+                    countSpan.textContent = (item.count > 0 && ["Semente", "Colheita", "Regador", "Pedra", "Madeira", "Cerca"].includes(item.name)) ? item.count : "";
                 } else {
                     nameSpan.textContent = "";
                     countSpan.textContent = "";
@@ -1339,7 +1360,7 @@
         }
         // CORRIGIDO: loadGame
         function loadGame() {
-            const defaultItems = [ { name: "Enxada", count: 1 }, { name: "Semente", count: 10 }, { name: "Colheita", count: 0 }, { name: "Pá", count: 1 }, { name: "Regador", count: 0 }, { name: "Martelo", count: 1 }, { name: "Machado", count: 1 }, { name: "Picareta", count: 1 }, { name: "Pedra", count: 0 }, { name: "Madeira", count: 0 } ];
+            const defaultItems = [ { name: "Enxada", count: 1 }, { name: "Semente", count: 10 }, { name: "Colheita", count: 0 }, { name: "Pá", count: 1 }, { name: "Regador", count: 0 }, { name: "Martelo", count: 1 }, { name: "Machado", count: 1 }, { name: "Picareta", count: 1 }, { name: "Pedra", count: 0 }, { name: "Madeira", count: 0 }, { name: "Cerca", count: 0 } ];
 
             const savedData = localStorage.getItem('pixelFarmSaveData');
             if (savedData) {
