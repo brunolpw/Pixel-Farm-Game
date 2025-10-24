@@ -796,7 +796,25 @@
                     updateBackpackUI();
                     return; // Ação concluída
                 }
-                // TODO: Adicionar lógica para Machado vs Árvore aqui
+                if (item.name === "Pá" && targetObject.type === 4) { // Cerca
+                    mapObjects.splice(objectIndex, 1); // Remove a cerca
+                    addItemToInventory("Madeira", 1); // Devolve 1 madeira
+                    console.log("Cerca removida!");
+                    saveGame();
+                    updateHotbarUI();
+                    updateBackpackUI();
+                    return; // Ação concluída
+                }
+                if (item.name === "Pá" && targetObject.type === 4) { // Cerca
+                    mapObjects.splice(objectIndex, 1); // Remove a cerca
+                    addItemToInventory("Madeira", 1); // Devolve 1 madeira
+                    console.log("Cerca removida!");
+                    saveGame();
+                    updateHotbarUI();
+                    updateBackpackUI();
+                    return; // Ação concluída
+                }
+
                 return; // Impede o uso da ferramenta no chão se houver um objeto
             }
 
