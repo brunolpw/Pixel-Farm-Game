@@ -618,6 +618,18 @@
                     updateBackpackUI();
                     return; // Ação concluída
                 }
+                if (item.name === "Machado" && targetObject.type === 1) { // Árvore
+                    mapObjects.splice(objectIndex, 1); // Remove a árvore
+                    const woodIdx = backpackInventory.findIndex(i => i && i.name === "Madeira");
+                    if (woodIdx !== -1) {
+                        backpackInventory[woodIdx].count++;
+                    }
+                    console.log("Árvore cortada!");
+                    saveGame();
+                    updateHotbarUI();
+                    updateBackpackUI();
+                    return; // Ação concluída
+                }
                 // TODO: Adicionar lógica para Machado vs Árvore aqui
                 return; // Impede o uso da ferramenta no chão se houver um objeto
             }
@@ -645,7 +657,7 @@
                 case "Pá": if (tId === 1 || tId === 2 || (tId >= 4 && tId <= 7)) { map[tY][tX] = 0; if (plantGrowthData[tK]) delete plantGrowthData[tK]; updatePreRenderedTile(tX, tY, 0); saveGame(); } else if (tId === 0) { let aW = false; const ne = [[0, 1], [0, -1], [1, 0], [-1, 0]]; for (const [nx, ny] of ne) { const cX = tX + nx; const cY = tY + ny; if (cX >= 0 && cX < MAP_WIDTH_TILES && cY >= 0 && cY < MAP_HEIGHT_TILES) { if (map[cY][cX] === 3) { aW = true; break; } } } if (aW) { map[tY][tX] = 3; updatePreRenderedTile(tX, tY, 3); saveGame(); } } else if (tId === 3) { map[tY][tX] = 0; updatePreRenderedTile(tX, tY, 0); saveGame(); } break;
                 case "Regador": if (tId === 3) { item.count = 10; updateHotbarUI(); updateBackpackUI(); saveGame(); } else if (tId >= 4 && tId <= 6 && item.count > 0) { const pD = plantGrowthData[tK]; if (pD && !pD.boosted) { pD.boosted = true; item.count--; activeAnimations.push({ type: 'water', x: tX, y: tY, startTime: timestamp, duration: 500 }); updateHotbarUI(); updateBackpackUI(); saveGame(); } } break;
                 case "Martelo": console.log("Usou Martelo"); break;
-                case "Machado": console.log("Usou Machado"); break;
+                case "Machado": console.log("Usou Machado no chão"); break; // Ação em objeto já tratada
                 case "Picareta": console.log("Usou Picareta no chão"); break; // Ação em objeto já tratada
             }
         }
@@ -665,7 +677,7 @@
 
                 if (item && nameSpan && countSpan) {
                     nameSpan.textContent = item.name;
-                    countSpan.textContent = (item.count > 0 && ["Semente", "Colheita", "Regador", "Pedra"].includes(item.name)) ? item.count : "";
+                    countSpan.textContent = (item.count > 0 && ["Semente", "Colheita", "Regador", "Pedra", "Madeira"].includes(item.name)) ? item.count : "";
                 } else if (nameSpan && countSpan) {
                     nameSpan.textContent = "";
                     countSpan.textContent = "";
@@ -819,7 +831,7 @@
         }
         // CORRIGIDO: loadGame
         function loadGame() {
-            const defaultItems = [ { name: "Enxada", count: 1 }, { name: "Semente", count: 10 }, { name: "Colheita", count: 0 }, { name: "Pá", count: 1 }, { name: "Regador", count: 0 }, { name: "Martelo", count: 1 }, { name: "Machado", count: 1 }, { name: "Picareta", count: 1 }, { name: "Pedra", count: 0 } ];
+            const defaultItems = [ { name: "Enxada", count: 1 }, { name: "Semente", count: 10 }, { name: "Colheita", count: 0 }, { name: "Pá", count: 1 }, { name: "Regador", count: 0 }, { name: "Martelo", count: 1 }, { name: "Machado", count: 1 }, { name: "Picareta", count: 1 }, { name: "Pedra", count: 0 }, { name: "Madeira", count: 0 } ];
 
             const savedData = localStorage.getItem('pixelFarmSaveData');
             if (savedData) {
