@@ -515,6 +515,14 @@
         const waterSpritesheetCtx = waterSpritesheetCanvas.getContext('2d');
         waterSpritesheetCtx.imageSmoothingEnabled = false;
 
+        const campfireSpritesheetCanvas = document.createElement('canvas');
+        const campfireSpritesheetCtx = campfireSpritesheetCanvas.getContext('2d');
+        campfireSpritesheetCtx.imageSmoothingEnabled = false;
+
+        const torchSpritesheetCanvas = document.createElement('canvas');
+        const torchSpritesheetCtx = torchSpritesheetCanvas.getContext('2d');
+        torchSpritesheetCtx.imageSmoothingEnabled = false;
+
         // --- Funções de Desenho ---
         function drawGrassTile(ctx, x, y, size) { ctx.fillStyle = '#558B2F'; ctx.fillRect(x, y, size, size); ctx.fillStyle = 'rgba(255, 255, 255, 0.05)'; const pS = 4; for (let ty=0; ty<size; ty+=pS*2){ for(let tx=0; tx<size; tx+=pS*2){ ctx.fillRect(x+tx, y+ty, pS, pS); ctx.fillRect(x+tx+pS, y+ty+pS, pS, pS); } } }
         function drawEarthTile(ctx, x, y, size) { ctx.fillStyle = '#8D6E63'; ctx.fillRect(x, y, size, size); ctx.fillStyle = 'rgba(0,0,0,0.1)'; ctx.fillRect(x+5, y+10, 4, 4); ctx.fillRect(x+15, y+25, 4, 4); ctx.fillRect(x+22, y+8, 4, 4); ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(x+8, y+20, 3, 3); ctx.fillRect(x+18, y+5, 3, 3); ctx.fillRect(x+25, y+15, 3, 3); }
@@ -558,7 +566,28 @@
             // Restaura a opacidade original
             ctx.globalAlpha = 1.0;
         }
-        function drawCampfire(ctx, x_px, y_px, timestamp) { ctx.fillStyle='#A1887F'; ctx.fillRect(x_px+10, y_px+20, 4, 6); ctx.fillRect(x_px+18, y_px+22, 4, 6); ctx.fillRect(x_px+14, y_px+24, 6, 4); ctx.fillStyle='#795548'; ctx.fillRect(x_px+12, y_px+21, 8, 2); ctx.fillRect(x_px+12, y_px+23, 8, 2); const fH=(Math.sin(timestamp*0.005)*0.1+0.9)*30; const fS=Math.sin(timestamp*0.003)*1+3; ctx.fillStyle=`hsl(${fH}, 100%, 50%)`; ctx.fillRect(x_px+14, y_px+16-fS, 4, 4+fS); ctx.fillStyle=`hsl(${fH+10}, 100%, 60%)`; ctx.fillRect(x_px+12, y_px+18-fS/2, 4, 4+fS/2); ctx.fillRect(x_px+18, y_px+18-fS/2, 4, 4+fS/2); const sO=(timestamp*0.001)%(TILE_SIZE/2); ctx.fillStyle=`rgba(180,180,180, ${0.3-(sO/(TILE_SIZE/2))*0.3})`; ctx.fillRect(x_px+15, y_px+10-sO, 2, 2); ctx.fillRect(x_px+17, y_px+8-sO*1.5, 2, 2); }
+        function drawCampfire(ctx, x_px, y_px, timestamp) {
+            // Logs
+            ctx.fillStyle='#A1887F'; ctx.fillRect(x_px+10, y_px+20, 4, 6); ctx.fillRect(x_px+18, y_px+22, 4, 6); ctx.fillRect(x_px+14, y_px+24, 6, 4);
+            ctx.fillStyle='#795548'; ctx.fillRect(x_px+12, y_px+21, 8, 2); ctx.fillRect(x_px+12, y_px+23, 8, 2);
+            // Fogo mais vivo
+            const fH=(Math.sin(timestamp*0.005)*0.1+0.9)*30;
+            const fS1=Math.sin(timestamp*0.003)*1+3;
+            const fS2=Math.sin(timestamp*0.0045)*0.8+0.5;
+            const fS = fS1 + fS2; // Combina duas ondas para um pulso mais natural
+            ctx.fillStyle=`hsl(${fH}, 100%, 50%)`; ctx.fillRect(x_px+14, y_px+16-fS, 4, 4+fS);
+            ctx.fillStyle=`hsl(${fH+10}, 100%, 60%)`; ctx.fillRect(x_px+12, y_px+18-fS/2, 4, 4+fS/2); ctx.fillRect(x_px+18, y_px+18-fS/2, 4, 4+fS/2);
+            // Fumaça mais densa
+            for (let i = 0; i < 5; i++) {
+                const timeOffset = timestamp + i * 500;
+                const sO = (timeOffset * 0.001) % (TILE_SIZE / 1.5);
+                const opacity = Math.max(0, 0.4 - (sO / (TILE_SIZE / 1.5)) * 0.4);
+                const size = 2 + (i % 2);
+                const drift = Math.sin(timeOffset * 0.0005 + i) * 3;
+                ctx.fillStyle=`rgba(180,180,180, ${opacity})`;
+                ctx.fillRect(x_px + 15 + drift, y_px + 12 - sO * (1 + i * 0.1), size, size);
+            }
+        }
         function drawTorch(ctx, x_px, y_px, timestamp) { const tX=x_px+TILE_SIZE/2-2; const tY=y_px+TILE_SIZE/2; ctx.fillStyle='#795548'; ctx.fillRect(tX, tY, 4, 10); ctx.fillStyle='#A0A0A0'; ctx.fillRect(tX-1, tY-2, 6, 2); const fH=(Math.sin(timestamp*0.007)*0.1+0.9)*30; const fS=Math.sin(timestamp*0.004)*0.5+1.5; ctx.fillStyle=`hsl(${fH}, 100%, 50%)`; ctx.fillRect(tX+1, tY-6-fS, 2, 4+fS); ctx.fillStyle=`hsl(${fH+10}, 100%, 60%)`; ctx.fillRect(tX, tY-4-fS/2, 4, 2+fS/2); }
         function drawFence(ctx, x_px, y_px, orientation) {
             ctx.fillStyle = '#3E2723'; // Cor da madeira da cerca (marrom mais claro)
@@ -619,6 +648,7 @@
         function updateCamera() { const tX=player.x-(640/2)+(player.width/2); const tY=player.y-(480/2)+(player.height/2); camera.x=Math.max(0,Math.min(tX,MAP_WIDTH_PX-canvas.width)); camera.y=Math.max(0,Math.min(tY,MAP_HEIGHT_PX-canvas.height)); }
         function update(timestamp) { updatePlayerMovement(timestamp); updateToolAnimation(timestamp); updateAnimations(timestamp); updateCamera(); }
         function draw(timestamp) {
+            const fireAnimFrame = Math.floor(timestamp / 150) % 8; // 8 quadros, muda a cada 150ms
             const waterAnimFrame = Math.floor(timestamp / 250) % 8; // 8 quadros, muda a cada 250ms
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -651,10 +681,10 @@
                     drawables.push({ type: 'tree_trunk', x_px: x_px, y_px: y_px, y_sort: y_base, draw: () => drawTreeTrunk(ctx, x_px, y_px) });
                     drawables.push({ type: 'tree_canopy', x_px: x_px, y_px: y_px, y_sort: y_base + TILE_SIZE * 2, draw: () => drawTreeCanopy(ctx, x_px, y_px) });
                 } else if (obj.type === 2) { // Fogueira
-                     drawables.push({ type: 'shadow', x_px: x_px, y_px: y_px, y_sort: y_base - 1, draw: ()=>{ctx.fillStyle='rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(x_px+16, y_base, 10, 5, 0, 0, 2*Math.PI); ctx.fill();} });
-                    drawables.push({ type: 'campfire', x_px: x_px, y_px: y_px, y_sort: y_base, draw: (ts) => drawCampfire(ctx, x_px, y_px, ts) });
+                    drawables.push({ type: 'shadow', x_px: x_px, y_px: y_px, y_sort: y_base - 1, draw: ()=>{ctx.fillStyle='rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(x_px+16, y_base, 10, 5, 0, 0, 2*Math.PI); ctx.fill();} });
+                    drawables.push({ type: 'campfire', x_px: x_px, y_px: y_px, y_sort: y_base, draw: () => ctx.drawImage(campfireSpritesheetCanvas, fireAnimFrame * TILE_SIZE, 0, TILE_SIZE, TILE_SIZE, x_px, y_px, TILE_SIZE, TILE_SIZE) });
                 } else if (obj.type === 3) { // Tocha
-                    drawables.push({ type: 'torch', x_px: x_px, y_px: y_px, y_sort: y_base, draw: (ts) => drawTorch(ctx, x_px, y_px, ts) });
+                    drawables.push({ type: 'torch', x_px: x_px, y_px: y_px, y_sort: y_base, draw: () => ctx.drawImage(torchSpritesheetCanvas, fireAnimFrame * TILE_SIZE, 0, TILE_SIZE, TILE_SIZE, x_px, y_px, TILE_SIZE, TILE_SIZE) });
                 } else if (obj.type === 4) { // Cerca - usa a orientação do objeto
                     drawables.push({ type: 'fence', x_px: x_px, y_px: y_px, y_sort: y_base, draw: () => drawFence(ctx, x_px, y_px, obj.orientation) });
                 }
@@ -1215,6 +1245,36 @@
             console.log("Spritesheet de água gerado.");
         }
 
+        function generateCampfireSpritesheet() {
+            const NUM_FRAMES = 8;
+            campfireSpritesheetCanvas.width = TILE_SIZE * NUM_FRAMES;
+            campfireSpritesheetCanvas.height = TILE_SIZE;
+            const frameDuration = 150; // Duração simulada para capturar a animação
+
+            for (let i = 0; i < NUM_FRAMES; i++) {
+                const x = i * TILE_SIZE;
+                const simulatedTimestamp = i * frameDuration;
+                // A função drawCampfire desenha relativo ao x,y que passamos
+                drawCampfire(campfireSpritesheetCtx, x, 0, simulatedTimestamp);
+            }
+            console.log("Spritesheet de fogueira gerado.");
+        }
+
+        function generateTorchSpritesheet() {
+            const NUM_FRAMES = 8;
+            torchSpritesheetCanvas.width = TILE_SIZE * NUM_FRAMES;
+            torchSpritesheetCanvas.height = TILE_SIZE;
+            const frameDuration = 150; // Duração simulada para capturar a animação
+
+            for (let i = 0; i < NUM_FRAMES; i++) {
+                const x = i * TILE_SIZE;
+                const simulatedTimestamp = i * frameDuration;
+                // A função drawTorch desenha relativo ao x,y que passamos
+                drawTorch(torchSpritesheetCtx, x, 0, simulatedTimestamp);
+            }
+            console.log("Spritesheet de tocha gerado.");
+        }
+
         // --- Inicialização ---
         function init() {
             backpackIcon = document.getElementById('backpackIcon');
@@ -1224,6 +1284,8 @@
 
             loadGame();
             generateWaterSpritesheet();
+            generateCampfireSpritesheet();
+            generateTorchSpritesheet();
             preRenderMap();
             updateHotbarUI();
             startGrowthTimer();
