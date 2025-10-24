@@ -619,7 +619,7 @@
             "Picareta": "<strong>Picareta</strong><br>Quebra pedras para obter minerais.",
             "Pedra": "<strong>Pedra</strong><br>Material de construção básico, obtido de rochas.",
             "Madeira": "<strong>Madeira</strong><br>Material de construção básico, obtido de árvores.",
-            "Cerca": "<strong>Cerca</strong><br>Uma cerca pré-fabricada. Use o Martelo para posicioná-la.",
+            "Cerca": "<strong>Cerca</strong><br>Uma cerca pré-fabricada. Use a ferramenta de Construção para posicioná-la.",
             "Muro": "<strong>Muro</strong><br>Um muro de tijolos resistente. Use o Martelo para posicioná-lo.",
             "Porta": "<strong>Porta</strong><br>Uma porta de madeira. Pode ser aberta e fechada.",
             "Porteira": "<strong>Porteira</strong><br>Uma porteira de fazenda. Pode ser aberta e fechada."
@@ -627,16 +627,13 @@
 
         const itemActions = {
             "Construção": [
+                { label: "Mudar para modo 'Pegar'", action: "set_sub_action", value: "pickup_mode" },
                 { label: "Construir Porta", action: "set_sub_action", value: "build_door" },
-                { label: "Pegar Porta", action: "set_sub_action", value: "pickup_door" },
                 { label: "Construir Porteira", action: "set_sub_action", value: "build_gate" },
-                { label: "Pegar Porteira", action: "set_sub_action", value: "pickup_gate" },
                 { label: "Construir Piso", action: "set_sub_action", value: "build_floor" },
                 { label: "Construir Muro", action: "set_sub_action", value: "build_wall" },
-                { label: "Pegar Muro", action: "set_sub_action", value: "pickup_wall" },
                 { label: "Construir Cerca Vertical", action: "set_sub_action", value: "vertical_fence" },
-                { label: "Construir Cerca Horizontal", action: "set_sub_action", value: "horizontal_fence" },
-                { label: "Pegar Cerca", action: "set_sub_action", value: "pickup_fence" }
+                { label: "Construir Cerca Horizontal", action: "set_sub_action", value: "horizontal_fence" }
             ],
             "Semente": [
                 { label: "Plantar Tomate", action: "log", value: "Ainda só temos um tipo de semente." },
@@ -1157,41 +1154,23 @@
                     updateBackpackUI();
                     return; // Ação concluída
                 }
-                if (item.name === "Construção" && player.toolSubAction === 'pickup_fence' && targetObject.type === 4) {
-                    mapObjects.splice(objectIndex, 1); // Remove a cerca do mapa
-                    addItemToInventory("Cerca", 1); // Adiciona o item Cerca ao inventário
-                    console.log("Cerca coletada!");
-                    saveGame();
-                    updateHotbarUI();
-                    updateBackpackUI();
-                    return; // Ação concluída
-                }
-                if (item.name === "Construção" && player.toolSubAction === 'pickup_wall' && targetObject.type === 5) {
-                    mapObjects.splice(objectIndex, 1); // Remove o muro do mapa
-                    addItemToInventory("Muro", 1); // Adiciona o item Muro ao inventário
-                    console.log("Muro coletado!");
-                    saveGame();
-                    updateHotbarUI();
-                    updateBackpackUI();
-                    return; // Ação concluída
-                }
-                if (item.name === "Construção" && player.toolSubAction === 'pickup_door' && targetObject.type === 6) {
-                    mapObjects.splice(objectIndex, 1); // Remove a porta do mapa
-                    addItemToInventory("Porta", 1); // Adiciona o item Porta ao inventário
-                    console.log("Porta coletada!");
-                    saveGame();
-                    updateHotbarUI();
-                    updateBackpackUI();
-                    return; // Ação concluída
-                }
-                if (item.name === "Construção" && player.toolSubAction === 'pickup_gate' && targetObject.type === 7) {
-                    mapObjects.splice(objectIndex, 1); // Remove a porteira do mapa
-                    addItemToInventory("Porteira", 1); // Adiciona o item Porteira ao inventário
-                    console.log("Porteira coletada!");
-                    saveGame();
-                    updateHotbarUI();
-                    updateBackpackUI();
-                    return; // Ação concluída
+                // Lógica Universal de "Pegar"
+                if (item.name === "Construção" && player.toolSubAction === 'pickup_mode') {
+                    let pickedUpItem = null;
+                    if (targetObject.type === 4) pickedUpItem = "Cerca";
+                    else if (targetObject.type === 5) pickedUpItem = "Muro";
+                    else if (targetObject.type === 6) pickedUpItem = "Porta";
+                    else if (targetObject.type === 7) pickedUpItem = "Porteira";
+
+                    if (pickedUpItem) {
+                        mapObjects.splice(objectIndex, 1);
+                        addItemToInventory(pickedUpItem, 1);
+                        console.log(`${pickedUpItem} coletado(a)!`);
+                        saveGame();
+                        updateHotbarUI();
+                        updateBackpackUI();
+                        return;
+                    }
                 }
 
                 return; // Impede o uso da ferramenta no chão se houver um objeto
@@ -1231,77 +1210,66 @@
                     break;
                 case "Regador": if (tId === 3) { item.count = 10; updateHotbarUI(); updateBackpackUI(); saveGame(); } else if (tId >= 4 && tId <= 6 && item.count > 0) { const pD = plantGrowthData[tK]; if (pD && !pD.boosted) { pD.boosted = true; item.count--; activeAnimations.push({ type: 'water', x: tX, y: tY, startTime: timestamp, duration: 500 }); updateHotbarUI(); updateBackpackUI(); saveGame(); } } break;
                 case "Construção":
-                    if ((tId === 0 || tId === 1) && objectIndex === -1) { // Pode construir em grama ou terra vazia
-                        if (player.toolSubAction === 'build_wall') {
+                    if (objectIndex !== -1) break; // Não constrói sobre objetos existentes
+
+                    if (player.toolSubAction === 'build_wall') {
+                        if (tId === 0 || tId === 1) {
                             const wallItemIdx = backpackInventory.findIndex(i => i && i.name === "Muro" && i.count > 0);
                             const stoneIdx = backpackInventory.findIndex(i => i && i.name === "Pedra" && i.count >= 5);
-                            if (wallItemIdx !== -1) {
-                                backpackInventory[wallItemIdx].count--;
-                            } else if (stoneIdx !== -1) {
-                                backpackInventory[stoneIdx].count -= 5;
-                            } else {
-                                console.log("Sem muros ou pedras (mín. 5) para construir.");
-                                break;
-                            }
+                            if (wallItemIdx !== -1) { backpackInventory[wallItemIdx].count--; }
+                            else if (stoneIdx !== -1) { backpackInventory[stoneIdx].count -= 5; }
+                            else { console.log("Sem muros ou pedras (mín. 5) para construir."); break; }
                             mapObjects.push({ type: 5, x: tX, y: tY }); // type 5 = Muro
                             console.log("Muro construído!");
-                        } else if (player.toolSubAction === 'build_floor') {
+                        }
+                    } else if (player.toolSubAction === 'build_floor') {
+                        if (tId === 0 || tId === 1) {
                             const woodIdx = backpackInventory.findIndex(i => i && i.name === "Madeira" && i.count > 0);
                             if (woodIdx !== -1) {
                                 backpackInventory[woodIdx].count--;
                                 map[tY][tX] = 8; // type 8 = Piso
                                 updatePreRenderedTile(tX, tY, 8);
                                 console.log("Piso construído!");
-                            } else {
-                                console.log("Sem madeira para construir o piso.");
-                                break;
-                            }
-                        } else if (player.toolSubAction === 'build_door') {
-                            const hasAdjacentWall = mapObjects.some(obj => obj.type === 5 && obj.y === tY && (obj.x === tX - 1 || obj.x === tX + 1));
-                            if (!hasAdjacentWall) {
-                                console.log("A porta deve ser construída ao lado de um muro.");
-                                break;
-                            }
+                            } else { console.log("Sem madeira para construir o piso."); break; }
+                        }
+                    } else if (player.toolSubAction === 'build_door') {
+                        if (tId === 8) { // Apenas em piso
+                            const hasHorizontalWall = mapObjects.some(obj => obj.type === 5 && obj.y === tY && (obj.x === tX - 1 || obj.x === tX + 1));
+                            const hasVerticalWall = mapObjects.some(obj => obj.type === 5 && obj.x === tX && (obj.y === tY - 1 || obj.y === tY + 1));
+                            if (!hasHorizontalWall && !hasVerticalWall) { console.log("A porta deve ser construída ao lado de um muro."); break; }
+
                             const doorItemIdx = backpackInventory.findIndex(i => i && i.name === "Porta" && i.count > 0);
                             const woodIdx = backpackInventory.findIndex(i => i && i.name === "Madeira" && i.count >= 4);
-                            if (doorItemIdx !== -1) { backpackInventory[doorItemIdx].count--; }
-                            else if (woodIdx !== -1) { backpackInventory[woodIdx].count -= 4; }
+                            if (doorItemIdx !== -1) { backpackInventory[doorItemIdx].count--; } 
+                            else if (woodIdx !== -1) { backpackInventory[woodIdx].count -= 4; } 
                             else { console.log("Sem Portas ou Madeira (mín. 4) para construir."); break; }
-
-                            const orientation = (player.lastMoveDir.dx !== 0) ? 'vertical' : 'horizontal';
+                            const orientation = hasHorizontalWall ? 'vertical' : 'horizontal';
                             mapObjects.push({ type: 6, x: tX, y: tY, orientation: orientation, isOpen: false }); // type 6 = Porta
                             console.log("Porta construída!");
-                        } else if (player.toolSubAction === 'build_gate') {
-                            const hasAdjacentFence = mapObjects.some(obj => obj.type === 4 && obj.y === tY && (obj.x === tX - 1 || obj.x === tX + 1));
-                            if (!hasAdjacentFence) {
-                                console.log("A porteira deve ser construída ao lado de uma cerca.");
-                                break;
-                            }
+                        } else { console.log("A porta deve ser construída sobre um piso de madeira."); break; }
+                    } else if (player.toolSubAction === 'build_gate') {
+                        if (tId === 0 || tId === 1) {
+                            const hasHorizontalFence = mapObjects.some(obj => obj.type === 4 && obj.y === tY && (obj.x === tX - 1 || obj.x === tX + 1));
+                            const hasVerticalFence = mapObjects.some(obj => obj.type === 4 && obj.x === tX && (obj.y === tY - 1 || obj.y === tY + 1));
+                            if (!hasHorizontalFence && !hasVerticalFence) { console.log("A porteira deve ser construída ao lado de uma cerca."); break; }
+
                             const gateItemIdx = backpackInventory.findIndex(i => i && i.name === "Porteira" && i.count > 0);
                             const woodIdx = backpackInventory.findIndex(i => i && i.name === "Madeira" && i.count >= 4);
-                            if (gateItemIdx !== -1) { backpackInventory[gateItemIdx].count--; }
-                            else if (woodIdx !== -1) { backpackInventory[woodIdx].count -= 4; }
+                            if (gateItemIdx !== -1) { backpackInventory[gateItemIdx].count--; } 
+                            else if (woodIdx !== -1) { backpackInventory[woodIdx].count -= 4; } 
                             else { console.log("Sem Porteiras ou Madeira (mín. 4) para construir."); break; }
-
-                            const orientation = (player.lastMoveDir.dx !== 0) ? 'vertical' : 'horizontal';
+                            const orientation = hasHorizontalFence ? 'vertical' : 'horizontal';
                             mapObjects.push({ type: 7, x: tX, y: tY, orientation: orientation, isOpen: false }); // type 7 = Porteira
                             console.log("Porteira construída!");
-                        } else if (player.toolSubAction === 'vertical_fence' || player.toolSubAction === 'horizontal_fence' || player.toolSubAction === null) {
-                            // Se a sub-ação for pegar, não faz nada em tile vazio
-                            if (['pickup_fence', 'pickup_wall', 'pickup_door', 'pickup_gate'].includes(player.toolSubAction)) break;
-
+                        }
+                    } else if (player.toolSubAction === 'vertical_fence' || player.toolSubAction === 'horizontal_fence' || player.toolSubAction === null) {
+                        if (tId === 0 || tId === 1) {
+                            if (player.toolSubAction === 'pickup_mode') break; // Modo pegar não constrói
                             const fenceItemIdx = backpackInventory.findIndex(i => i && i.name === "Cerca" && i.count > 0);
                             const woodIdx = backpackInventory.findIndex(i => i && i.name === "Madeira" && i.count > 0);
-
-                            if (fenceItemIdx !== -1) { // Prioriza usar cercas prontas
-                                backpackInventory[fenceItemIdx].count--;
-                            } else if (woodIdx !== -1) { // Se não tiver, usa madeira
-                                backpackInventory[woodIdx].count--;
-                            } else {
-                                console.log("Sem cercas ou madeira para construir.");
-                                break; // Sai se não tiver material
-                            }
-
+                            if (fenceItemIdx !== -1) { backpackInventory[fenceItemIdx].count--; } 
+                            else if (woodIdx !== -1) { backpackInventory[woodIdx].count--; } 
+                            else { console.log("Sem cercas ou madeira para construir."); break; }
                             let orientation;
                             if (player.toolSubAction === 'vertical_fence' || player.toolSubAction === 'horizontal_fence') {
                                 orientation = player.toolSubAction === 'vertical_fence' ? 'vertical' : 'horizontal';
@@ -1311,10 +1279,11 @@
                             mapObjects.push({ type: 4, x: tX, y: tY, orientation: orientation });
                             console.log("Cerca construída!");
                         }
-                        saveGame();
-                        updateHotbarUI();
-                        updateBackpackUI();
                     }
+                    // Salva e atualiza a UI se qualquer ação de construção foi bem-sucedida
+                    saveGame();
+                    updateHotbarUI();
+                    updateBackpackUI();
                     break;
                 case "Machado": console.log("Usou Machado no chão"); break; // Ação em objeto já tratada
                 case "Picareta": console.log("Usou Picareta no chão"); break; // Ação em objeto já tratada
@@ -1345,14 +1314,11 @@
                     
                     // Mostra a sub-ação no slot ativo
                     if (hotbarIndex === activeHotbarSlot && player.toolSubAction) {
-                        if (player.toolSubAction === 'pickup_fence') subActionSpan.textContent = "(Pegar)";
+                        if (player.toolSubAction === 'pickup_mode') subActionSpan.textContent = "(Pegar)";
                         else if (player.toolSubAction === 'build_door') subActionSpan.textContent = "(Construir)";
-                        else if (player.toolSubAction === 'pickup_door') subActionSpan.textContent = "(Pegar)";
                         else if (player.toolSubAction === 'build_gate') subActionSpan.textContent = "(Construir)";
-                        else if (player.toolSubAction === 'pickup_gate') subActionSpan.textContent = "(Pegar)";
                         else if (player.toolSubAction === 'build_floor') subActionSpan.textContent = "(Piso)";
                         else if (player.toolSubAction === 'build_wall') subActionSpan.textContent = "(Construir)";
-                        else if (player.toolSubAction === 'pickup_wall') subActionSpan.textContent = "(Pegar)";
                         else if (player.toolSubAction === 'vertical_fence') subActionSpan.textContent = "(Vertical)";
                         else if (player.toolSubAction === 'horizontal_fence') subActionSpan.textContent = "(Horizontal)";
                         else subActionSpan.textContent = "";
@@ -1937,12 +1903,8 @@
                 if (item.name === "Picareta" && targetObject.type === 0) return true;
                 if (item.name === "Machado" && targetObject.type === 1) return true;
                 if (item.name === "Pá" && targetObject.type === 4) return true;
-                if (item.name === "Construção") {
-                    if (player.toolSubAction === 'pickup_fence' && targetObject.type === 4) return true;
-                    if (player.toolSubAction === 'pickup_wall' && targetObject.type === 5) return true;
-                    if (player.toolSubAction === 'pickup_door' && targetObject.type === 6) return true;
-                    if (player.toolSubAction === 'pickup_gate' && targetObject.type === 7) return true;
-                }
+                // Ação universal de pegar
+                if (item.name === "Construção" && player.toolSubAction === 'pickup_mode' && [4, 5, 6, 7].includes(targetObject.type)) return true;
                 return false;
             }
 
@@ -1954,20 +1916,25 @@
                 case "Pá": return (tId === 1 || tId === 2 || (tId >= 4 && tId <= 7) || tId === 0 || tId === 3 || tId === 8);
                 case "Regador": return (tId === 3 || (tId >= 4 && tId <= 6 && item.count > 0));
                 case "Construção":
-                    if (['pickup_fence', 'pickup_wall', 'pickup_door', 'pickup_gate'].includes(player.toolSubAction)) {
+                    if (player.toolSubAction === 'pickup_mode') {
                         return false; // Não é acionável em tile vazio
                     }
                     if (player.toolSubAction === 'build_floor') {
                         return ((tId === 0 || tId === 1) && backpackInventory.some(i => i && i.name === "Madeira" && i.count > 0));
                     }
                     if (player.toolSubAction === 'build_door' || player.toolSubAction === 'build_gate') {
-                        const hasWood = backpackInventory.some(i => i && i.name === "Madeira" && i.count >= 4);
-                        const hasItem = player.toolSubAction === 'build_door' ? backpackInventory.some(i => i && i.name === "Porta" && i.count > 0) : backpackInventory.some(i => i && i.name === "Porteira" && i.count > 0);
-                        const hasAdjacent = player.toolSubAction === 'build_door' ?
-                            mapObjects.some(obj => obj.type === 5 && obj.y === tileY && (obj.x === tileX - 1 || obj.x === tileX + 1)) :
-                            mapObjects.some(obj => obj.type === 4 && obj.y === tileY && (obj.x === tileX - 1 || obj.x === tileX + 1));
-
-                        return ((tId === 0 || tId === 1) && (hasWood || hasItem) && hasAdjacent);
+                        if (player.toolSubAction === 'build_door') {
+                            if (tId !== 8) return false; // Portas só em piso
+                            const hasMaterial = backpackInventory.some(i => i && i.name === "Porta" && i.count > 0) || backpackInventory.some(i => i && i.name === "Madeira" && i.count >= 4);
+                            const hasAdjacentWall = mapObjects.some(obj => obj.type === 5 && ( (obj.y === tileY && (obj.x === tileX - 1 || obj.x === tileX + 1)) || (obj.x === tileX && (obj.y === tileY - 1 || obj.y === tileY + 1))));
+                            return hasMaterial && hasAdjacentWall;
+                        }
+                        if (player.toolSubAction === 'build_gate') {
+                            if (tId !== 0 && tId !== 1) return false; // Portões em grama/terra
+                            const hasMaterial = backpackInventory.some(i => i && i.name === "Porteira" && i.count > 0) || backpackInventory.some(i => i && i.name === "Madeira" && i.count >= 4);
+                            const hasAdjacentFence = mapObjects.some(obj => obj.type === 4 && ( (obj.y === tileY && (obj.x === tileX - 1 || obj.x === tileX + 1)) || (obj.x === tileX && (obj.y === tileY - 1 || obj.y === tileY + 1))));
+                            return hasMaterial && hasAdjacentFence;
+                        }
                     }
                     if (player.toolSubAction === 'build_wall') {
                         return ((tId === 0 || tId === 1) && (backpackInventory.some(i => i && i.name === "Muro" && i.count > 0) || backpackInventory.some(i => i && i.name === "Pedra" && i.count >= 5)));
