@@ -54,6 +54,23 @@
             height: calc(100% - 4px);
             border-radius: 8px;
         }
+        
+        /* --- Cursores Customizados --- */
+        #mouseIcon {
+            position: absolute;
+            width: 32px;
+            height: 32px;
+            pointer-events: none; /* O ícone não interfere com os cliques */
+            z-index: 110; /* Acima de tudo */
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            display: none; /* Começa escondido */
+        }
+        /* Define os ícones como background-image para o div #mouseIcon */
+        #mouseIcon.cursor-walk { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="white" style="filter: drop-shadow(0 0 2px black);"><path d="M15.5 3.5a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5h-4a1.5 1.5 0 0 1-1.5-1.5v-8a1.5 1.5 0 0 1 1.5-1.5h4zm-8 6a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5h-4a1.5 1.5 0 0 1-1.5-1.5v-8a1.5 1.5 0 0 1 1.5-1.5h4z"/></svg>'); }
+        #mouseIcon.cursor-action { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 0 2px black);"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>'); }
+        #mouseIcon.cursor-invalid { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="red" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 0 2px black);"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>'); }
 
         #gameContainer > #itemTooltip { position: absolute; } /* Override if needed */
 
@@ -298,6 +315,7 @@
         </canvas>
 
         <div id="itemTooltip"></div>
+        <div id="mouseIcon"></div>
 
         <div id="nightOverlay"></div>
         <canvas id="lightCanvas"></canvas>
@@ -357,6 +375,7 @@
         let backpackIcon = null; // Definido dentro de init()
         let timeRangeSlider = null; // Definido dentro de init()
         let itemTooltip = null; // Definido dentro de init()
+        let mouseIcon = null; // Definido dentro de init()
 
         ctx.imageSmoothingEnabled = false;
         timeIconCtx.imageSmoothingEnabled = false;
@@ -629,7 +648,7 @@
         }
         function drawTorch(ctx, x_px, y_px, timestamp) { const tX=x_px+TILE_SIZE/2-2; const tY=y_px+TILE_SIZE/2; ctx.fillStyle='#795548'; ctx.fillRect(tX, tY, 4, 10); ctx.fillStyle='#A0A0A0'; ctx.fillRect(tX-1, tY-2, 6, 2); const fH=(Math.sin(timestamp*0.007)*0.1+0.9)*30; const fS=Math.sin(timestamp*0.004)*0.5+1.5; ctx.fillStyle=`hsl(${fH}, 100%, 50%)`; ctx.fillRect(tX+1, tY-6-fS, 2, 4+fS); ctx.fillStyle=`hsl(${fH+10}, 100%, 60%)`; ctx.fillRect(tX, tY-4-fS/2, 4, 2+fS/2); }
         function drawFence(ctx, x_px, y_px, orientation) {
-            ctx.fillStyle = '#3E2723'; // Cor da madeira da cerca (marrom mais claro)
+            ctx.fillStyle = '#3E2723'; // Cor da madeira da cerca
             if (orientation === 'horizontal') {
                 // Poste esquerdo e direito
                 ctx.fillRect(x_px + 4, y_px + 6, 4, 20);
@@ -1438,6 +1457,34 @@
             return path;
         }
 
+        function isActionable(tileX, tileY) {
+            const bpIdx = hotbarMapping[activeHotbarSlot];
+            if (bpIdx < 0 || !backpackInventory[bpIdx]) return false;
+            const item = backpackInventory[bpIdx];
+            const tId = map[tileY][tileX];
+            const objectIndex = mapObjects.findIndex(obj => obj.x === tileX && obj.y === tileY);
+
+            if (objectIndex !== -1) {
+                const targetObject = mapObjects[objectIndex];
+                if (item.name === "Picareta" && targetObject.type === 0) return true;
+                if (item.name === "Machado" && targetObject.type === 1) return true;
+                if (item.name === "Pá" && targetObject.type === 4) return true;
+                return false;
+            }
+
+            if (tId === 7) return true; // Colheita
+
+            switch (item.name) {
+                case "Enxada": return (tId === 0 || tId === 1);
+                case "Semente": return (tId === 2 && item.count > 0);
+                case "Pá": return (tId === 1 || tId === 2 || (tId >= 4 && tId <= 7) || tId === 0 || tId === 3);
+                case "Regador": return (tId === 3 || (tId >= 4 && tId <= 6 && item.count > 0));
+                case "Martelo": return ((tId === 0 || tId === 1) && backpackInventory.some(i => i && i.name === "Madeira" && i.count > 0));
+            }
+
+            return false;
+        }
+
         function handleCanvasClick(event) {
             // Ignora o clique se a mochila estiver aberta ou o jogador estiver ocupado
             if (isBackpackOpen || player.isMoving || player.isUsingTool) return;
@@ -1469,26 +1516,54 @@
         }
 
         function handleCanvasMouseMove(event) {
-            if (isBackpackOpen) {
-                mouseHoverTile.x = null;
-                mouseHoverTile.y = null;
-                return;
-            }
-
             const rect = canvas.getBoundingClientRect();
             const moveX = event.clientX - rect.left;
             const moveY = event.clientY - rect.top;
 
+            // Posiciona o ícone flutuante
+            mouseIcon.style.left = `${moveX - 16}px`; // Centraliza o ícone no cursor
+            mouseIcon.style.top = `${moveY - 16}px`;
+            mouseIcon.className = ''; // Limpa classes anteriores
+
+            if (isBackpackOpen) {
+                mouseHoverTile.x = null;
+                mouseHoverTile.y = null;
+                mouseIcon.style.display = 'none';
+                return;
+            }
+
+            mouseIcon.style.display = 'block';
             const worldX = moveX + camera.x;
             const worldY = moveY + camera.y;
-
             mouseHoverTile.x = Math.floor(worldX / TILE_SIZE);
             mouseHoverTile.y = Math.floor(worldY / TILE_SIZE);
+
+            // Calcula distância e verifica se o tile é válido
+            const playerTileX = Math.floor(player.x / TILE_SIZE);
+            const playerTileY = Math.floor(player.y / TILE_SIZE);
+            const dist = Math.sqrt(Math.pow(playerTileX - mouseHoverTile.x, 2) + Math.pow(playerTileY - mouseHoverTile.y, 2));
+
+            if (dist < 1.5) { // Alcance de interação
+                if (isActionable(mouseHoverTile.x, mouseHoverTile.y)) {
+                    mouseIcon.classList.add('cursor-action');
+                } else {
+                    mouseIcon.classList.add('cursor-invalid');
+                }
+            } else { // Fora do alcance de interação
+                if (isWalkable(mouseHoverTile.x * TILE_SIZE, mouseHoverTile.y * TILE_SIZE)) {
+                    mouseIcon.classList.add('cursor-walk');
+                } else {
+                    mouseIcon.classList.add('cursor-invalid');
+                }
+            }
         }
 
         function handleCanvasMouseLeave() {
             mouseHoverTile.x = null;
             mouseHoverTile.y = null;
+            if (mouseIcon) {
+                mouseIcon.style.display = 'none';
+            }
         }
 
         function generateWaterSpritesheet() {
@@ -1553,6 +1628,8 @@
             if (!timeRangeSlider) { console.error("Slider de tempo não encontrado!"); return; }
             itemTooltip = document.getElementById('itemTooltip');
             if (!itemTooltip) { console.error("Elemento do tooltip não encontrado!"); return; }
+            mouseIcon = document.getElementById('mouseIcon');
+            if (!mouseIcon) { console.error("Elemento do ícone do mouse não encontrado!"); return; }
 
             loadGame();
             generateWaterSpritesheet();
