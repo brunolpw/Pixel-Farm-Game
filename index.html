@@ -676,6 +676,26 @@
             triggerMovementOrTurn(newDir); // Chama a função helper
         });
 
+        // Função helper para adicionar itens ao inventário
+        function addItemToInventory(itemName, quantity) {
+            let itemIndex = backpackInventory.findIndex(i => i && i.name === itemName);
+            if (itemIndex !== -1) {
+                backpackInventory[itemIndex].count += quantity;
+            } else {
+                let emptyBackpackSlot = backpackInventory.findIndex(slot => slot === null);
+                if (emptyBackpackSlot !== -1) {
+                    backpackInventory[emptyBackpackSlot] = { name: itemName, count: quantity };
+                    // Tenta mapear para um slot vazio da hotbar, se houver
+                    let emptyHotbarSlot = hotbarMapping.findIndex(mapping => mapping === -1);
+                    if (emptyHotbarSlot !== -1) {
+                        hotbarMapping[emptyHotbarSlot] = emptyBackpackSlot;
+                    }
+                } else {
+                    console.warn(`Mochila cheia, não foi possível adicionar ${quantity} de ${itemName}.`);
+                }
+            }
+        }
+
         function useTool(timestamp) {
             const pX = Math.floor(player.x/TILE_SIZE); const pY = Math.floor(player.y/TILE_SIZE);
             const tX = pX + player.lastMoveDir.dx; const tY = pY + player.lastMoveDir.dy;
@@ -692,11 +712,9 @@
                 const targetObject = mapObjects[objectIndex];
                 if (item.name === "Picareta" && targetObject.type === 0) { // Rocha
                     mapObjects.splice(objectIndex, 1); // Remove a rocha
-                    const stoneIdx = backpackInventory.findIndex(i => i && i.name === "Pedra");
-                    if (stoneIdx !== -1) {
-                        backpackInventory[stoneIdx].count++;
-                    }
-                    console.log("Rocha quebrada!");
+                    const stoneGained = Math.floor(Math.random() * 11) + 5; // Ganho de 5 a 15 pedras
+                    addItemToInventory("Pedra", stoneGained);
+                    console.log(`Rocha quebrada! Ganhou ${stoneGained} pedras.`);
                     saveGame();
                     updateHotbarUI();
                     updateBackpackUI();
@@ -704,11 +722,9 @@
                 }
                 if (item.name === "Machado" && targetObject.type === 1) { // Árvore
                     mapObjects.splice(objectIndex, 1); // Remove a árvore
-                    const woodIdx = backpackInventory.findIndex(i => i && i.name === "Madeira");
-                    if (woodIdx !== -1) {
-                        backpackInventory[woodIdx].count++;
-                    }
-                    console.log("Árvore cortada!");
+                    const woodGained = Math.floor(Math.random() * 11) + 5; // Ganho de 5 a 15 madeiras
+                    addItemToInventory("Madeira", woodGained);
+                    console.log(`Árvore cortada! Ganhou ${woodGained} madeiras.`);
                     saveGame();
                     updateHotbarUI();
                     updateBackpackUI();
@@ -726,11 +742,9 @@
             if (tId === 7) {
                 map[tY][tX] = 2; // Volta para solo arado
                 delete plantGrowthData[tK]; // Remove os dados de crescimento da planta
-                const harvestIdx = backpackInventory.findIndex(i => i && i.name === "Colheita");
-                if (harvestIdx !== -1) backpackInventory[harvestIdx].count++; // Adiciona 1 colheita
+                addItemToInventory("Colheita", 1);
                 const seedsGained = Math.floor(Math.random() * 4); // 0, 1, 2 ou 3 sementes
-                const seedIdx = backpackInventory.findIndex(i => i && i.name === "Semente");
-                if (seedIdx !== -1) backpackInventory[seedIdx].count += seedsGained; // Adiciona as sementes
+                if (seedsGained > 0) addItemToInventory("Semente", seedsGained);
                 updatePreRenderedTile(tX, tY, 2);
                 saveGame(); updateHotbarUI(); updateBackpackUI(); return;
             }
@@ -740,7 +754,21 @@
                 case "Semente": if (tId === 2 && item.count > 0) { map[tY][tX] = 4; plantGrowthData[tK] = { plantedAt: timestamp, boosted: false }; item.count--; updatePreRenderedTile(tX, tY, 4); saveGame(); updateHotbarUI(); updateBackpackUI(); } break;
                 case "Pá": if (tId === 1 || tId === 2 || (tId >= 4 && tId <= 7)) { map[tY][tX] = 0; if (plantGrowthData[tK]) delete plantGrowthData[tK]; updatePreRenderedTile(tX, tY, 0); saveGame(); } else if (tId === 0) { let aW = false; const ne = [[0, 1], [0, -1], [1, 0], [-1, 0]]; for (const [nx, ny] of ne) { const cX = tX + nx; const cY = tY + ny; if (cX >= 0 && cX < MAP_WIDTH_TILES && cY >= 0 && cY < MAP_HEIGHT_TILES) { if (map[cY][cX] === 3) { aW = true; break; } } } if (aW) { map[tY][tX] = 3; updatePreRenderedTile(tX, tY, 3); saveGame(); } } else if (tId === 3) { map[tY][tX] = 0; updatePreRenderedTile(tX, tY, 0); saveGame(); } break;
                 case "Regador": if (tId === 3) { item.count = 10; updateHotbarUI(); updateBackpackUI(); saveGame(); } else if (tId >= 4 && tId <= 6 && item.count > 0) { const pD = plantGrowthData[tK]; if (pD && !pD.boosted) { pD.boosted = true; item.count--; activeAnimations.push({ type: 'water', x: tX, y: tY, startTime: timestamp, duration: 500 }); updateHotbarUI(); updateBackpackUI(); saveGame(); } } break;
-                case "Martelo": console.log("Usou Martelo"); break;
+                case "Martelo":
+                    if ((tId === 0 || tId === 1) && objectIndex === -1) { // Pode construir em grama ou terra vazia
+                        const woodIdx = backpackInventory.findIndex(i => i && i.name === "Madeira");
+                        if (woodIdx !== -1 && backpackInventory[woodIdx].count > 0) {
+                            backpackInventory[woodIdx].count--;
+                            mapObjects.push({ type: 4, x: tX, y: tY }); // type 4 = Cerca
+                            console.log("Cerca construída!");
+                            saveGame();
+                            updateHotbarUI();
+                            updateBackpackUI();
+                        } else {
+                            console.log("Sem madeira para construir a cerca.");
+                        }
+                    }
+                    break;
                 case "Machado": console.log("Usou Machado no chão"); break; // Ação em objeto já tratada
                 case "Picareta": console.log("Usou Picareta no chão"); break; // Ação em objeto já tratada
             }
