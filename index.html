@@ -55,6 +55,8 @@
             border-radius: 8px;
         }
 
+        #gameContainer > #itemTooltip { position: absolute; } /* Override if needed */
+
         #nightOverlay {
             background-color: #000033;
             opacity: 0;
@@ -270,7 +272,7 @@
 
         /* --- Tooltip de Descrição do Item --- */
         #itemTooltip {
-            position: fixed; /* Posição relativa à janela do navegador */
+            position: absolute; /* Posição relativa ao gameContainer */
             display: none;   /* Começa escondido */
             background-color: rgba(20, 20, 20, 0.9);
             border: 1px solid #999;
@@ -294,6 +296,8 @@
         <canvas id="gameCanvas">
             Seu navegador não suporta o elemento Canvas.
         </canvas>
+
+        <div id="itemTooltip"></div>
 
         <div id="nightOverlay"></div>
         <canvas id="lightCanvas"></canvas>
@@ -336,8 +340,6 @@
         <input type="range" id="timeRangeSlider" min="0" max="23" step="1" value="0">
     </div>
 
-    <div id="itemTooltip"></div>
-
     <script>
         // --- Configurações Iniciais ---
         const canvas = document.getElementById('gameCanvas');
@@ -348,6 +350,7 @@
         const nightOverlay = document.getElementById('nightOverlay');
         const lightCanvas = document.getElementById('lightCanvas');
         const lightCtx = lightCanvas.getContext('2d');
+        const gameContainer = document.getElementById('gameContainer');
         const backpackContainer = document.getElementById('backpackContainer');
         const backpackGrid = document.getElementById('backpackGrid');
         const hotbarElement = document.getElementById('hotbar');
@@ -948,7 +951,6 @@
                 // Adiciona listeners para o tooltip
                 slot.addEventListener('mouseover', showTooltip);
                 slot.addEventListener('mouseout', hideTooltip);
-                slot.addEventListener('mousemove', updateTooltipPosition);
                 backpackGrid.appendChild(slot);
             });
         }
@@ -972,19 +974,33 @@
             }
 
             if (itemName && itemDescriptions[itemName]) {
+                const slotRect = slot.getBoundingClientRect();
+                const containerRect = gameContainer.getBoundingClientRect();
+
                 itemTooltip.innerHTML = itemDescriptions[itemName];
                 itemTooltip.style.display = 'block';
-                updateTooltipPosition(event);
+
+                // Calcula a posição ideal (acima e centralizado)
+                let top = slotRect.top - containerRect.top - itemTooltip.offsetHeight - 10; // 10px de margem
+                let left = slotRect.left - containerRect.left + (slotRect.width / 2) - (itemTooltip.offsetWidth / 2);
+
+                // Garante que não saia pelos lados
+                if (left < 5) left = 5;
+                if (left + itemTooltip.offsetWidth > containerRect.width - 5) {
+                    left = containerRect.width - itemTooltip.offsetWidth - 5;
+                }
+                // Se sair por cima, mostra embaixo
+                if (top < 5) {
+                    top = slotRect.top - containerRect.top + slotRect.height + 10;
+                }
+
+                itemTooltip.style.top = `${top}px`;
+                itemTooltip.style.left = `${left}px`;
             }
         }
 
         function hideTooltip() {
             itemTooltip.style.display = 'none';
-        }
-
-        function updateTooltipPosition(event) {
-            itemTooltip.style.left = `${event.clientX + 15}px`;
-            itemTooltip.style.top = `${event.clientY + 15}px`;
         }
 
         function updateActiveHotbarSlot(hotbarIndex) { if (hotbarIndex >= 0 && hotbarIndex < HOTBAR_SIZE) { activeHotbarSlot = hotbarIndex; saveGame(); updateHotbarUI(); } }
@@ -1399,7 +1415,6 @@
                 // Adiciona listeners para o tooltip
                 slotElement.addEventListener('mouseover', showTooltip);
                 slotElement.addEventListener('mouseout', hideTooltip);
-                slotElement.addEventListener('mousemove', updateTooltipPosition);
             });
 
             // Listener do Slider de Tempo
