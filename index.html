@@ -799,8 +799,8 @@
         }
 
         function useTool(timestamp) {
-            const pX = Math.floor(player.x/TILE_SIZE); const pY = Math.floor(player.y/TILE_SIZE);
-            const tX = pX + player.lastMoveDir.dx; const tY = pY + player.lastMoveDir.dy;
+            const tX = (player.toolTarget && player.toolTarget.x !== null) ? player.toolTarget.x : Math.floor(player.x/TILE_SIZE) + player.lastMoveDir.dx;
+            const tY = (player.toolTarget && player.toolTarget.y !== null) ? player.toolTarget.y : Math.floor(player.y/TILE_SIZE) + player.lastMoveDir.dy;
             if (tX < 0 || tX >= MAP_WIDTH_TILES || tY < 0 || tY >= MAP_HEIGHT_TILES) return;
 
             const bpIdx = hotbarMapping[activeHotbarSlot];
@@ -1170,13 +1170,15 @@
 
 
         // --- Funções Helper para Controles (CORRIGIDO) ---
-        function triggerUseTool() {
+        function triggerUseTool(targetTile = null) {
              // Bloqueia se mochila aberta ou já em ação
              if (isBackpackOpen || player.isMoving || player.isUsingTool) return;
 
              const bpIdx = hotbarMapping[activeHotbarSlot];
             
              if (bpIdx === -1 || bpIdx >= backpackInventory.length || !backpackInventory[bpIdx]) return; // Slot vazio ou inválido
+
+             player.toolTarget = targetTile; // Armazena o alvo do clique (pode ser null)
 
              console.log("Trigger Use Tool - Slot:", activeHotbarSlot);
              player.isMoving = false; // Garante que parou de andar
@@ -1325,6 +1327,31 @@
              isHolding = false; // Reseta estado de hold ao soltar
          }
 
+        function handleCanvasClick(event) {
+            // Ignora o clique se a mochila estiver aberta ou o jogador estiver ocupado
+            if (isBackpackOpen || player.isMoving || player.isUsingTool) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const clickX = event.clientX - rect.left;
+            const clickY = event.clientY - rect.top;
+
+            const worldX = clickX + camera.x;
+            const worldY = clickY + camera.y;
+
+            const clickedTileX = Math.floor(worldX / TILE_SIZE);
+            const clickedTileY = Math.floor(worldY / TILE_SIZE);
+
+            const playerTileX = Math.floor(player.x / TILE_SIZE);
+            const playerTileY = Math.floor(player.y / TILE_SIZE);
+
+            const dist = Math.sqrt(Math.pow(playerTileX - clickedTileX, 2) + Math.pow(playerTileY - clickedTileY, 2));
+
+            // Permite o uso se a distância for pequena (adjacente ou diagonal)
+            if (dist < 1.5) {
+                triggerUseTool({ x: clickedTileX, y: clickedTileY });
+            }
+        }
+
         function generateWaterSpritesheet() {
             const NUM_FRAMES = 8;
             waterSpritesheetCanvas.width = TILE_SIZE * NUM_FRAMES;
@@ -1434,6 +1461,7 @@
             canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
             canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
             canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false }); // Trata cancelamento como touchend
+            canvas.addEventListener('click', handleCanvasClick);
 
 
             requestAnimationFrame(gameLoop);
