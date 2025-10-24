@@ -609,10 +609,13 @@
                 if (item.name === "Picareta" && targetObject.type === 0) { // Rocha
                     mapObjects.splice(objectIndex, 1); // Remove a rocha
                     const stoneIdx = backpackInventory.findIndex(i => i && i.name === "Pedra");
+                    const stoneGained = Math.floor(Math.random() * 11) + 5; // Ganho de 5 a 15 pedras
                     if (stoneIdx !== -1) {
                         backpackInventory[stoneIdx].count++;
+                        backpackInventory[stoneIdx].count += stoneGained;
                     }
                     console.log("Rocha quebrada!");
+                    console.log(`Rocha quebrada! Ganhou ${stoneGained} pedras.`);
                     saveGame();
                     updateHotbarUI();
                     updateBackpackUI();
@@ -621,10 +624,13 @@
                 if (item.name === "Machado" && targetObject.type === 1) { // Árvore
                     mapObjects.splice(objectIndex, 1); // Remove a árvore
                     const woodIdx = backpackInventory.findIndex(i => i && i.name === "Madeira");
+                    const woodGained = Math.floor(Math.random() * 11) + 5; // Ganho de 5 a 15 madeiras
                     if (woodIdx !== -1) {
                         backpackInventory[woodIdx].count++;
+                        backpackInventory[woodIdx].count += woodGained;
                     }
                     console.log("Árvore cortada!");
+                    console.log(`Árvore cortada! Ganhou ${woodGained} madeiras.`);
                     saveGame();
                     updateHotbarUI();
                     updateBackpackUI();
