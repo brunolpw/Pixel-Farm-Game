@@ -580,7 +580,7 @@
             "Colheita": "<strong>Colheita</strong><br>O fruto do seu trabalho. Um dia, talvez possa ser vendido.",
             "Pá": "<strong>Pá</strong><br>Remove plantações, cercas e outros erros. Transforma grama em terra ou água (perto de água).",
             "Regador": "<strong>Regador</strong><br>Acelera o crescimento das plantas. Recarregue na água.",
-            "Martelo": "<strong>Martelo</strong><br>Constrói cercas em tiles de grama ou terra, consumindo madeira.",
+            "Construção": "<strong>Construção</strong><br>Permite construir e remover estruturas como cercas e muros.",
             "Machado": "<strong>Machado</strong><br>Corta árvores para obter madeira.",
             "Picareta": "<strong>Picareta</strong><br>Quebra pedras para obter minerais.",
             "Pedra": "<strong>Pedra</strong><br>Material de construção básico, obtido de rochas.",
@@ -590,7 +590,8 @@
         };
 
         const itemActions = {
-            "Martelo": [
+            "Construção": [
+                { label: "Construir Piso", action: "set_sub_action", value: "build_floor" },
                 { label: "Construir Muro", action: "set_sub_action", value: "build_wall" },
                 { label: "Pegar Muro", action: "set_sub_action", value: "pickup_wall" },
                 { label: "Construir Cerca Vertical", action: "set_sub_action", value: "vertical_fence" },
@@ -717,6 +718,17 @@
                 ctx.fillRect(x_px + 10, y_px + 18, 12, 3);
             }
         }
+        function drawFloorTile(ctx, x, y, size) {
+            const plankColor1 = '#A1887F';
+            const plankColor2 = '#8D6E63';
+            ctx.fillStyle = '#5D4037'; // Fundo escuro
+            ctx.fillRect(x, y, size, size);
+
+            for (let i = 0; i < size; i += 8) {
+                ctx.fillStyle = (i / 8) % 2 === 0 ? plankColor1 : plankColor2;
+                ctx.fillRect(x + i, y, 8, size);
+            }
+        }
         function drawWall(ctx, x_px, y_px) {
             const baseColor = '#BCAAA4'; // Cor do tijolo
             const mortarColor = '#8D6E63'; // Cor da argamassa
@@ -752,6 +764,7 @@
                 case 5: drawSproutTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break;
                 case 6: drawPlantTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break;
                 case 7: drawHarvestableTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break;
+                case 8: drawFloorTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break;
                 default: drawGrassTile(preRenderedMapCtx, dX, dY, TILE_SIZE);
             }
         }
@@ -1024,7 +1037,7 @@
                     updateBackpackUI();
                     return; // Ação concluída
                 }
-                if (item.name === "Martelo" && player.toolSubAction === 'pickup_fence' && targetObject.type === 4) {
+                if (item.name === "Construção" && player.toolSubAction === 'pickup_fence' && targetObject.type === 4) {
                     mapObjects.splice(objectIndex, 1); // Remove a cerca do mapa
                     addItemToInventory("Cerca", 1); // Adiciona o item Cerca ao inventário
                     console.log("Cerca coletada!");
@@ -1033,7 +1046,7 @@
                     updateBackpackUI();
                     return; // Ação concluída
                 }
-                if (item.name === "Martelo" && player.toolSubAction === 'pickup_wall' && targetObject.type === 5) {
+                if (item.name === "Construção" && player.toolSubAction === 'pickup_wall' && targetObject.type === 5) {
                     mapObjects.splice(objectIndex, 1); // Remove o muro do mapa
                     addItemToInventory("Muro", 1); // Adiciona o item Muro ao inventário
                     console.log("Muro coletado!");
@@ -1064,9 +1077,22 @@
             switch (item.name) {
                 case "Enxada": if (tId === 0 || tId === 1) { map[tY][tX] = 2; updatePreRenderedTile(tX, tY, 2); saveGame(); } break;
                 case "Semente": if (tId === 2 && item.count > 0) { map[tY][tX] = 4; plantGrowthData[tK] = { plantedAt: timestamp, boosted: false }; item.count--; updatePreRenderedTile(tX, tY, 4); saveGame(); updateHotbarUI(); updateBackpackUI(); } break;
-                case "Pá": if (tId === 1 || tId === 2 || (tId >= 4 && tId <= 7)) { map[tY][tX] = 0; if (plantGrowthData[tK]) delete plantGrowthData[tK]; updatePreRenderedTile(tX, tY, 0); saveGame(); } else if (tId === 0) { let aW = false; const ne = [[0, 1], [0, -1], [1, 0], [-1, 0]]; for (const [nx, ny] of ne) { const cX = tX + nx; const cY = tY + ny; if (cX >= 0 && cX < MAP_WIDTH_TILES && cY >= 0 && cY < MAP_HEIGHT_TILES) { if (map[cY][cX] === 3) { aW = true; break; } } } if (aW) { map[tY][tX] = 3; updatePreRenderedTile(tX, tY, 3); saveGame(); } } else if (tId === 3) { map[tY][tX] = 0; updatePreRenderedTile(tX, tY, 0); saveGame(); } break;
+                case "Pá":
+                    if (tId === 8) { // Remove piso de madeira
+                        map[tY][tX] = 0; // Volta para grama
+                        addItemToInventory("Madeira", 1); // Devolve 1 madeira
+                        updatePreRenderedTile(tX, tY, 0);
+                        saveGame();
+                    } else if (tId === 1 || tId === 2 || (tId >= 4 && tId <= 7)) {
+                        map[tY][tX] = 0; if (plantGrowthData[tK]) delete plantGrowthData[tK]; updatePreRenderedTile(tX, tY, 0); saveGame();
+                    } else if (tId === 0) {
+                        let aW = false; const ne = [[0, 1], [0, -1], [1, 0], [-1, 0]]; for (const [nx, ny] of ne) { const cX = tX + nx; const cY = tY + ny; if (cX >= 0 && cX < MAP_WIDTH_TILES && cY >= 0 && cY < MAP_HEIGHT_TILES) { if (map[cY][cX] === 3) { aW = true; break; } } } if (aW) { map[tY][tX] = 3; updatePreRenderedTile(tX, tY, 3); saveGame(); }
+                    } else if (tId === 3) {
+                        map[tY][tX] = 0; updatePreRenderedTile(tX, tY, 0); saveGame();
+                    }
+                    break;
                 case "Regador": if (tId === 3) { item.count = 10; updateHotbarUI(); updateBackpackUI(); saveGame(); } else if (tId >= 4 && tId <= 6 && item.count > 0) { const pD = plantGrowthData[tK]; if (pD && !pD.boosted) { pD.boosted = true; item.count--; activeAnimations.push({ type: 'water', x: tX, y: tY, startTime: timestamp, duration: 500 }); updateHotbarUI(); updateBackpackUI(); saveGame(); } } break;
-                case "Martelo":
+                case "Construção":
                     if ((tId === 0 || tId === 1) && objectIndex === -1) { // Pode construir em grama ou terra vazia
                         if (player.toolSubAction === 'build_wall') {
                             const wallItemIdx = backpackInventory.findIndex(i => i && i.name === "Muro" && i.count > 0);
@@ -1081,6 +1107,17 @@
                             }
                             mapObjects.push({ type: 5, x: tX, y: tY }); // type 5 = Muro
                             console.log("Muro construído!");
+                        } else if (player.toolSubAction === 'build_floor') {
+                            const woodIdx = backpackInventory.findIndex(i => i && i.name === "Madeira" && i.count > 0);
+                            if (woodIdx !== -1) {
+                                backpackInventory[woodIdx].count--;
+                                map[tY][tX] = 8; // type 8 = Piso
+                                updatePreRenderedTile(tX, tY, 8);
+                                console.log("Piso construído!");
+                            } else {
+                                console.log("Sem madeira para construir o piso.");
+                                break;
+                            }
                         } else if (player.toolSubAction === 'vertical_fence' || player.toolSubAction === 'horizontal_fence' || player.toolSubAction === null) {
                             // Se a sub-ação for pegar, não faz nada em tile vazio
                             if (player.toolSubAction === 'pickup_fence' || player.toolSubAction === 'pickup_wall') break;
@@ -1134,11 +1171,12 @@
 
                 if (item && nameSpan && countSpan && subActionSpan) {
                     nameSpan.textContent = item.name;
-                    countSpan.textContent = (item.count > 0 && ["Semente", "Colheita", "Regador", "Pedra", "Madeira", "Cerca", "Muro"].includes(item.name)) ? item.count : "";
+                    countSpan.textContent = (item.count > 0 && ["Semente", "Colheita", "Regador", "Pedra", "Madeira", "Cerca", "Muro"].includes(item.name)) ? `x${item.count}` : "";
                     
                     // Mostra a sub-ação no slot ativo
                     if (hotbarIndex === activeHotbarSlot && player.toolSubAction) {
                         if (player.toolSubAction === 'pickup_fence') subActionSpan.textContent = "(Pegar)";
+                        else if (player.toolSubAction === 'build_floor') subActionSpan.textContent = "(Piso)";
                         else if (player.toolSubAction === 'build_wall') subActionSpan.textContent = "(Construir)";
                         else if (player.toolSubAction === 'pickup_wall') subActionSpan.textContent = "(Pegar)";
                         else if (player.toolSubAction === 'vertical_fence') subActionSpan.textContent = "(Vertical)";
@@ -1171,7 +1209,7 @@
 
                 if (item) {
                     nameSpan.textContent = item.name;
-                    countSpan.textContent = (item.count > 0 && ["Semente", "Colheita", "Regador", "Pedra", "Madeira", "Cerca", "Muro"].includes(item.name)) ? item.count : "";
+                    countSpan.textContent = (item.count > 0 && ["Semente", "Colheita", "Regador", "Pedra", "Madeira", "Cerca", "Muro"].includes(item.name)) ? `x${item.count}` : "";
                 } else {
                     nameSpan.textContent = "";
                     countSpan.textContent = "";
@@ -1432,7 +1470,7 @@
         }
         // CORRIGIDO: loadGame
         function loadGame() {
-            const defaultItems = [ { name: "Enxada", count: 1 }, { name: "Semente", count: 10 }, { name: "Colheita", count: 0 }, { name: "Pá", count: 1 }, { name: "Regador", count: 0 }, { name: "Martelo", count: 1 }, { name: "Machado", count: 1 }, { name: "Picareta", count: 1 }, { name: "Pedra", count: 0 }, { name: "Madeira", count: 0 }, { name: "Cerca", count: 0 }, { name: "Muro", count: 0 } ];
+            const defaultItems = [ { name: "Enxada", count: 1 }, { name: "Semente", count: 10 }, { name: "Colheita", count: 0 }, { name: "Pá", count: 1 }, { name: "Regador", count: 0 }, { name: "Construção", count: 1 }, { name: "Machado", count: 1 }, { name: "Picareta", count: 1 }, { name: "Pedra", count: 0 }, { name: "Madeira", count: 0 }, { name: "Cerca", count: 0 }, { name: "Muro", count: 0 } ];
 
             const savedData = localStorage.getItem('pixelFarmSaveData');
             if (savedData) {
@@ -1698,10 +1736,8 @@
                 if (item.name === "Picareta" && targetObject.type === 0) return true;
                 if (item.name === "Machado" && targetObject.type === 1) return true;
                 if (item.name === "Pá" && targetObject.type === 4) return true;
-                // CORREÇÃO: Ação de pegar cerca com martelo
-                if (item.name === "Martelo" && player.toolSubAction === 'pickup_fence' && targetObject.type === 4) return true;
-                // Ação de pegar muro com martelo
-                if (item.name === "Martelo" && player.toolSubAction === 'pickup_wall' && targetObject.type === 5) return true;
+                if (item.name === "Construção" && player.toolSubAction === 'pickup_fence' && targetObject.type === 4) return true;
+                if (item.name === "Construção" && player.toolSubAction === 'pickup_wall' && targetObject.type === 5) return true;
                 return false;
             }
 
@@ -1710,10 +1746,15 @@
             switch (item.name) {
                 case "Enxada": return (tId === 0 || tId === 1);
                 case "Semente": return (tId === 2 && item.count > 0);
-                case "Pá": return (tId === 1 || tId === 2 || (tId >= 4 && tId <= 7) || tId === 0 || tId === 3);
+                case "Pá": return (tId === 1 || tId === 2 || (tId >= 4 && tId <= 7) || tId === 0 || tId === 3 || tId === 8);
                 case "Regador": return (tId === 3 || (tId >= 4 && tId <= 6 && item.count > 0));
-                case "Martelo":
-                    if (player.toolSubAction === 'pickup_fence' || player.toolSubAction === 'pickup_wall') return false;
+                case "Construção":
+                    if (player.toolSubAction === 'pickup_fence' || player.toolSubAction === 'pickup_wall') {
+                        return false; // Não é acionável em tile vazio
+                    }
+                    if (player.toolSubAction === 'build_floor') {
+                        return ((tId === 0 || tId === 1) && backpackInventory.some(i => i && i.name === "Madeira" && i.count > 0));
+                    }
                     if (player.toolSubAction === 'build_wall') {
                         return ((tId === 0 || tId === 1) && (backpackInventory.some(i => i && i.name === "Muro" && i.count > 0) || backpackInventory.some(i => i && i.name === "Pedra" && i.count >= 5)));
                     }
