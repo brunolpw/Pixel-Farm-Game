@@ -655,63 +655,33 @@
         let activeConstructionHotbarSlot = 0;
 
 
+        const ITEMS = {
+            'hoe': { id: 'hoe', name: 'Enxada', description: '<strong>Enxada</strong><br>Prepara a terra para o plantio.', category: 'ferramenta', stackable: false },
+            'seed_tomato': { id: 'seed_tomato', name: 'Semente', description: '<strong>Semente</strong><br>Plante em solo arado para cultivar tomates.', category: 'material', stackable: true, actions: [ { label: "Plantar Tomate", action: "log", value: "Ainda só temos um tipo de semente." }, { label: "Plantar Milho", action: "log", value: "Semente de milho não implementada." }, { label: "Plantar Árvore", action: "log", value: "Semente de árvore não implementada." } ] },
+            'tomato': { id: 'tomato', name: 'Colheita', description: '<strong>Colheita</strong><br>O fruto do seu trabalho. Um tomate suculento.', category: 'material', stackable: true },
+            'shovel': { id: 'shovel', name: 'Pá', description: '<strong>Pá</strong><br>Remove plantações e outros erros.', category: 'ferramenta', stackable: false },
+            'watering_can': { id: 'watering_can', name: 'Regador', description: '<strong>Regador</strong><br>Acelera o crescimento das plantas.', category: 'ferramenta', stackable: false },
+            'axe': { id: 'axe', name: 'Machado', description: '<strong>Machado</strong><br>Corta árvores para obter madeira.', category: 'ferramenta', stackable: false },
+            'pickaxe': { id: 'pickaxe', name: 'Picareta', description: '<strong>Picareta</strong><br>Quebra pedras para obter minerais.', category: 'ferramenta', stackable: false },
+            'stone': { id: 'stone', name: 'Pedra', description: '<strong>Pedra</strong><br>Material de construção básico.', category: 'material', stackable: true },
+            'wood': { id: 'wood', name: 'Madeira', description: '<strong>Madeira</strong><br>Material de construção básico.', category: 'material', stackable: true },
+            'fence': { id: 'fence', name: 'Cerca', description: '<strong>Cerca</strong><br>Uma cerca pré-fabricada.', category: 'construcao', stackable: true },
+            'wall': { id: 'wall', name: 'Muro', description: '<strong>Muro</strong><br>Um muro de tijolos resistente.', category: 'construcao', stackable: true },
+            'door': { id: 'door', name: 'Porta', description: '<strong>Porta</strong><br>Uma porta de madeira.', category: 'construcao', stackable: true },
+            'gate': { id: 'gate', name: 'Porteira', description: '<strong>Porteira</strong><br>Uma porteira de fazenda.', category: 'construcao', stackable: true },
+            'construction_tool': { id: 'construction_tool', name: 'Construção', description: '<strong>Construção</strong><br>Permite construir e remover estruturas.', category: 'ferramenta', stackable: false, actions: [
+                    { label: "Mudar para modo 'Pegar'", action: "set_sub_action", value: "pickup_mode" },
+                    { label: "Construir Porta", action: "set_sub_action", value: "build_door" },
+                    { label: "Construir Porteira", action: "set_sub_action", value: "build_gate" },
+                    { label: "Construir Piso", action: "set_sub_action", value: "build_floor" },
+                    { label: "Construir Muro", action: "set_sub_action", value: "build_wall" },
+                    { label: "Construir Cerca Vertical", action: "set_sub_action", value: "vertical_fence" },
+                    { label: "Construir Cerca Horizontal", action: "set_sub_action", value: "horizontal_fence" }
+                ]
+            }
+        };
+
         let activeAnimations = [];
-
-        // --- Variáveis de Tempo ---
-        const itemDescriptions = {
-            "Enxada": "<strong>Enxada</strong><br>Prepara a terra para o plantio em tiles de grama ou terra.",
-            "Semente": "<strong>Semente</strong><br>Plante em solo arado para cultivar. A colheita pode render mais sementes.",
-            "Colheita": "<strong>Colheita</strong><br>O fruto do seu trabalho. Um dia, talvez possa ser vendido.",
-            "Pá": "<strong>Pá</strong><br>Remove plantações, cercas e outros erros. Transforma grama em terra ou água (perto de água).",
-            "Regador": "<strong>Regador</strong><br>Acelera o crescimento das plantas. Recarregue na água.",
-            "Construção": "<strong>Construção</strong><br>Permite construir e remover estruturas como cercas e muros.",
-            "Machado": "<strong>Machado</strong><br>Corta árvores para obter madeira.",
-            "Picareta": "<strong>Picareta</strong><br>Quebra pedras para obter minerais.",
-            "Pedra": "<strong>Pedra</strong><br>Material de construção básico, obtido de rochas.",
-            "Madeira": "<strong>Madeira</strong><br>Material de construção básico, obtido de árvores.",
-            "Cerca": "<strong>Cerca</strong><br>Uma cerca pré-fabricada. Use a ferramenta de Construção para posicioná-la.",
-            "Muro": "<strong>Muro</strong><br>Um muro de tijolos resistente. Use o Martelo para posicioná-lo.",
-            "Porta": "<strong>Porta</strong><br>Uma porta de madeira. Pode ser aberta e fechada.",
-            "Porteira": "<strong>Porteira</strong><br>Uma porteira de fazenda. Pode ser aberta e fechada."
-        };
-
-        const ITEM_DATA = {
-            "Enxada": { category: 'ferramenta' },
-            "Semente": { category: 'material' },
-            "Colheita": { category: 'material' },
-            "Pá": { category: 'ferramenta' },
-            "Regador": { category: 'ferramenta' },
-            "Construção": { category: 'ferramenta' },
-            "Machado": { category: 'ferramenta' },
-            "Picareta": { category: 'ferramenta' },
-            "Pedra": { category: 'material' },
-            "Madeira": { category: 'material' },
-            "Cerca": { category: 'construcao' }, // Piso não é um item, é um tile
-            "Muro": { category: 'construcao' },
-            "Porta": { category: 'construcao' },
-            "Porteira": { category: 'construcao' }
-        };
-
-        const CONSTRUCTION_ITEM_NAMES = ["Construção", "Cerca", "Muro", "Porta", "Porteira"];
-
-        const itemActions = {
-            "Construção": [
-                { label: "Mudar para modo 'Pegar'", action: "set_sub_action", value: "pickup_mode" },
-                { label: "Construir Porta", action: "set_sub_action", value: "build_door" },
-                { label: "Construir Porteira", action: "set_sub_action", value: "build_gate" },
-                { label: "Construir Piso", action: "set_sub_action", value: "build_floor" },
-                { label: "Construir Muro", action: "set_sub_action", value: "build_wall" },
-                { label: "Construir Cerca Vertical", action: "set_sub_action", value: "vertical_fence" },
-                { label: "Construir Cerca Horizontal", action: "set_sub_action", value: "horizontal_fence" }
-            ],
-            "Semente": [
-                { label: "Plantar Tomate", action: "log", value: "Ainda só temos um tipo de semente." },
-                { label: "Plantar Milho", action: "log", value: "Semente de milho não implementada." },
-                { label: "Plantar Árvore", action: "log", value: "Semente de árvore não implementada." }
-            ]
-            // Todos os itens recebem a opção "Guardar" automaticamente
-        };
-
 
         let gameHour = 0; let gameMinute = 0; let gameTimeOffset = 0;
         const GAME_MINUTES_PER_DAY = 1440; const REAL_SECONDS_PER_GAME_DAY = 3600;
@@ -1148,22 +1118,23 @@
         });
 
         // Função helper para adicionar itens ao inventário
-        function addItemToInventory(itemName, quantity) {
-            let itemIndex = backpackInventory.findIndex(i => i && i.name === itemName);
+        function addItemToInventory(itemId, quantity) {
+            const itemDefinition = ITEMS[itemId];
+            if (!itemDefinition) { console.warn(`Tentativa de adicionar item desconhecido: ${itemId}`); return; }
+            let itemIndex = backpackInventory.findIndex(i => i && i.id === itemId && itemDefinition.stackable);
             if (itemIndex !== -1) {
                 backpackInventory[itemIndex].count += quantity;
             } else {
                 let emptyBackpackSlot = backpackInventory.findIndex(slot => slot === null);
                 if (emptyBackpackSlot !== -1) {
-                    const itemData = ITEM_DATA[itemName] || {};
-                    backpackInventory[emptyBackpackSlot] = { name: itemName, count: quantity, category: itemData.category || 'desconhecido' };
+                    backpackInventory[emptyBackpackSlot] = { id: itemId, count: quantity };
                     // Tenta mapear para um slot vazio da hotbar, se houver
                     let emptyHotbarSlot = hotbarMapping.findIndex(mapping => mapping === -1);
                     if (emptyHotbarSlot !== -1) {
                         hotbarMapping[emptyHotbarSlot] = emptyBackpackSlot;
                     }
                 } else {
-                    console.warn(`Mochila cheia, não foi possível adicionar ${quantity} de ${itemName}.`);
+                    console.warn(`Mochila cheia, não foi possível adicionar ${quantity} de ${itemDefinition.name}.`);
                 }
             }
         }
@@ -1175,9 +1146,10 @@
             const currentMapping = isConstructionModeActive ? constructionHotbarMapping : hotbarMapping;
             const currentSlot = isConstructionModeActive ? activeConstructionHotbarSlot : activeHotbarSlot;
             const bpIdx = currentMapping[currentSlot];
-            if (bpIdx < 0 || bpIdx >= backpackInventory.length) return;
-            const item = backpackInventory[bpIdx];
-            if (!item) return;
+            if (bpIdx < 0 || !backpackInventory[bpIdx]) return;
+            const inventoryItem = backpackInventory[bpIdx];
+            if (!inventoryItem) return;
+            const item = ITEMS[inventoryItem.id];
 
             // Verifica se há um objeto no tile alvo
             const objectIndex = mapObjects.findIndex(obj => obj.x === tX && obj.y === tY);
@@ -1186,7 +1158,7 @@
                 if (item.name === "Picareta" && targetObject.type === 0) { // Rocha
                     mapObjects.splice(objectIndex, 1); // Remove a rocha
                     const stoneGained = Math.floor(Math.random() * 11) + 5; // Ganho de 5 a 15 pedras
-                    addItemToInventory("Pedra", stoneGained);
+                    addItemToInventory('stone', stoneGained);
                     console.log(`Rocha quebrada! Ganhou ${stoneGained} pedras.`);
                     saveGame();
                     updateHotbarUI();
@@ -1196,7 +1168,7 @@
                 if (item.name === "Machado" && targetObject.type === 1) { // Árvore
                     mapObjects.splice(objectIndex, 1); // Remove a árvore
                     const woodGained = Math.floor(Math.random() * 11) + 5; // Ganho de 5 a 15 madeiras
-                    addItemToInventory("Madeira", woodGained);
+                    addItemToInventory('wood', woodGained);
                     console.log(`Árvore cortada! Ganhou ${woodGained} madeiras.`);
                     saveGame();
                     updateHotbarUI();
@@ -1205,7 +1177,7 @@
                 }
                 if (item.name === "Pá" && targetObject.type === 4) { // Cerca
                     mapObjects.splice(objectIndex, 1); // Remove a cerca
-                    addItemToInventory("Madeira", 1); // Devolve 1 madeira
+                    addItemToInventory('wood', 1); // Devolve 1 madeira
                     console.log("Cerca removida!");
                     saveGame();
                     updateHotbarUI();
@@ -1214,7 +1186,7 @@
                 }
                 if (item.name === "Pá" && targetObject.type === 4) { // Cerca
                     mapObjects.splice(objectIndex, 1); // Remove a cerca
-                    addItemToInventory("Madeira", 1); // Devolve 1 madeira
+                    addItemToInventory('wood', 1); // Devolve 1 madeira
                     console.log("Cerca removida!");
                     saveGame();
                     updateHotbarUI();
@@ -1224,10 +1196,10 @@
                 // Lógica Universal de "Pegar"
                 if (item.name === "Construção" && player.toolSubAction === 'pickup_mode') {
                     let pickedUpItem = null;
-                    if (targetObject.type === 4) pickedUpItem = "Cerca";
-                    else if (targetObject.type === 5) pickedUpItem = "Muro";
-                    else if (targetObject.type === 6) pickedUpItem = "Porta";
-                    else if (targetObject.type === 7) pickedUpItem = "Porteira";
+                    if (targetObject.type === 4) pickedUpItem = 'fence';
+                    else if (targetObject.type === 5) pickedUpItem = 'wall';
+                    else if (targetObject.type === 6) pickedUpItem = 'door';
+                    else if (targetObject.type === 7) pickedUpItem = 'gate';
 
                     if (pickedUpItem) {
                         mapObjects.splice(objectIndex, 1);
@@ -1251,9 +1223,9 @@
             if (tId === 7) {
                 map[tY][tX] = 2; // Volta para solo arado
                 delete plantGrowthData[tK]; // Remove os dados de crescimento da planta
-                addItemToInventory("Colheita", 1);
+                addItemToInventory('tomato', 1);
                 const seedsGained = Math.floor(Math.random() * 4); // 0, 1, 2 ou 3 sementes
-                if (seedsGained > 0) addItemToInventory("Semente", seedsGained);
+                if (seedsGained > 0) addItemToInventory('seed_tomato', seedsGained);
                 updatePreRenderedTile(tX, tY, 2);
                 saveGame(); updateHotbarUI(); updateBackpackUI(); return;
             }
@@ -1261,7 +1233,7 @@
             // Lógica Universal de "Pegar" para pisos
             if (item.name === "Construção" && player.toolSubAction === 'pickup_mode' && tId === 8) {
                 map[tY][tX] = 0; // Volta para grama
-                addItemToInventory("Madeira", 1); // Devolve 1 madeira
+                addItemToInventory('wood', 1); // Devolve 1 madeira
                 updatePreRenderedTile(tX, tY, 0);
                 console.log("Piso removido!");
                 saveGame();
@@ -1272,11 +1244,11 @@
 
             switch (item.name) {
                 case "Enxada": if (tId === 0 || tId === 1) { map[tY][tX] = 2; updatePreRenderedTile(tX, tY, 2); saveGame(); } break;
-                case "Semente": if (tId === 2 && item.count > 0) { map[tY][tX] = 4; plantGrowthData[tK] = { plantedAt: timestamp, boosted: false }; item.count--; updatePreRenderedTile(tX, tY, 4); saveGame(); updateHotbarUI(); updateBackpackUI(); } break;
+                case "Semente": if (tId === 2 && inventoryItem.count > 0) { map[tY][tX] = 4; plantGrowthData[tK] = { plantedAt: timestamp, boosted: false }; inventoryItem.count--; updatePreRenderedTile(tX, tY, 4); saveGame(); updateHotbarUI(); updateBackpackUI(); } break;
                 case "Pá":
                     if (tId === 8) { // Remove piso de madeira
                         map[tY][tX] = 0; // Volta para grama
-                        addItemToInventory("Madeira", 1); // Devolve 1 madeira
+                        addItemToInventory('wood', 1); // Devolve 1 madeira
                         updatePreRenderedTile(tX, tY, 0);
                         saveGame();
                     } else if (tId === 1 || tId === 2 || (tId >= 4 && tId <= 7)) {
@@ -1287,14 +1259,14 @@
                         map[tY][tX] = 0; updatePreRenderedTile(tX, tY, 0); saveGame();
                     }
                     break;
-                case "Regador": if (tId === 3) { item.count = 10; updateHotbarUI(); updateBackpackUI(); saveGame(); } else if (tId >= 4 && tId <= 6 && item.count > 0) { const pD = plantGrowthData[tK]; if (pD && !pD.boosted) { pD.boosted = true; item.count--; activeAnimations.push({ type: 'water', x: tX, y: tY, startTime: timestamp, duration: 500 }); updateHotbarUI(); updateBackpackUI(); saveGame(); } } break;
+                case "Regador": if (tId === 3) { inventoryItem.count = 10; updateHotbarUI(); updateBackpackUI(); saveGame(); } else if (tId >= 4 && tId <= 6 && inventoryItem.count > 0) { const pD = plantGrowthData[tK]; if (pD && !pD.boosted) { pD.boosted = true; inventoryItem.count--; activeAnimations.push({ type: 'water', x: tX, y: tY, startTime: timestamp, duration: 500 }); updateHotbarUI(); updateBackpackUI(); saveGame(); } } break;
                 case "Construção":
                     if (objectIndex !== -1) break; // Não constrói sobre objetos existentes
 
                     if (player.toolSubAction === 'build_wall') {
                         if (tId === 0 || tId === 1) {
-                            const wallItemIdx = backpackInventory.findIndex(i => i && i.name === "Muro" && i.count > 0);
-                            const stoneIdx = backpackInventory.findIndex(i => i && i.name === "Pedra" && i.count >= 5);
+                            const wallItemIdx = backpackInventory.findIndex(i => i && i.id === 'wall' && i.count > 0);
+                            const stoneIdx = backpackInventory.findIndex(i => i && i.id === 'stone' && i.count >= 5);
                             if (wallItemIdx !== -1) { backpackInventory[wallItemIdx].count--; }
                             else if (stoneIdx !== -1) { backpackInventory[stoneIdx].count -= 5; }
                             else { console.log("Sem muros ou pedras (mín. 5) para construir."); break; }
@@ -1303,7 +1275,7 @@
                         }
                     } else if (player.toolSubAction === 'build_floor') {
                         if (tId === 0 || tId === 1) {
-                            const woodIdx = backpackInventory.findIndex(i => i && i.name === "Madeira" && i.count > 0);
+                            const woodIdx = backpackInventory.findIndex(i => i && i.id === 'wood' && i.count > 0);
                             if (woodIdx !== -1) {
                                 backpackInventory[woodIdx].count--;
                                 map[tY][tX] = 8; // type 8 = Piso
@@ -1317,8 +1289,8 @@
                             const hasVerticalWall = mapObjects.some(obj => obj.type === 5 && obj.x === tX && (obj.y === tY - 1 || obj.y === tY + 1));
                             if (!hasHorizontalWall && !hasVerticalWall) { console.log("A porta deve ser construída ao lado de um muro."); break; }
 
-                            const doorItemIdx = backpackInventory.findIndex(i => i && i.name === "Porta" && i.count > 0);
-                            const woodIdx = backpackInventory.findIndex(i => i && i.name === "Madeira" && i.count >= 4);
+                            const doorItemIdx = backpackInventory.findIndex(i => i && i.id === 'door' && i.count > 0);
+                            const woodIdx = backpackInventory.findIndex(i => i && i.id === 'wood' && i.count >= 4);
                             if (doorItemIdx !== -1) { backpackInventory[doorItemIdx].count--; } 
                             else if (woodIdx !== -1) { backpackInventory[woodIdx].count -= 4; } 
                             else { console.log("Sem Portas ou Madeira (mín. 4) para construir."); break; }
@@ -1332,8 +1304,8 @@
                             const hasVerticalFence = mapObjects.some(obj => obj.type === 4 && obj.x === tX && (obj.y === tY - 1 || obj.y === tY + 1));
                             if (!hasHorizontalFence && !hasVerticalFence) { console.log("A porteira deve ser construída ao lado de uma cerca."); break; }
 
-                            const gateItemIdx = backpackInventory.findIndex(i => i && i.name === "Porteira" && i.count > 0);
-                            const woodIdx = backpackInventory.findIndex(i => i && i.name === "Madeira" && i.count >= 4);
+                            const gateItemIdx = backpackInventory.findIndex(i => i && i.id === 'gate' && i.count > 0);
+                            const woodIdx = backpackInventory.findIndex(i => i && i.id === 'wood' && i.count >= 4);
                             if (gateItemIdx !== -1) { backpackInventory[gateItemIdx].count--; } 
                             else if (woodIdx !== -1) { backpackInventory[woodIdx].count -= 4; } 
                             else { console.log("Sem Porteiras ou Madeira (mín. 4) para construir."); break; }
@@ -1344,8 +1316,8 @@
                     } else if (player.toolSubAction === 'vertical_fence' || player.toolSubAction === 'horizontal_fence' || player.toolSubAction === null) {
                         if (tId === 0 || tId === 1) {
                             if (player.toolSubAction === 'pickup_mode') break; // Modo pegar não constrói
-                            const fenceItemIdx = backpackInventory.findIndex(i => i && i.name === "Cerca" && i.count > 0);
-                            const woodIdx = backpackInventory.findIndex(i => i && i.name === "Madeira" && i.count > 0);
+                            const fenceItemIdx = backpackInventory.findIndex(i => i && i.id === 'fence' && i.count > 0);
+                            const woodIdx = backpackInventory.findIndex(i => i && i.id === 'wood' && i.count > 0);
                             if (fenceItemIdx !== -1) { backpackInventory[fenceItemIdx].count--; } 
                             else if (woodIdx !== -1) { backpackInventory[woodIdx].count--; } 
                             else { console.log("Sem cercas ou madeira para construir."); break; }
@@ -1382,16 +1354,16 @@
                 const currentMapping = isConstructionModeActive ? constructionHotbarMapping : hotbarMapping;
                 const currentActiveSlot = isConstructionModeActive ? activeConstructionHotbarSlot : activeHotbarSlot; // Usa o slot ativo correto
                 const backpackIndex = currentMapping[hotbarIndex];
-                const item = (backpackIndex !== -1 && backpackIndex >= 0 && backpackIndex < backpackInventory.length) ? backpackInventory[backpackIndex] : null;
+                const inventoryItem = (backpackIndex !== -1 && backpackIndex >= 0 && backpackIndex < backpackInventory.length) ? backpackInventory[backpackIndex] : null;
+                const item = inventoryItem ? ITEMS[inventoryItem.id] : null;
                 const nameSpan = slot.querySelector('.slot-name');
                 const subActionSpan = slot.querySelector('.slot-sub-action');
                 const countSpan = slot.querySelector('.slot-count');
 
                 if (item && nameSpan && countSpan && subActionSpan) {
                     nameSpan.textContent = item.name;
-                    // A ferramenta "Construção" não precisa de contagem
-                    const isCountable = !CONSTRUCTION_ITEM_NAMES.includes(item.name) || item.name !== "Construção";
-                    countSpan.textContent = (item.count > 0 && isCountable && ["Semente", "Colheita", "Regador", "Pedra", "Madeira", "Cerca", "Muro", "Porta", "Porteira"].includes(item.name)) ? `x${item.count}` : "";
+                    const isCountable = item.stackable || item.category === 'ferramenta' && inventoryItem.count > 0; // Regador tem contagem
+                    countSpan.textContent = (isCountable && inventoryItem.count > 0) ? `x${inventoryItem.count}` : "";
                     
                     // Mostra a sub-ação no slot ativo
                     if (hotbarIndex === currentActiveSlot && player.toolSubAction) {
@@ -1430,10 +1402,11 @@
                 const countSpan = document.createElement('span');
                 countSpan.classList.add('slot-count');
 
-                if (item) {
-                    nameSpan.textContent = item.name;
-                    const isCountable = !CONSTRUCTION_ITEM_NAMES.includes(item.name) || item.name !== "Construção";
-                    countSpan.textContent = (item.count > 0 && isCountable && ["Semente", "Colheita", "Regador", "Pedra", "Madeira", "Cerca", "Muro", "Porta", "Porteira"].includes(item.name)) ? `x${item.count}` : "";
+                if (item && item.id) {
+                    const itemDefinition = ITEMS[item.id];
+                    nameSpan.textContent = itemDefinition.name;
+                    const isCountable = itemDefinition.stackable || itemDefinition.category === 'ferramenta' && item.count > 0;
+                    countSpan.textContent = (isCountable && item.count > 0) ? `x${item.count}` : "";
                 } else {
                     nameSpan.textContent = "";
                     countSpan.textContent = "";
@@ -1460,26 +1433,27 @@
                 const currentMapping = isConstructionModeActive ? constructionHotbarMapping : hotbarMapping;
                 const hotbarIndex = parseInt(slot.dataset.hotbarIndex, 10);
                 const backpackIndex = currentMapping[hotbarIndex];
-                if (backpackIndex !== -1 && backpackInventory[backpackIndex]) {
-                    itemName = backpackInventory[backpackIndex].name;
+                if (backpackIndex !== -1 && backpackInventory[backpackIndex] && ITEMS[backpackInventory[backpackIndex].id]) {
+                    itemName = ITEMS[backpackInventory[backpackIndex].id].name;
                 }
             } else if (slot.parentElement.id === 'constructionGrid') {
                 const backpackIndex = parseInt(slot.dataset.backpackIndex, 10);
-                if (backpackInventory[backpackIndex]) {
-                    itemName = backpackInventory[backpackIndex].name;
+                if (backpackInventory[backpackIndex] && ITEMS[backpackInventory[backpackIndex].id]) {
+                    itemName = ITEMS[backpackInventory[backpackIndex].id].name;
                 }
             } else if (slot.parentElement.id === 'backpackGrid') {
                 const backpackIndex = parseInt(slot.dataset.backpackIndex, 10);
-                if (backpackInventory[backpackIndex]) {
-                    itemName = backpackInventory[backpackIndex].name;
+                if (backpackInventory[backpackIndex] && ITEMS[backpackInventory[backpackIndex].id]) {
+                    itemName = ITEMS[backpackInventory[backpackIndex].id].name;
                 }
             }
 
-            if (itemName && itemDescriptions[itemName]) {
+            const itemDefinition = Object.values(ITEMS).find(i => i.name === itemName);
+            if (itemDefinition && itemDefinition.description) {
                 const slotRect = slot.getBoundingClientRect();
                 const containerRect = gameContainer.getBoundingClientRect();
 
-                itemTooltip.innerHTML = itemDescriptions[itemName];
+                itemTooltip.innerHTML = itemDefinition.description;
                 itemTooltip.style.display = 'block';
 
                 // Calcula a posição ideal (acima e centralizado)
@@ -1512,14 +1486,15 @@
             const backpackIndex = currentMapping[hotbarIndex];
             if (backpackIndex === -1 || !backpackInventory[backpackIndex]) return;
 
-            const item = backpackInventory[backpackIndex];
+            const inventoryItem = backpackInventory[backpackIndex];
+            const item = ITEMS[inventoryItem.id];
             const slotElement = hotbarElement.querySelector(`[data-hotbar-index="${hotbarIndex}"]`);
             const slotRect = slotElement.getBoundingClientRect();
             const containerRect = gameContainer.getBoundingClientRect();
 
             contextMenu.innerHTML = ''; // Limpa o menu
 
-            const actions = itemActions[item.name] || [];
+            const actions = item.actions || [];
             
             // Adiciona ações específicas do item
             actions.forEach(actionInfo => {
@@ -1599,10 +1574,13 @@
 
             // Filtra apenas os itens de construção
             backpackInventory.forEach((item, index) => {
-                if (item && (item.category === 'construcao' || item.name === 'Construção')) {
-                    if (currentSlotIndex < 20) {
-                        constructionSlots[currentSlotIndex] = { item: item, originalIndex: index };
-                        currentSlotIndex++;
+                if (item && item.id) {
+                    const itemDef = ITEMS[item.id];
+                    if (itemDef && (itemDef.category === 'construcao' || itemDef.id === 'construction_tool')) {
+                        if (currentSlotIndex < 20) {
+                            constructionSlots[currentSlotIndex] = { item: item, originalIndex: index };
+                            currentSlotIndex++;
+                        }
                     }
                 }
             });
@@ -1612,7 +1590,8 @@
                 slot.classList.add('slot');
 
                 if (slotData) {
-                    const { item, originalIndex } = slotData;
+                    const { item: inventoryItem, originalIndex } = slotData;
+                    const item = ITEMS[inventoryItem.id];
                     slot.dataset.backpackIndex = originalIndex; // Mantém o índice original da mochila
 
                     const nameSpan = document.createElement('span');
@@ -1621,8 +1600,8 @@
 
                     const countSpan = document.createElement('span');
                     countSpan.classList.add('slot-count');
-                    if (item.category !== 'ferramenta' && item.count > 0) {
-                        countSpan.textContent = `x${item.count}`;
+                    if (item.category !== 'ferramenta' && inventoryItem.count > 0) {
+                        countSpan.textContent = `x${inventoryItem.count}`;
                     }
 
                     slot.appendChild(nameSpan);
@@ -1712,7 +1691,7 @@
                 if (clickedHotbarIndex === currentActiveSlot && !player.isMoving && !player.isUsingTool) {
                      const currentMapping = isConstructionModeActive ? constructionHotbarMapping : hotbarMapping;
                      const bpIdx = currentMapping[currentActiveSlot];
-                     if(bpIdx !== -1 && backpackInventory[bpIdx]){
+                     if(bpIdx !== -1 && backpackInventory[bpIdx] && ITEMS[backpackInventory[bpIdx].id]){
                         // Se uma sub-ação foi escolhida, usa a ferramenta imediatamente
                         if (player.toolSubAction) {
                             triggerUseTool();
@@ -1756,20 +1735,19 @@
         function ensureInventoryConsistency(backpack, mapping, defaultItems) {
             while(backpack.length < BACKPACK_SIZE) backpack.push(null); if(backpack.length > BACKPACK_SIZE) backpack.length = BACKPACK_SIZE;
             while(mapping.length < HOTBAR_SIZE) mapping.push(-1); if(mapping.length > HOTBAR_SIZE) mapping.length = HOTBAR_SIZE;
-             defaultItems.forEach((defaultItem, defaultIndex) => {
-                 let foundIndex = backpack.findIndex(i => i && i.name === defaultItem.name);
+             defaultItems.forEach((defaultItemInfo, defaultIndex) => {
+                 let foundIndex = backpack.findIndex(i => i && i.id === defaultItemInfo.id);
                  if(foundIndex === -1) {
                      let emptySlotIndex = backpack.findIndex(slot => slot === null);
                     if (emptySlotIndex !== -1) {
-                        const itemData = ITEM_DATA[defaultItem.name] || {};
-                        backpack[emptySlotIndex] = { ...defaultItem, category: itemData.category || 'desconhecido' };
+                        backpack[emptySlotIndex] = { id: defaultItemInfo.id, count: defaultItemInfo.count };
                          foundIndex = emptySlotIndex;
-                         console.log(`Adicionado item padrão "${defaultItem.name}" no slot vazio ${foundIndex}`);
-                     } else { console.warn(`Mochila cheia, não foi possível adicionar item padrão "${defaultItem.name}"`); }
+                         console.log(`Adicionado item padrão "${ITEMS[defaultItemInfo.id].name}" no slot vazio ${foundIndex}`);
+                     } else { console.warn(`Mochila cheia, não foi possível adicionar item padrão "${ITEMS[defaultItemInfo.id].name}"`); }
                  }
                  if (defaultIndex < HOTBAR_SIZE && mapping[defaultIndex] === -1 && foundIndex !== -1) {
                       const isMappedElsewhere = mapping.includes(foundIndex);
-                      if (!isMappedElsewhere) { mapping[defaultIndex] = foundIndex; console.log(`Mapeado item padrão "${defaultItem.name}" (mochila ${foundIndex}) para hotbar ${defaultIndex}`); }
+                      if (!isMappedElsewhere) { mapping[defaultIndex] = foundIndex; console.log(`Mapeado item padrão "${ITEMS[defaultItemInfo.id].name}" (mochila ${foundIndex}) para hotbar ${defaultIndex}`); }
                  }
             });
             for (let i = 0; i < mapping.length; i++) { if (mapping[i] !== -1 && (mapping[i] >= BACKPACK_SIZE || !backpack[mapping[i]])) { console.log(`Limpando mapeamento inválido da hotbar ${i} (apontava para ${mapping[i]})`); mapping[i] = -1; } }
@@ -1796,7 +1774,7 @@
         }
         // CORRIGIDO: loadGame
         function loadGame() {
-            const defaultItems = [ { name: "Enxada", count: 1 }, { name: "Semente", count: 10 }, { name: "Colheita", count: 0 }, { name: "Pá", count: 1 }, { name: "Regador", count: 0 }, { name: "Construção", count: 1 }, { name: "Machado", count: 1 }, { name: "Picareta", count: 1 }, { name: "Pedra", count: 0 }, { name: "Madeira", count: 0 }, { name: "Cerca", count: 0 }, { name: "Muro", count: 0 }, { name: "Porta", count: 0 }, { name: "Porteira", count: 0 } ];
+            const defaultItems = [ { id: 'hoe', count: 1 }, { id: 'seed_tomato', count: 10 }, { id: 'shovel', count: 1 }, { id: 'watering_can', count: 0 }, { id: 'construction_tool', count: 1 }, { id: 'axe', count: 1 }, { id: 'pickaxe', count: 1 } ];
 
             const savedData = localStorage.getItem('pixelFarmSaveData');
             if (savedData) {
@@ -1820,7 +1798,15 @@
                     if (data.activeSlotData !== undefined && data.activeSlotData >= 0 && data.activeSlotData < HOTBAR_SIZE) { activeHotbarSlot = data.activeSlotData; }
 
                     // Carrega inventário e hotbar do save, ou usa arrays vazios se não existirem
-                    backpackInventory = (data.backpackData && Array.isArray(data.backpackData)) ? data.backpackData : new Array(BACKPACK_SIZE).fill(null);
+                    let loadedBackpack = (data.backpackData && Array.isArray(data.backpackData)) ? data.backpackData : new Array(BACKPACK_SIZE).fill(null);
+                    // Migração de save antigo (baseado em nome) para novo (baseado em ID)
+                    loadedBackpack.forEach((item, index) => {
+                        if (item && item.name && !item.id) {
+                            const foundItem = Object.values(ITEMS).find(def => def.name === item.name);
+                            if (foundItem) loadedBackpack[index] = { id: foundItem.id, count: item.count };
+                        }
+                    });
+                    backpackInventory = loadedBackpack;
                     hotbarMapping = (data.hotbarMapData && Array.isArray(data.hotbarMapData)) ? data.hotbarMapData : new Array(HOTBAR_SIZE).fill(-1);
                     constructionHotbarMapping = (data.constructionHotbarMapData && Array.isArray(data.constructionHotbarMapData)) ? data.constructionHotbarMapData : new Array(HOTBAR_SIZE).fill(-1);
                     if (data.activeConstructionSlotData !== undefined) activeConstructionHotbarSlot = data.activeConstructionSlotData;
@@ -1860,8 +1846,9 @@
              const currentMapping = isConstructionModeActive ? constructionHotbarMapping : hotbarMapping;
              const currentSlot = isConstructionModeActive ? activeConstructionHotbarSlot : activeHotbarSlot;
              const bpIdx = currentMapping[currentSlot];
-            
-             if (bpIdx === -1 || bpIdx >= backpackInventory.length || !backpackInventory[bpIdx]) return; // Slot vazio ou inválido
+
+             const inventoryItem = backpackInventory[bpIdx];
+             if (!inventoryItem || !ITEMS[inventoryItem.id]) return; // Slot vazio, inválido ou item desconhecido
 
              player.toolTarget = targetTile; // Armazena o alvo do clique (pode ser null)
 
@@ -2073,55 +2060,55 @@
             const currentMapping = isConstructionModeActive ? constructionHotbarMapping : hotbarMapping;
             const currentSlot = isConstructionModeActive ? activeConstructionHotbarSlot : activeHotbarSlot;
             const bpIdx = currentMapping[currentSlot];
-            if (bpIdx < 0 || !backpackInventory[bpIdx]) return false;
-            const item = backpackInventory[bpIdx];
+            if (bpIdx < 0 || !backpackInventory[bpIdx]) return false; // Slot vazio
+            const item = ITEMS[backpackInventory[bpIdx].id];
+            if (!item) return false; // Item desconhecido
             const tId = map[tileY][tileX];
             const objectIndex = mapObjects.findIndex(obj => obj.x === tileX && obj.y === tileY);
 
             if (objectIndex !== -1) {
                 const targetObject = mapObjects[objectIndex];
-                if (item.name === "Picareta" && targetObject.type === 0) return true;
-                if (item.name === "Machado" && targetObject.type === 1) return true;
-                if (item.name === "Pá" && targetObject.type === 4) return true;
+                if (item.id === 'pickaxe' && targetObject.type === 0) return true;
+                if (item.id === 'axe' && targetObject.type === 1) return true;
+                if (item.id === 'shovel' && targetObject.type === 4) return true;
                 // Ação universal de pegar
-                if (item.name === "Construção" && player.toolSubAction === 'pickup_mode' && [4, 5, 6, 7].includes(targetObject.type)) return true; // Pega objetos
+                if (item.id === 'construction_tool' && player.toolSubAction === 'pickup_mode' && [4, 5, 6, 7].includes(targetObject.type)) return true; // Pega objetos
                 return false;
             }
 
             if (tId === 7) return true; // Colheita
 
-            switch (item.name) {
-                case "Enxada": return (tId === 0 || tId === 1);
-                case "Semente": return (tId === 2 && item.count > 0);
-                case "Pá": return (tId === 1 || tId === 2 || (tId >= 4 && tId <= 7) || tId === 0 || tId === 3 || tId === 8);
-                case "Regador": return (tId === 3 || (tId >= 4 && tId <= 6 && item.count > 0));
-                case "Construção":
+            switch (item.id) {
+                case 'hoe': return (tId === 0 || tId === 1);
+                case 'seed_tomato': return (tId === 2 && backpackInventory[bpIdx].count > 0);
+                case 'shovel': return (tId === 1 || tId === 2 || (tId >= 4 && tId <= 7) || tId === 0 || tId === 3 || tId === 8);
+                case 'watering_can': return (tId === 3 || (tId >= 4 && tId <= 6 && backpackInventory[bpIdx].count > 0));
+                case 'construction_tool':
                     if (player.toolSubAction === 'pickup_mode') { // Pega piso
                         return tId === 8;
-                        return false; // Não é acionável em tile vazio
                     }
                     if (player.toolSubAction === 'build_floor') {
-                        return ((tId === 0 || tId === 1) && backpackInventory.some(i => i && i.name === "Madeira" && i.count > 0));
+                        return ((tId === 0 || tId === 1) && backpackInventory.some(i => i && i.id === 'wood' && i.count > 0));
                     }
                     if (player.toolSubAction === 'build_door' || player.toolSubAction === 'build_gate') {
                         if (player.toolSubAction === 'build_door') {
                             if (tId !== 8) return false; // Portas só em piso
-                            const hasMaterial = backpackInventory.some(i => i && i.name === "Porta" && i.count > 0) || backpackInventory.some(i => i && i.name === "Madeira" && i.count >= 4);
+                            const hasMaterial = backpackInventory.some(i => i && i.id === 'door' && i.count > 0) || backpackInventory.some(i => i && i.id === 'wood' && i.count >= 4);
                             const hasAdjacentWall = mapObjects.some(obj => obj.type === 5 && ( (obj.y === tileY && (obj.x === tileX - 1 || obj.x === tileX + 1)) || (obj.x === tileX && (obj.y === tileY - 1 || obj.y === tileY + 1))));
                             return hasMaterial && hasAdjacentWall;
                         }
                         if (player.toolSubAction === 'build_gate') {
                             if (tId !== 0 && tId !== 1) return false; // Portões em grama/terra
-                            const hasMaterial = backpackInventory.some(i => i && i.name === "Porteira" && i.count > 0) || backpackInventory.some(i => i && i.name === "Madeira" && i.count >= 4);
+                            const hasMaterial = backpackInventory.some(i => i && i.id === 'gate' && i.count > 0) || backpackInventory.some(i => i && i.id === 'wood' && i.count >= 4);
                             const hasAdjacentFence = mapObjects.some(obj => obj.type === 4 && ( (obj.y === tileY && (obj.x === tileX - 1 || obj.x === tileX + 1)) || (obj.x === tileX && (obj.y === tileY - 1 || obj.y === tileY + 1))));
                             return hasMaterial && hasAdjacentFence;
                         }
                     }
                     if (player.toolSubAction === 'build_wall') {
-                        return ((tId === 0 || tId === 1) && (backpackInventory.some(i => i && i.name === "Muro" && i.count > 0) || backpackInventory.some(i => i && i.name === "Pedra" && i.count >= 5)));
+                        return ((tId === 0 || tId === 1) && (backpackInventory.some(i => i && i.id === 'wall' && i.count > 0) || backpackInventory.some(i => i && i.id === 'stone' && i.count >= 5)));
                     }
                     // Para construir cerca (padrão ou explícito)
-                    return ((tId === 0 || tId === 1) && (backpackInventory.some(i => i && i.name === "Cerca" && i.count > 0) || backpackInventory.some(i => i && i.name === "Madeira" && i.count > 0)));
+                    return ((tId === 0 || tId === 1) && (backpackInventory.some(i => i && i.id === 'fence' && i.count > 0) || backpackInventory.some(i => i && i.id === 'wood' && i.count > 0)));
             }
 
             return false;
