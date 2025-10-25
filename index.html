@@ -594,9 +594,11 @@
         // As coordenadas são ajustadas com o offset para centralizar
         let mapObjects = [
             // Árvores
+            { type: 1, x: 0 + mapOffsetX, y: 0 + mapOffsetY }, 
             { type: 1, x: 4 + mapOffsetX, y: 7 + mapOffsetY }, { type: 1, x: 6 + mapOffsetX, y: 10 + mapOffsetY }, { type: 1, x: 18 + mapOffsetX, y: 8 + mapOffsetY }, { type: 1, x: 20 + mapOffsetX, y: 12 + mapOffsetY }, { type: 1, x: 22 + mapOffsetX, y: 5 + mapOffsetY },
             { type: 1, x: 2 + mapOffsetX, y: 15 + mapOffsetY }, { type: 1, x: 10 + mapOffsetX, y: 20 + mapOffsetY }, { type: 1, x: 15 + mapOffsetX, y: 25 + mapOffsetY }, { type: 1, x: 23 + mapOffsetX, y: 20 + mapOffsetY }, { type: 1, x: 5 + mapOffsetX, y: 22 + mapOffsetY },
             // Rochas
+            { type: 0, x: 0 + mapOffsetX, y: 3 + mapOffsetY },
             { type: 0, x: 5 + mapOffsetX, y: 8 + mapOffsetY }, { type: 0, x: 19 + mapOffsetX, y: 6 + mapOffsetY }, { type: 0, x: 21 + mapOffsetX, y: 11 + mapOffsetY }, { type: 0, x: 23 + mapOffsetX, y: 14 + mapOffsetY }, { type: 0, x: 17 + mapOffsetX, y: 13 + mapOffsetY },
             { type: 0, x: 8 + mapOffsetX, y: 16 + mapOffsetY }, { type: 0, x: 12 + mapOffsetX, y: 22 + mapOffsetY }, { type: 0, x: 1 + mapOffsetX, y: 20 + mapOffsetY }, { type: 0, x: 16 + mapOffsetX, y: 18 + mapOffsetY }, { type: 0, x: 20 + mapOffsetX, y: 26 + mapOffsetY },
             // Fogueiras e Tochas
@@ -663,8 +665,8 @@
             'watering_can': { id: 'watering_can', name: 'Regador', description: '<strong>Regador</strong><br>Acelera o crescimento das plantas.', category: 'ferramenta', stackable: false },
             'axe': { id: 'axe', name: 'Machado', description: '<strong>Machado</strong><br>Corta árvores para obter madeira.', category: 'ferramenta', stackable: false },
             'pickaxe': { id: 'pickaxe', name: 'Picareta', description: '<strong>Picareta</strong><br>Quebra pedras para obter minerais.', category: 'ferramenta', stackable: false },
-            'stone': { id: 'stone', name: 'Pedra', description: '<strong>Pedra</strong><br>Material de construção básico.', category: 'material', stackable: true },
-            'wood': { id: 'wood', name: 'Madeira', description: '<strong>Madeira</strong><br>Material de construção básico.', category: 'material', stackable: true },
+            'stone': { id: 'stone', name: 'Pedra', description: '<strong>Pedra</strong><br>Material de construção básico.', category: 'material_construcao', stackable: true },
+            'wood': { id: 'wood', name: 'Madeira', description: '<strong>Madeira</strong><br>Material de construção básico.', category: 'material_construcao', stackable: true },
             'fence': { id: 'fence', name: 'Cerca', description: '<strong>Cerca</strong><br>Uma cerca pré-fabricada.', category: 'construcao', stackable: true },
             'wall': { id: 'wall', name: 'Muro', description: '<strong>Muro</strong><br>Um muro de tijolos resistente.', category: 'construcao', stackable: true },
             'door': { id: 'door', name: 'Porta', description: '<strong>Porta</strong><br>Uma porta de madeira.', category: 'construcao', stackable: true },
@@ -1392,6 +1394,9 @@
         function updateBackpackUI() {
             backpackGrid.innerHTML = '';
             backpackInventory.forEach((item, index) => {
+                // Oculta a ferramenta de construção da mochila principal
+                if (item && item.id === 'construction_tool') return;
+
                 const slot = document.createElement('div');
                 slot.classList.add('slot');
                 slot.dataset.backpackIndex = index;
@@ -1576,7 +1581,7 @@
             backpackInventory.forEach((item, index) => {
                 if (item && item.id) {
                     const itemDef = ITEMS[item.id];
-                    if (itemDef && (itemDef.category === 'construcao' || itemDef.id === 'construction_tool')) {
+                    if (itemDef && (itemDef.category === 'construcao' || itemDef.category === 'material_construcao' || itemDef.id === 'construction_tool')) {
                         if (currentSlotIndex < 20) {
                             constructionSlots[currentSlotIndex] = { item: item, originalIndex: index };
                             currentSlotIndex++;
