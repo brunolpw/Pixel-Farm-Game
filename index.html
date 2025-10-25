@@ -625,6 +625,25 @@
             "Porteira": "<strong>Porteira</strong><br>Uma porteira de fazenda. Pode ser aberta e fechada."
         };
 
+        const ITEM_DATA = {
+            "Enxada": { category: 'ferramenta' },
+            "Semente": { category: 'material' },
+            "Colheita": { category: 'material' },
+            "Pá": { category: 'ferramenta' },
+            "Regador": { category: 'ferramenta' },
+            "Construção": { category: 'ferramenta' },
+            "Machado": { category: 'ferramenta' },
+            "Picareta": { category: 'ferramenta' },
+            "Pedra": { category: 'material' },
+            "Madeira": { category: 'material' },
+            "Cerca": { category: 'construcao' },
+            "Muro": { category: 'construcao' },
+            "Porta": { category: 'construcao' },
+            "Porteira": { category: 'construcao' }
+        };
+
+        const CONSTRUCTION_ITEM_NAMES = ["Construção", "Cerca", "Muro", "Porta", "Porteira"];
+
         const itemActions = {
             "Construção": [
                 { label: "Mudar para modo 'Pegar'", action: "set_sub_action", value: "pickup_mode" },
@@ -772,30 +791,27 @@
                 ctx.fillRect(x + size - 6, y + i - 3, 2, 2); // Prego direito
             }
         }
-        function drawDoor(ctx, x_px, y_px, orientation, isOpen) { // Sprite refeito para visão de topo
+        function drawDoor(ctx, x_px, y_px, orientation, isOpen) { // Sprite da porta aberta melhorado
             const frameColor = '#5D4037';
             const doorColor = '#8D6E63';
             const knobColor = '#FFC107';
 
-            // Desenha o chão por baixo se a porta estiver aberta
             if (isOpen) {
-                drawFloorTile(ctx, x_px, y_px, TILE_SIZE);
-            }
-
-            // Moldura
-            ctx.fillStyle = frameColor;
-            ctx.fillRect(x_px, y_px, TILE_SIZE, 4); // Top
-            ctx.fillRect(x_px, y_px + TILE_SIZE - 4, TILE_SIZE, 4); // Bottom
-            ctx.fillRect(x_px, y_px, 4, TILE_SIZE); // Left
-            ctx.fillRect(x_px + TILE_SIZE - 4, y_px, 4, TILE_SIZE); // Right
-
-            if (isOpen) {
+                // Se estiver aberta, desenha apenas a porta como uma linha na lateral
                 ctx.fillStyle = doorColor;
-                // Porta aberta como uma linha na lateral
-                if (orientation === 'vertical') ctx.fillRect(x_px + 4, y_px, 4, TILE_SIZE);
-                else ctx.fillRect(x_px, y_px + 4, TILE_SIZE, 4);
+                if (orientation === 'vertical') {
+                    ctx.fillRect(x_px, y_px, 4, TILE_SIZE); // Linha na esquerda
+                } else { // horizontal
+                    ctx.fillRect(x_px, y_px, TILE_SIZE, 4); // Linha em cima
+                }
             } else {
-                // Porta fechada
+                // Se estiver fechada, desenha a moldura e a porta
+                ctx.fillStyle = frameColor;
+                ctx.fillRect(x_px, y_px, TILE_SIZE, 4); // Top
+                ctx.fillRect(x_px, y_px + TILE_SIZE - 4, TILE_SIZE, 4); // Bottom
+                ctx.fillRect(x_px, y_px, 4, TILE_SIZE); // Left
+                ctx.fillRect(x_px + TILE_SIZE - 4, y_px, 4, TILE_SIZE); // Right
+
                 ctx.fillStyle = doorColor;
                 ctx.fillRect(x_px + 4, y_px + 4, TILE_SIZE - 8, TILE_SIZE - 8);
                 ctx.fillStyle = knobColor;
@@ -1089,7 +1105,8 @@
             } else {
                 let emptyBackpackSlot = backpackInventory.findIndex(slot => slot === null);
                 if (emptyBackpackSlot !== -1) {
-                    backpackInventory[emptyBackpackSlot] = { name: itemName, count: quantity };
+                    const itemData = ITEM_DATA[itemName] || {};
+                    backpackInventory[emptyBackpackSlot] = { name: itemName, count: quantity, category: itemData.category || 'desconhecido' };
                     // Tenta mapear para um slot vazio da hotbar, se houver
                     let emptyHotbarSlot = hotbarMapping.findIndex(mapping => mapping === -1);
                     if (emptyHotbarSlot !== -1) {
@@ -1189,6 +1206,18 @@
                 if (seedsGained > 0) addItemToInventory("Semente", seedsGained);
                 updatePreRenderedTile(tX, tY, 2);
                 saveGame(); updateHotbarUI(); updateBackpackUI(); return;
+            }
+
+            // Lógica Universal de "Pegar" para pisos
+            if (item.name === "Construção" && player.toolSubAction === 'pickup_mode' && tId === 8) {
+                map[tY][tX] = 0; // Volta para grama
+                addItemToInventory("Madeira", 1); // Devolve 1 madeira
+                updatePreRenderedTile(tX, tY, 0);
+                console.log("Piso removido!");
+                saveGame();
+                updateHotbarUI();
+                updateBackpackUI();
+                return;
             }
 
             switch (item.name) {
@@ -1310,7 +1339,9 @@
 
                 if (item && nameSpan && countSpan && subActionSpan && (!isConstructionModeActive || item.name === "Construção")) {
                     nameSpan.textContent = item.name;
-                    countSpan.textContent = (item.count > 0 && ["Semente", "Colheita", "Regador", "Pedra", "Madeira", "Cerca", "Muro", "Porta", "Porteira"].includes(item.name)) ? `x${item.count}` : "";
+                    // A ferramenta "Construção" não precisa de contagem
+                    const isCountable = !CONSTRUCTION_ITEM_NAMES.includes(item.name) || item.name !== "Construção";
+                    countSpan.textContent = (item.count > 0 && isCountable && ["Semente", "Colheita", "Regador", "Pedra", "Madeira", "Cerca", "Muro", "Porta", "Porteira"].includes(item.name)) ? `x${item.count}` : "";
                     
                     // Mostra a sub-ação no slot ativo
                     if (hotbarIndex === activeHotbarSlot && player.toolSubAction) {
@@ -1351,7 +1382,8 @@
 
                 if (item) {
                     nameSpan.textContent = item.name;
-                    countSpan.textContent = (item.count > 0 && ["Semente", "Colheita", "Regador", "Pedra", "Madeira", "Cerca", "Muro", "Porta", "Porteira"].includes(item.name)) ? `x${item.count}` : "";
+                    const isCountable = !CONSTRUCTION_ITEM_NAMES.includes(item.name) || item.name !== "Construção";
+                    countSpan.textContent = (item.count > 0 && isCountable && ["Semente", "Colheita", "Regador", "Pedra", "Madeira", "Cerca", "Muro", "Porta", "Porteira"].includes(item.name)) ? `x${item.count}` : "";
                 } else {
                     nameSpan.textContent = "";
                     countSpan.textContent = "";
@@ -1375,8 +1407,9 @@
             let itemName = null;
 
             if (slot.parentElement.id === 'hotbar') {
+                const currentMapping = isConstructionModeActive ? constructionHotbarMapping : hotbarMapping;
                 const hotbarIndex = parseInt(slot.dataset.hotbarIndex, 10);
-                const backpackIndex = hotbarMapping[hotbarIndex];
+                const backpackIndex = currentMapping[hotbarIndex];
                 if (backpackIndex !== -1 && backpackInventory[backpackIndex]) {
                     itemName = backpackInventory[backpackIndex].name;
                 }
@@ -1420,7 +1453,8 @@
         // --- Lógica do Menu de Contexto ---
         function openContextMenu(hotbarIndex) {
             if (isBackpackOpen) return;
-            const backpackIndex = hotbarMapping[hotbarIndex];
+            const currentMapping = isConstructionModeActive ? constructionHotbarMapping : hotbarMapping;
+            const backpackIndex = currentMapping[hotbarIndex];
             if (backpackIndex === -1 || !backpackInventory[backpackIndex]) return;
 
             const item = backpackInventory[backpackIndex];
@@ -1478,7 +1512,8 @@
                     console.log("Sub-ação definida:", player.toolSubAction);
                     break;
                 case 'store':
-                    hotbarMapping[hotbarIndex] = -1;
+                    const currentMapping = isConstructionModeActive ? constructionHotbarMapping : hotbarMapping;
+                    currentMapping[hotbarIndex] = -1;
                     updateHotbarUI();
                     saveGame();
                     break;
@@ -1527,7 +1562,7 @@
         function handleHotbarSlotClick(event) {
             const clickedHotbarIndex = parseInt(event.currentTarget.dataset.hotbarIndex, 10);
             if (isBackpackOpen) {
-                if (selectedBackpackIndex !== -1) {
+                if (selectedBackpackIndex !== -1 && !isConstructionModeActive) { // Desativa atribuição manual no modo construção
                     const currentMapping = isConstructionModeActive ? constructionHotbarMapping : hotbarMapping;
                     console.log(`Atribuindo mochila[${selectedBackpackIndex}] -> hotbar[${clickedHotbarIndex}] (Modo Construção: ${isConstructionModeActive})`);
                     const existingHotbarSlot = currentMapping.indexOf(selectedBackpackIndex);
@@ -1559,7 +1594,7 @@
 
         // --- Lógica Drag & Drop ---
         let draggedHotbarIndex = -1;
-        function handleDragStart(event) { if(isBackpackOpen) { event.preventDefault(); return; } const targetSlot = event.target.closest('.slot'); if(!targetSlot || !targetSlot.dataset.hotbarIndex) { event.preventDefault(); return; } draggedHotbarIndex = parseInt(targetSlot.dataset.hotbarIndex, 10); event.dataTransfer.setData('text/plain', draggedHotbarIndex); event.dataTransfer.effectAllowed = 'move'; setTimeout(() => targetSlot.classList.add('dragging'), 0); console.log("Drag Start:", draggedHotbarIndex); }
+        function handleDragStart(event) { if(isBackpackOpen || isConstructionModeActive) { event.preventDefault(); return; } const targetSlot = event.target.closest('.slot'); if(!targetSlot || !targetSlot.dataset.hotbarIndex) { event.preventDefault(); return; } draggedHotbarIndex = parseInt(targetSlot.dataset.hotbarIndex, 10); event.dataTransfer.setData('text/plain', draggedHotbarIndex); event.dataTransfer.effectAllowed = 'move'; setTimeout(() => targetSlot.classList.add('dragging'), 0); console.log("Drag Start:", draggedHotbarIndex); }
         function handleDragOver(event) { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; const targetSlot = event.target.closest('.slot'); if(targetSlot && targetSlot.parentElement.id === 'hotbar'){ hotbarElement.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over')); targetSlot.classList.add('drag-over'); } }
         function handleDragLeave(event) { const targetSlot = event.target.closest('.slot'); if(targetSlot && targetSlot.parentElement.id === 'hotbar'){ targetSlot.classList.remove('drag-over'); } }
         function handleDrop(event) {
@@ -1590,8 +1625,9 @@
                  let foundIndex = backpack.findIndex(i => i && i.name === defaultItem.name);
                  if(foundIndex === -1) {
                      let emptySlotIndex = backpack.findIndex(slot => slot === null);
-                     if (emptySlotIndex !== -1) {
-                         backpack[emptySlotIndex] = { ...defaultItem };
+                    if (emptySlotIndex !== -1) {
+                        const itemData = ITEM_DATA[defaultItem.name] || {};
+                        backpack[emptySlotIndex] = { ...defaultItem, category: itemData.category || 'desconhecido' };
                          foundIndex = emptySlotIndex;
                          console.log(`Adicionado item padrão "${defaultItem.name}" no slot vazio ${foundIndex}`);
                      } else { console.warn(`Mochila cheia, não foi possível adicionar item padrão "${defaultItem.name}"`); }
@@ -1887,12 +1923,26 @@
             if (isBackpackOpen) toggleBackpack(false); // Fecha a mochila se estiver aberta
             if (isContextMenuOpen) closeContextMenu();
             isConstructionModeActive = !isConstructionModeActive;
+
+            if (isConstructionModeActive) {
+                // Popula a hotbar de construção automaticamente
+                constructionHotbarMapping.fill(-1);
+                let hotbarSlot = 0;
+                for (let i = 0; i < backpackInventory.length && hotbarSlot < HOTBAR_SIZE; i++) {
+                    if (backpackInventory[i] && CONSTRUCTION_ITEM_NAMES.includes(backpackInventory[i].name)) {
+                        constructionHotbarMapping[hotbarSlot++] = i;
+                    }
+                }
+            }
+
             constructionIcon.classList.toggle('active', isConstructionModeActive);
             updateHotbarUI();
         }
 
         function isActionable(tileX, tileY) {
-            const bpIdx = hotbarMapping[activeHotbarSlot];
+            const currentMapping = isConstructionModeActive ? constructionHotbarMapping : hotbarMapping;
+            const currentSlot = isConstructionModeActive ? activeConstructionHotbarSlot : activeHotbarSlot;
+            const bpIdx = currentMapping[currentSlot];
             if (bpIdx < 0 || !backpackInventory[bpIdx]) return false;
             const item = backpackInventory[bpIdx];
             const tId = map[tileY][tileX];
@@ -1904,7 +1954,7 @@
                 if (item.name === "Machado" && targetObject.type === 1) return true;
                 if (item.name === "Pá" && targetObject.type === 4) return true;
                 // Ação universal de pegar
-                if (item.name === "Construção" && player.toolSubAction === 'pickup_mode' && [4, 5, 6, 7].includes(targetObject.type)) return true;
+                if (item.name === "Construção" && player.toolSubAction === 'pickup_mode' && [4, 5, 6, 7].includes(targetObject.type)) return true; // Pega objetos
                 return false;
             }
 
@@ -1916,7 +1966,8 @@
                 case "Pá": return (tId === 1 || tId === 2 || (tId >= 4 && tId <= 7) || tId === 0 || tId === 3 || tId === 8);
                 case "Regador": return (tId === 3 || (tId >= 4 && tId <= 6 && item.count > 0));
                 case "Construção":
-                    if (player.toolSubAction === 'pickup_mode') {
+                    if (player.toolSubAction === 'pickup_mode') { // Pega piso
+                        return tId === 8;
                         return false; // Não é acionável em tile vazio
                     }
                     if (player.toolSubAction === 'build_floor') {
