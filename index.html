@@ -235,6 +235,44 @@
              box-shadow: 0 0 8px #FFD700;
          }
 
+        #constructionGrid .slot.selected-for-assignment {
+            border-color: #FFD700;
+            box-shadow: 0 0 8px #FFD700;
+        }
+
+        /* --- Container de Construção --- */
+        #constructionContainer {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 300px;
+            background-color: rgba(40, 40, 40, 0.95);
+            border: 3px solid #FFD700; /* Borda dourada para diferenciar */
+            border-radius: 10px;
+            padding: 15px;
+            z-index: 20;
+            display: none; /* Começa escondido */
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+        }
+        #constructionTitle {
+            font-size: 1.2em;
+            margin-bottom: 10px;
+            color: #eee;
+        }
+        #constructionGrid {
+            display: grid;
+            grid-template-columns: repeat(5, 50px);
+            gap: 8px;
+        }
+        #constructionGrid .slot {
+            width: 50px;
+            height: 50px;
+            font-size: 10px;
+        }
+
         .slot-name {
             font-weight: bold;
             font-size: 10px;
@@ -381,6 +419,14 @@
             <span>00:00</span>
         </div>
 
+        <div id="constructionContainer">
+            <div id="constructionTitle">Inventário de Construção</div>
+            <div id="constructionGrid">
+                <!-- Slots de construção gerados pelo JS -->
+            </div>
+            <p style="font-size: 0.8em; margin-top: 10px; color: #ccc;">Clique em um item e depois em um atalho (1-0) para atribuir.</p>
+        </div>
+
         <div id="backpackContainer">
             <div id="backpackTitle">Mochila</div>
             <div id="backpackGrid">
@@ -432,6 +478,8 @@
         const backpackContainer = document.getElementById('backpackContainer');
         const backpackGrid = document.getElementById('backpackGrid');
         const hotbarElement = document.getElementById('hotbar');
+        const constructionGrid = document.getElementById('constructionGrid');
+        let constructionContainer = document.getElementById('constructionContainer');
         let backpackIcon = null; // Definido dentro de init()
         let constructionIcon = null; // Definido dentro de init()
         let timeRangeSlider = null; // Definido dentro de init()
@@ -598,6 +646,8 @@
         let isBackpackOpen = false;
         let selectedBackpackIndex = -1;
         let mouseHoverTile = { x: null, y: null };
+        let isConstructionInventoryOpen = false;
+        let selectedConstructionIndex = -1; // Para o novo inventário de construção
         let isConstructionModeActive = false;
 
         // Mapeamentos e slots ativos para cada modo
@@ -636,7 +686,7 @@
             "Picareta": { category: 'ferramenta' },
             "Pedra": { category: 'material' },
             "Madeira": { category: 'material' },
-            "Cerca": { category: 'construcao' },
+            "Cerca": { category: 'construcao' }, // Piso não é um item, é um tile
             "Muro": { category: 'construcao' },
             "Porta": { category: 'construcao' },
             "Porteira": { category: 'construcao' }
@@ -1330,21 +1380,21 @@
             const slots = hotbarElement.querySelectorAll('.slot');
             slots.forEach((slot, hotbarIndex) => {
                 const currentMapping = isConstructionModeActive ? constructionHotbarMapping : hotbarMapping;
-                const currentActiveSlot = isConstructionModeActive ? activeConstructionHotbarSlot : activeHotbarSlot;
+                const currentActiveSlot = isConstructionModeActive ? activeConstructionHotbarSlot : activeHotbarSlot; // Usa o slot ativo correto
                 const backpackIndex = currentMapping[hotbarIndex];
                 const item = (backpackIndex !== -1 && backpackIndex >= 0 && backpackIndex < backpackInventory.length) ? backpackInventory[backpackIndex] : null;
                 const nameSpan = slot.querySelector('.slot-name');
                 const subActionSpan = slot.querySelector('.slot-sub-action');
                 const countSpan = slot.querySelector('.slot-count');
 
-                if (item && nameSpan && countSpan && subActionSpan && (!isConstructionModeActive || item.name === "Construção")) {
+                if (item && nameSpan && countSpan && subActionSpan) {
                     nameSpan.textContent = item.name;
                     // A ferramenta "Construção" não precisa de contagem
                     const isCountable = !CONSTRUCTION_ITEM_NAMES.includes(item.name) || item.name !== "Construção";
                     countSpan.textContent = (item.count > 0 && isCountable && ["Semente", "Colheita", "Regador", "Pedra", "Madeira", "Cerca", "Muro", "Porta", "Porteira"].includes(item.name)) ? `x${item.count}` : "";
                     
                     // Mostra a sub-ação no slot ativo
-                    if (hotbarIndex === activeHotbarSlot && player.toolSubAction) {
+                    if (hotbarIndex === currentActiveSlot && player.toolSubAction) {
                         if (player.toolSubAction === 'pickup_mode') subActionSpan.textContent = "(Pegar)";
                         else if (player.toolSubAction === 'build_door') subActionSpan.textContent = "(Construir)";
                         else if (player.toolSubAction === 'build_gate') subActionSpan.textContent = "(Construir)";
@@ -1411,6 +1461,11 @@
                 const hotbarIndex = parseInt(slot.dataset.hotbarIndex, 10);
                 const backpackIndex = currentMapping[hotbarIndex];
                 if (backpackIndex !== -1 && backpackInventory[backpackIndex]) {
+                    itemName = backpackInventory[backpackIndex].name;
+                }
+            } else if (slot.parentElement.id === 'constructionGrid') {
+                const backpackIndex = parseInt(slot.dataset.backpackIndex, 10);
+                if (backpackInventory[backpackIndex]) {
                     itemName = backpackInventory[backpackIndex].name;
                 }
             } else if (slot.parentElement.id === 'backpackGrid') {
@@ -1537,12 +1592,69 @@
             }
         }
 
+        function updateConstructionUI() {
+            constructionGrid.innerHTML = '';
+            const constructionSlots = new Array(20).fill(null);
+            let currentSlotIndex = 0;
+
+            // Filtra apenas os itens de construção
+            backpackInventory.forEach((item, index) => {
+                if (item && (item.category === 'construcao' || item.name === 'Construção')) {
+                    if (currentSlotIndex < 20) {
+                        constructionSlots[currentSlotIndex] = { item: item, originalIndex: index };
+                        currentSlotIndex++;
+                    }
+                }
+            });
+
+            constructionSlots.forEach(slotData => {
+                const slot = document.createElement('div');
+                slot.classList.add('slot');
+
+                if (slotData) {
+                    const { item, originalIndex } = slotData;
+                    slot.dataset.backpackIndex = originalIndex; // Mantém o índice original da mochila
+
+                    const nameSpan = document.createElement('span');
+                    nameSpan.classList.add('slot-name');
+                    nameSpan.textContent = item.name;
+
+                    const countSpan = document.createElement('span');
+                    countSpan.classList.add('slot-count');
+                    if (item.category !== 'ferramenta' && item.count > 0) {
+                        countSpan.textContent = `x${item.count}`;
+                    }
+
+                    slot.appendChild(nameSpan);
+                    slot.appendChild(countSpan);
+
+                    if (originalIndex === selectedConstructionIndex) {
+                        slot.classList.add('selected-for-assignment');
+                    }
+                    slot.addEventListener('click', handleConstructionSlotClick);
+                    slot.addEventListener('mouseover', showTooltip);
+                    slot.addEventListener('mouseout', hideTooltip);
+                }
+
+                constructionGrid.appendChild(slot);
+            });
+        }
+
+        function toggleConstructionInventory(forceState = null) {
+            if (isContextMenuOpen) closeContextMenu();
+            isConstructionInventoryOpen = (forceState !== null) ? forceState : !isConstructionInventoryOpen;
+            if (isConstructionInventoryOpen) {
+                selectedConstructionIndex = -1; updateConstructionUI(); constructionContainer.style.display = 'flex';
+            } else {
+                constructionContainer.style.display = 'none';
+            }
+        }
+
         // --- Lógica Mochila ---
         function toggleBackpack(forceState = null) {
             if (isContextMenuOpen) closeContextMenu();
-            console.log("toggleBackpack chamado. Estado atual:", isBackpackOpen, "Forçar:", forceState); // DEBUG
+            if (isConstructionModeActive) toggleConstructionMode(false); // Fecha o modo construção
             isBackpackOpen = (forceState !== null) ? forceState : !isBackpackOpen;
-            console.log("Novo estado:", isBackpackOpen); // DEBUG
             if (isBackpackOpen) {
                 selectedBackpackIndex = -1; updateBackpackUI(); backpackContainer.style.display = 'flex';
             } else {
@@ -1559,18 +1671,41 @@
              else { selectedBackpackIndex = clickedIndex; event.currentTarget.classList.add('selected-for-assignment'); console.log(`Selecionado item da mochila: ${selectedBackpackIndex}`); }
         }
 
+        function handleConstructionSlotClick(event) {
+            if (!isConstructionModeActive) return;
+            // dataset.backpackIndex pode não existir em slots vazios
+            if (event.currentTarget.dataset.backpackIndex) {
+                const clickedIndex = parseInt(event.currentTarget.dataset.backpackIndex, 10);
+                if (clickedIndex === selectedConstructionIndex) {
+                    selectedConstructionIndex = -1; // Desseleciona se clicar no mesmo item
+                } else {
+                    selectedConstructionIndex = clickedIndex; // Seleciona o novo item
+                }
+                console.log(`Selecionado item de construção (índice da mochila): ${selectedConstructionIndex}`);
+                updateConstructionUI(); // Redesenha a UI para mostrar a seleção
+            }
+        }
+
         function handleHotbarSlotClick(event) {
             const clickedHotbarIndex = parseInt(event.currentTarget.dataset.hotbarIndex, 10);
             if (isBackpackOpen) {
-                if (selectedBackpackIndex !== -1 && !isConstructionModeActive) { // Desativa atribuição manual no modo construção
-                    const currentMapping = isConstructionModeActive ? constructionHotbarMapping : hotbarMapping;
-                    console.log(`Atribuindo mochila[${selectedBackpackIndex}] -> hotbar[${clickedHotbarIndex}] (Modo Construção: ${isConstructionModeActive})`);
+                if (selectedBackpackIndex !== -1) {
+                    const currentMapping = hotbarMapping; // Mochila só interage com a hotbar normal
+                    console.log(`Atribuindo mochila[${selectedBackpackIndex}] -> hotbar[${clickedHotbarIndex}]`);
                     const existingHotbarSlot = currentMapping.indexOf(selectedBackpackIndex);
                     if(existingHotbarSlot !== -1) { hotbarMapping[existingHotbarSlot] = -1; }
                     currentMapping[clickedHotbarIndex] = selectedBackpackIndex;
                     selectedBackpackIndex = -1;
                     updateBackpackUI(); updateHotbarUI(); saveGame();
                     closeContextMenu();
+                } // CORREÇÃO: Lógica de atribuição para construção
+            } else if (isConstructionModeActive) {
+                if (selectedConstructionIndex !== -1) {
+                    const existingHotbarSlot = constructionHotbarMapping.indexOf(selectedConstructionIndex);
+                    if (existingHotbarSlot !== -1) { constructionHotbarMapping[existingHotbarSlot] = -1; }
+                    constructionHotbarMapping[clickedHotbarIndex] = selectedConstructionIndex;
+                    selectedConstructionIndex = -1;
+                    updateConstructionUI(); updateHotbarUI(); saveGame();
                 }
             } else {
                 const currentActiveSlot = isConstructionModeActive ? activeConstructionHotbarSlot : activeHotbarSlot;
@@ -1594,7 +1729,7 @@
 
         // --- Lógica Drag & Drop ---
         let draggedHotbarIndex = -1;
-        function handleDragStart(event) { if(isBackpackOpen || isConstructionModeActive) { event.preventDefault(); return; } const targetSlot = event.target.closest('.slot'); if(!targetSlot || !targetSlot.dataset.hotbarIndex) { event.preventDefault(); return; } draggedHotbarIndex = parseInt(targetSlot.dataset.hotbarIndex, 10); event.dataTransfer.setData('text/plain', draggedHotbarIndex); event.dataTransfer.effectAllowed = 'move'; setTimeout(() => targetSlot.classList.add('dragging'), 0); console.log("Drag Start:", draggedHotbarIndex); }
+        function handleDragStart(event) { if(isBackpackOpen) { event.preventDefault(); return; } const targetSlot = event.target.closest('.slot'); if(!targetSlot || !targetSlot.dataset.hotbarIndex) { event.preventDefault(); return; } draggedHotbarIndex = parseInt(targetSlot.dataset.hotbarIndex, 10); event.dataTransfer.setData('text/plain', draggedHotbarIndex); event.dataTransfer.effectAllowed = 'move'; setTimeout(() => targetSlot.classList.add('dragging'), 0); console.log("Drag Start:", draggedHotbarIndex); }
         function handleDragOver(event) { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; const targetSlot = event.target.closest('.slot'); if(targetSlot && targetSlot.parentElement.id === 'hotbar'){ hotbarElement.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over')); targetSlot.classList.add('drag-over'); } }
         function handleDragLeave(event) { const targetSlot = event.target.closest('.slot'); if(targetSlot && targetSlot.parentElement.id === 'hotbar'){ targetSlot.classList.remove('drag-over'); } }
         function handleDrop(event) {
@@ -1919,20 +2054,15 @@
             return path;
         }
 
-        function toggleConstructionMode() {
-            if (isBackpackOpen) toggleBackpack(false); // Fecha a mochila se estiver aberta
+        function toggleConstructionMode(forceState = null) {
             if (isContextMenuOpen) closeContextMenu();
-            isConstructionModeActive = !isConstructionModeActive;
+            isConstructionModeActive = (forceState !== null) ? forceState : !isConstructionModeActive;
 
             if (isConstructionModeActive) {
-                // Popula a hotbar de construção automaticamente
-                constructionHotbarMapping.fill(-1);
-                let hotbarSlot = 0;
-                for (let i = 0; i < backpackInventory.length && hotbarSlot < HOTBAR_SIZE; i++) {
-                    if (backpackInventory[i] && CONSTRUCTION_ITEM_NAMES.includes(backpackInventory[i].name)) {
-                        constructionHotbarMapping[hotbarSlot++] = i;
-                    }
-                }
+                if (isBackpackOpen) toggleBackpack(false); // Fecha a mochila se estiver aberta
+                // Não abre o inventário automaticamente, apenas entra no modo
+            } else {
+                if (isConstructionInventoryOpen) toggleConstructionInventory(false); // Fecha o inventário de construção se estiver aberto
             }
 
             constructionIcon.classList.toggle('active', isConstructionModeActive);
@@ -1999,7 +2129,7 @@
 
         function handleCanvasClick(event) {
             // Ignora o clique se a mochila estiver aberta ou o jogador estiver ocupado
-            if (isBackpackOpen || player.isMoving || player.isUsingTool) return;
+            if (isBackpackOpen || isConstructionInventoryOpen || player.isMoving || player.isUsingTool) return;
 
             const rect = canvas.getBoundingClientRect();
             const clickX = event.clientX - rect.left;
@@ -2154,6 +2284,8 @@
             if (!itemTooltip) { console.error("Elemento do tooltip não encontrado!"); return; }
             mouseIcon = document.getElementById('mouseIcon');
             if (!mouseIcon) { console.error("Elemento do ícone do mouse não encontrado!"); return; }
+            constructionContainer = document.getElementById('constructionContainer');
+            if (!constructionContainer) { console.error("Container de construção não encontrado!"); return; }
             constructionIcon = document.getElementById('constructionIcon');
             if (!constructionIcon) { console.error("Ícone de construção não encontrado!"); return; }
             contextMenu = document.getElementById('contextMenu');
@@ -2173,8 +2305,14 @@
             setInterval(saveGame, 30000); // Salva o jogo a cada 30 segundos
 
             // Listener de clique do ÍCONE da Mochila
-            backpackIcon.addEventListener('click', () => { console.log("Clique no ícone da mochila"); toggleBackpack(); });
-            constructionIcon.addEventListener('click', toggleConstructionMode);
+            backpackIcon.addEventListener('click', () => {
+                if (isConstructionModeActive) toggleConstructionMode(false); // Sai do modo construção
+                toggleBackpack(); // Abre/fecha a mochila
+            });
+            constructionIcon.addEventListener('click', () => {
+                if (!isConstructionModeActive) toggleConstructionMode(true); // Entra no modo construção
+                toggleConstructionInventory(); // Abre/fecha o inventário de construção
+            });
 
             // Listeners da HOTBAR
             hotbarElement.querySelectorAll('.slot').forEach(slotElement => {
@@ -2218,7 +2356,18 @@
             canvas.addEventListener('click', handleCanvasClick);
             // Fecha o menu de contexto se clicar em qualquer lugar fora dele
             document.addEventListener('click', (e) => {
-                if (isContextMenuOpen && !contextMenu.contains(e.target) && !hotbarElement.contains(e.target)) {
+                // Lógica para fechar os inventários ao clicar fora
+                const isClickOnHotbar = hotbarElement.contains(e.target);
+
+                // Só fecha se o clique for fora do container E não for um clique na hotbar para atribuir um item
+                if (isConstructionInventoryOpen && !constructionContainer.contains(e.target) && e.target !== constructionIcon && !(isClickOnHotbar && selectedConstructionIndex !== -1)) {
+                    toggleConstructionInventory(false);
+                }
+                if (isBackpackOpen && !backpackContainer.contains(e.target) && e.target !== backpackIcon && !(isClickOnHotbar && selectedBackpackIndex !== -1)) {
+                    toggleBackpack(false);
+                }
+
+                if (isContextMenuOpen && !contextMenu.contains(e.target) && !hotbarElement.contains(e.target)) { // Mantém a lógica do menu de contexto
                     closeContextMenu();
                 }
             });
