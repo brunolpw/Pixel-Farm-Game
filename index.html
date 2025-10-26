@@ -1295,11 +1295,11 @@
             ctx.scale(zoomLevel, zoomLevel);
             ctx.translate(-camera.x, -camera.y);
 
-            // --- Lógica de Desenho de Andares (Refatorada) ---
+            // --- Lógica de Desenho de Andares (Refatorada para Múltiplos Níveis) ---
 
-            // 1. Desenha o ANDAR DE BAIXO (se aplicável)
-            if (player.currentFloor > 0 && worldData[player.currentFloor - 1]) {
-                const lowerFloor = worldData[player.currentFloor - 1];
+            // 1. Desenha TODOS os andares ABAIXO do atual
+            for (let i = player.currentFloor - 1; i >= 0; i--) {
+                const lowerFloor = worldData[i];
                 
                 // 1a. Desenha o CHÃO e a ÁGUA do andar de baixo
                 ctx.drawImage(lowerFloor.preRenderedMapCanvas, 0, 0);
@@ -1320,12 +1320,14 @@
                     else if (obj.type === 9) { drawStairs(ctx, x_px, y_px, TILE_SIZE, 'up'); }
                 }
 
-                // 1c. Aplica o escurecimento sobre tudo do andar de baixo
-                ctx.globalAlpha = 0.5;
+                // 1c. Aplica o escurecimento, que aumenta com a distância
+                const darkness = 0.5 + (player.currentFloor - 1 - i) * 0.15;
+                ctx.globalAlpha = Math.min(0.85, darkness); // Limita o escurecimento máximo
                 ctx.fillStyle = 'black';
                 ctx.fillRect(0, 0, MAP_WIDTH_PX, MAP_HEIGHT_PX);
                 ctx.globalAlpha = 1.0;
             }
+
 
             // 2. Desenha o chão do andar atual
             const currentFloorCanvas = worldData[player.currentFloor].preRenderedMapCanvas; // Re-obtém para clareza
@@ -1400,7 +1402,7 @@
             drawConstructionPreview();
             drawConstructionGrid();
 
-            // Desenha animações de feedback de recursos
+            // 4a. Desenha animações de feedback de recursos
             activeAnimations.forEach(anim => {
                 if (anim.type === 'resource_feedback') {
                     const elapsed = timestamp - anim.startTime;
@@ -1415,12 +1417,12 @@
                 }
             });
 
-            // 5. Desenha a pré-visualização do ANDAR DE CIMA (se aplicável)
-            if (worldData[player.currentFloor + 1]) {
+            // 5. Verifica se o jogador está "debaixo" de algo no andar de cima
+            let isPlayerUnderSomething = false;
+            if (worldData[player.currentFloor + 1]) { // Só verifica se houver um andar de cima
                 const playerTileX = Math.floor((player.x + player.width / 2) / TILE_SIZE);
                 const playerTileY = Math.floor((player.y + player.height / 2) / TILE_SIZE);
                 const upperFloor = worldData[player.currentFloor + 1];
-                let isPlayerUnderSomething = false;
 
                 // Verifica uma área de 3x3 tiles no andar de cima, em torno da posição do jogador
                 for (let y = playerTileY - 1; y <= playerTileY + 1; y++) {
@@ -1440,40 +1442,43 @@
                     }
                     if (isPlayerUnderSomething) break;
                 }
+            }
 
-                // Mostra o andar de cima apenas se o jogador NÃO estiver debaixo de algo
-                if (!isPlayerUnderSomething) {
+            // 6. Desenha TODOS os andares ACIMA (se não estiver debaixo de nada)
+            if (!isPlayerUnderSomething) {
+                for (let i = player.currentFloor + 1; i < worldData.length; i++) {
+                    const upperFloor = worldData[i];
                     const upperFloorCanvas = upperFloor.preRenderedMapCanvas;
+                    const opacity = 0.5 - (i - (player.currentFloor + 1)) * 0.15; // Fica mais transparente com a distância
+                    if (opacity <= 0) continue;
 
-                    // Aplica um filtro de dessaturação e opacidade para o efeito "raio-x"
-                    ctx.filter = 'saturate(0.5)';
-                    ctx.globalAlpha = 0.5;
+                    ctx.filter = 'saturate(0)'; // Efeito acinzentado
+                    ctx.globalAlpha = opacity;
 
-                    // 1. Desenha o CHÃO do andar de cima (ignorando os vazios)
+                    // Desenha o chão e os objetos do andar superior
                     for (let y = 0; y < MAP_HEIGHT_TILES; y++) {
                         for (let x = 0; x < MAP_WIDTH_TILES; x++) {
-                            const tileId = upperFloor.map[y][x];
-                            if (tileId !== 10) { // Se não for Vazio
-                                ctx.drawImage(upperFloorCanvas, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-                            }
+                            if (upperFloor.map[y][x] !== 10) ctx.drawImage(upperFloorCanvas, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
                         }
                     }
-
-                    // 2. Desenha os OBJETOS do andar de cima
-                    // Não precisa de y-sort aqui, pois é apenas uma pré-visualização "chapada"
                     for (const obj of upperFloor.mapObjects) {
-                        const x_px = obj.x * TILE_SIZE;
-                        const y_px = obj.y * TILE_SIZE;
-                        if (obj.type === 1) { drawTreeTrunk(ctx, x_px, y_px); drawTreeCanopy(ctx, x_px, y_px); }
-                        else if (obj.type === 0) { drawRock(ctx, x_px, y_px); }
-                        else if (obj.type === 5) { drawWall(ctx, x_px, y_px); } // Adicionado para desenhar muros
-                        else if (obj.type === 10) { drawStairs(ctx, x_px, y_px, TILE_SIZE, 'down'); }
-                        else if (obj.type === 11) { drawRoof(ctx, x_px, y_px, obj.x, obj.y, player.currentFloor + 1); }
+                        // Desenha todos os objetos, EXCETO o telhado, com transparência
+                        if (obj.type !== 11) {
+                            const x_px = obj.x * TILE_SIZE; const y_px = obj.y * TILE_SIZE;
+                            if (obj.type === 1) { drawTreeTrunk(ctx, x_px, y_px); drawTreeCanopy(ctx, x_px, y_px); } else if (obj.type === 0) { drawRock(ctx, x_px, y_px); } else if (obj.type === 5) { drawWall(ctx, x_px, y_px); } else if (obj.type === 10) { drawStairs(ctx, x_px, y_px, TILE_SIZE, 'down'); }
+                        }
                     }
+                }
+                // Restaura o estado normal do canvas após o loop
+                ctx.globalAlpha = 1.0;
+                ctx.filter = 'none';
 
-                    // Restaura o estado normal do canvas
-                    ctx.globalAlpha = 1.0;
-                    ctx.filter = 'none';
+                // 7. Desenha os telhados por cima de tudo, com opacidade total
+                for (let i = player.currentFloor + 1; i < worldData.length; i++) {
+                    const upperFloor = worldData[i];
+                    for (const obj of upperFloor.mapObjects) {
+                        if (obj.type === 11) drawRoof(ctx, obj.x * TILE_SIZE, obj.y * TILE_SIZE, obj.x, obj.y, i);
+                    }
                 }
             }
 
