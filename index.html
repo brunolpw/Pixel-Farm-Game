@@ -1276,19 +1276,30 @@
             if (worldData[player.currentFloor + 1]) {
                 const playerTileX = Math.floor((player.x + player.width / 2) / TILE_SIZE);
                 const playerTileY = Math.floor((player.y + player.height / 2) / TILE_SIZE);
-                let minDistanceToWall = 999; // Inicializa com um valor alto, mas finito
+                const upperFloor = worldData[player.currentFloor + 1];
+                let isPlayerUnderSomething = false;
 
-                const currentFloorObjects = worldData[player.currentFloor].mapObjects;
-                for (const obj of currentFloorObjects) {
-                    if (obj.type === 8) { // Parede de Montanha
-                        const dist = Math.sqrt(Math.pow(playerTileX - obj.x, 2) + Math.pow(playerTileY - obj.y, 2));
-                        if (dist < minDistanceToWall) minDistanceToWall = dist;
+                // Verifica uma área de 3x3 tiles no andar de cima, em torno da posição do jogador
+                for (let y = playerTileY - 1; y <= playerTileY + 1; y++) {
+                    for (let x = playerTileX - 1; x <= playerTileX + 1; x++) {
+                        if (x >= 0 && x < MAP_WIDTH_TILES && y >= 0 && y < MAP_HEIGHT_TILES) {
+                            // Se houver qualquer tile que não seja vazio...
+                            if (upperFloor.map[y][x] !== 10) {
+                                isPlayerUnderSomething = true;
+                                break;
+                            }
+                            // Ou se houver qualquer objeto...
+                            if (upperFloor.mapObjects.some(obj => obj.x === x && obj.y === y)) {
+                                isPlayerUnderSomething = true;
+                                break;
+                            }
+                        }
                     }
+                    if (isPlayerUnderSomething) break;
                 }
 
-                // Se estiver a 2+ tiles de distância, mostra o andar de cima com opacidade
-                if (minDistanceToWall >= 2) {
-                    const upperFloor = worldData[player.currentFloor + 1];
+                // Mostra o andar de cima apenas se o jogador NÃO estiver debaixo de algo
+                if (!isPlayerUnderSomething) {
                     const upperFloorCanvas = upperFloor.preRenderedMapCanvas;
 
                     ctx.globalAlpha = 0.8;
