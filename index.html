@@ -543,9 +543,9 @@
 
         // --- Estado do Jogo ---
         let player = {
-            x: 11 * TILE_SIZE, y: 11 * TILE_SIZE, width: 20, height: 28,
+            x: 34 * TILE_SIZE, y: 33 * TILE_SIZE, width: 20, height: 28,
             colorHead: '#FFDAB9', colorBody: '#007BFF', colorLegs: '#0056B3',
-            speed: 2, isMoving: false, targetX: 11 * TILE_SIZE, targetY: 11 * TILE_SIZE, currentFloor: 0,
+            speed: 2, isMoving: false, targetX: 34 * TILE_SIZE, targetY: 33 * TILE_SIZE, currentFloor: 0,
             path: [], // Para o movimento point-and-click
             walkBob: 0, walkBobSpeed: 0.15, isUsingTool: false, toolAnimStart: 0, toolTarget: null, toolSubAction: null,
             lastMoveDir: { dx: 0, dy: 1 }
@@ -709,9 +709,9 @@
 
         // --- Animais Iniciais ---
         const initialAnimals = [
-            { type: 'sheep', x: 36 * TILE_SIZE, y: 32 * TILE_SIZE, state: 'idle', woolLevel: 0, hunger: 0, path: [], isMoving: false, speed: 1, walkBob: 0, walkBobSpeed: 0.1 },
-            { type: 'sheep', x: 38 * TILE_SIZE, y: 34 * TILE_SIZE, state: 'idle', woolLevel: 20, hunger: 0, path: [], isMoving: false, speed: 1, walkBob: 0, walkBobSpeed: 0.1 },
-            { type: 'sheep', x: 40 * TILE_SIZE, y: 33 * TILE_SIZE, state: 'idle', woolLevel: 50, hunger: 0, path: [], isMoving: false, speed: 1, walkBob: 0, walkBobSpeed: 0.1 },
+            { type: 'sheep', x: 36 * TILE_SIZE, y: 32 * TILE_SIZE, state: 'idle', woolLevel: 0, hunger: 0, path: [], isMoving: false, speed: 1, walkBob: 0, walkBobSpeed: 0.1, lastMoveDir: { dx: 0, dy: 1 }, stateTimer: 0 },
+            { type: 'sheep', x: 38 * TILE_SIZE, y: 34 * TILE_SIZE, state: 'idle', woolLevel: 20, hunger: 0, path: [], isMoving: false, speed: 1, walkBob: 0, walkBobSpeed: 0.1, lastMoveDir: { dx: 0, dy: 1 }, stateTimer: 0 },
+            { type: 'sheep', x: 40 * TILE_SIZE, y: 33 * TILE_SIZE, state: 'idle', woolLevel: 50, hunger: 0, path: [], isMoving: false, speed: 1, walkBob: 0, walkBobSpeed: 0.1, lastMoveDir: { dx: 0, dy: 1 }, stateTimer: 0 },
         ];
 
         // --- Estrutura de Dados do Mundo ---
@@ -729,7 +729,7 @@
                 map: JSON.parse(JSON.stringify(layout)),
                 mapObjects: JSON.parse(JSON.stringify(objects)),
                 plantGrowthData: {},
-                animals: [],
+                animals: [], // Adicionado para cada andar
                 preRenderedMapCanvas: preRenderedCanvas,
                 preRenderedMapCtx: preRenderedCtx
             };
@@ -1048,26 +1048,97 @@
             const y = animal.y + Math.sin(animal.walkBob) * 2; // Bobbing motion
             const bodyColor = '#ECEFF1';
             const faceColor = '#37474F';
+            const legColor = '#455A64';
+            const woolSize = animal.woolLevel >= 100 ? 2 : 0; // Lã extra
+            
+            // Animação da cabeça a comer
+            const headBob = animal.state === 'eating' ? Math.sin(animal.stateTimer * 0.1) * 4 + 4 : 0;
 
-            // Lã (corpo)
-            ctx.fillStyle = bodyColor;
-            ctx.beginPath();
-            ctx.ellipse(x + 16, y + 18, 12, 8, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Lã extra se estiver pronta para tosquia
-            if (animal.woolLevel >= 100) {
-                ctx.ellipse(x + 16, y + 12, 10, 6, 0, 0, Math.PI * 2);
-                ctx.ellipse(x + 10, y + 18, 8, 5, 0, 0, Math.PI * 2);
-                ctx.ellipse(x + 22, y + 18, 8, 5, 0, 0, Math.PI * 2);
-                ctx.fill();
+            ctx.save();
+            // Centraliza o desenho e inverte se estiver a olhar para a esquerda
+            ctx.translate(x + 16, y + 16);
+            if (animal.lastMoveDir.dx < 0) {
+                ctx.scale(-1, 1);
             }
 
-            // Cabeça
-            ctx.fillStyle = faceColor;
-            ctx.beginPath();
-            ctx.arc(x + 16, y + 10, 5, 0, Math.PI * 2);
-            ctx.fill();
+            if (animal.lastMoveDir.dx !== 0) { // Vista Lateral
+                // Pernas
+                ctx.fillStyle = legColor;
+                ctx.fillRect(-4, 8, 4, 6); // Perna de trás
+                ctx.fillRect(2, 8, 4, 6);  // Perna da frente
+
+                // Corpo
+                ctx.fillStyle = bodyColor;
+                ctx.beginPath();
+                ctx.arc(0, 2, 10 + woolSize, 0, Math.PI * 2);
+                ctx.arc(5, 4, 7 + woolSize, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Cabeça
+                ctx.fillStyle = faceColor;
+                ctx.beginPath();
+                ctx.ellipse(10, -2 + headBob, 4, 5, 0, 0, Math.PI * 2);
+                ctx.fillRect(12, -5 + headBob, 3, 3); // Orelha
+                ctx.fill();
+
+            } else { // Vista Frontal ou Traseira
+                // Pernas
+                ctx.fillStyle = legColor;
+                ctx.fillRect(-6, 8, 4, 6); // Perna esquerda
+                ctx.fillRect(2, 8, 4, 6);  // Perna direita
+
+                // Corpo
+                ctx.fillStyle = bodyColor;
+                ctx.beginPath();
+                ctx.arc(0, 2, 10 + woolSize, 0, Math.PI * 2); // Central
+                ctx.arc(-6, 4, 6 + woolSize, 0, Math.PI * 2); // Esquerda
+                ctx.arc(6, 4, 6 + woolSize, 0, Math.PI * 2); // Direita
+                ctx.arc(0, -4, 8 + woolSize, 0, Math.PI * 2); // Topo
+                ctx.fill();
+
+                if (animal.lastMoveDir.dy >= 0) { // Olhando para baixo/frente
+                    // Cabeça
+                    ctx.fillStyle = faceColor;
+                    ctx.beginPath();
+                    ctx.ellipse(0, -6 + headBob, 5, 6, 0, 0, Math.PI * 2);
+                    ctx.fillRect(-8, -8 + headBob, 3, 3); // Orelha esquerda
+                    ctx.fillRect(5, -8 + headBob, 3, 3);  // Orelha direita
+                    ctx.fill();
+                } else { // Olhando para cima/trás
+                    // Apenas a parte de cima da cabeça é visível
+                    ctx.fillStyle = faceColor;
+                    ctx.beginPath();
+                    ctx.arc(0, -10, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            ctx.restore();
+
+            // --- Desenha Indicadores de Status ---
+            const indicatorY = y - 10;
+
+            // Indicador de Fome
+            if (animal.hunger >= 60 && animal.state !== 'eating') { // Aparece mais cedo
+                ctx.fillStyle = 'white';
+                ctx.strokeStyle = 'black';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.roundRect(x + 8, indicatorY - 12, 16, 12, 4);
+                ctx.stroke();
+                ctx.fill();
+                ctx.fillStyle = 'black';
+                ctx.fillText('...', x + 16, indicatorY - 2);
+            }
+
+            // Barra de Progresso da Lã
+            if (animal.woolLevel < 100) {
+                const barWidth = 28;
+                ctx.fillStyle = '#333';
+                ctx.fillRect(x + 2, indicatorY, barWidth, 6);
+                ctx.fillStyle = '#4FC3F7'; // Azul claro
+                ctx.fillRect(x + 2, indicatorY, barWidth * (animal.woolLevel / 100), 6);
+            }
         }
         function drawClayTile(ctx, x_px, y_px, size) { // Sprite simplificado sem bordas
             const baseColor = '#A1887F'; // Um marrom mais acinzentado
@@ -1377,24 +1448,47 @@
 
             for (const animal of floorData.animals) {
                 // Crescimento da lã
-                if (animal.woolLevel < 100) {
-                    animal.woolLevel += 0.01; // Ajuste a velocidade conforme necessário
+                if (animal.woolLevel < 100) animal.woolLevel += 0.02;
+                
+                // Aumento da fome
+                if (animal.hunger < 100) animal.hunger += 0.01;
+
+                // Lógica de estado
+                if (animal.state === 'eating') {
+                    animal.stateTimer--;
+                    if (animal.stateTimer <= 0) {
+                        animal.state = 'idle';
+                        animal.hunger = 0;
+                        const tileX = Math.floor(animal.x / TILE_SIZE);
+                        const tileY = Math.floor(animal.y / TILE_SIZE);
+                        if (floorData.map[tileY][tileX] === 0) { // Se ainda for grama
+                            floorData.map[tileY][tileX] = 1; // Transforma em terra
+                            updatePreRenderedTile(tileX, tileY, 1);
+                        }
+                    }
                 }
 
                 // Lógica de movimento
-                if (!animal.isMoving) {
-                    if (Math.random() < 0.005) { // Chance de começar a passear
+                if (!animal.isMoving && animal.state === 'idle') {
+                    // Tenta comer se estiver com fome
+                    const currentTileX = Math.floor(animal.x / TILE_SIZE);
+                    const currentTileY = Math.floor(animal.y / TILE_SIZE);
+                    if (animal.hunger >= 80 && floorData.map[currentTileY][currentTileX] === 0) {
+                        animal.state = 'eating';
+                        animal.stateTimer = 180; // 3 segundos a 60fps
+                    } else if (Math.random() < 0.005) { // Chance de começar a passear
                         const range = 4; // Raio de passeio
-                        const currentTileX = Math.floor(animal.x / TILE_SIZE);
-                        const currentTileY = Math.floor(animal.y / TILE_SIZE);
                         const targetTileX = currentTileX + Math.floor(Math.random() * (range * 2 + 1)) - range;
                         const targetTileY = currentTileY + Math.floor(Math.random() * (range * 2 + 1)) - range;
 
                         // Garante que o alvo está dentro do cercado
                         if (targetTileX > 35 && targetTileX < 42 && targetTileY > 30 && targetTileY < 37) {
-                            animal.path = findPath(currentTileX, currentTileY, targetTileX, targetTileY);
+                            animal.path = findPath(currentTileX, currentTileY, targetTileX, targetTileY, (px, py) => isAnimalWalkable(px, py, animal));
                             if (animal.path.length > 0) {
                                 animal.isMoving = true;
+                                const firstStep = animal.path.shift();
+                                animal.targetX = firstStep.x * TILE_SIZE;
+                                animal.targetY = firstStep.y * TILE_SIZE;
                             }
                         }
                     }
@@ -1407,6 +1501,14 @@
 
                     let dx = animal.targetX - animal.x;
                     let dy = animal.targetY - animal.y;
+
+                    // Atualiza a direção do animal
+                    if (Math.abs(dx) > Math.abs(dy)) {
+                        animal.lastMoveDir = { dx: Math.sign(dx), dy: 0 };
+                    } else if (dy !== 0) {
+                        animal.lastMoveDir = { dx: 0, dy: Math.sign(dy) };
+                    }
+
                     if (Math.abs(dx) < animal.speed) animal.x = animal.targetX; else animal.x += Math.sign(dx) * animal.speed;
                     if (Math.abs(dy) < animal.speed) animal.y = animal.targetY; else animal.y += Math.sign(dy) * animal.speed;
                     animal.walkBob += animal.walkBobSpeed;
@@ -1529,11 +1631,18 @@
                 }
             }
 
+            // 3a. Adiciona os animais do andar atual à lista de desenháveis
+            const animals = worldData[player.currentFloor].animals;
+            for (const animal of animals) {
+                drawables.push({ type: 'shadow', x_px: animal.x, y_px: animal.y, y_sort: animal.y + 28 - 1, draw: ()=>{ctx.fillStyle='rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(animal.x+16, animal.y+28, 12, 6, 0, 0, 2*Math.PI); ctx.fill();} });
+                drawables.push({ type: 'animal', x_px: animal.x, y_px: animal.y, y_sort: animal.y + 28, draw: () => drawSheep(ctx, animal) });
+            }
+
             drawables.sort((a, b) => a.y_sort - b.y_sort);
             for (const item of drawables) { item.draw(timestamp); }
 
             // 4. Desenha os EFEITOS do andar atual
-            drawAnimations(timestamp);
+            drawAnimations(timestamp); drawPlantTimers(timestamp);
             drawTileSelector();
             drawPlantingPreview();
             drawPathIndicator(timestamp);
@@ -1725,11 +1834,13 @@
             if (!floorData) return;
 
             if (bpIdx < 0 || !backpackInventory[bpIdx]) return;
+            const inventoryItem = backpackInventory[bpIdx];
+            if (!inventoryItem) return;
+            const item = ITEMS[inventoryItem.id];
 
             // --- Lógica de Interação com Animais ---
             const animal = floorData.animals.find(a => tX >= Math.floor(a.x / TILE_SIZE) && tX < Math.ceil((a.x + TILE_SIZE) / TILE_SIZE) && tY >= Math.floor(a.y / TILE_SIZE) && tY < Math.ceil((a.y + TILE_SIZE) / TILE_SIZE));
             if (animal) {
-                const item = ITEMS[inventoryItem.id];
                 if (item.id === 'shears' && animal.type === 'sheep' && animal.woolLevel >= 100) {
                     animal.woolLevel = 0;
                     addItemToInventory('wool', 1);
@@ -1739,10 +1850,6 @@
                     return; // Ação concluída
                 }
             }
-
-            const inventoryItem = backpackInventory[bpIdx];
-            if (!inventoryItem) return;
-            const item = ITEMS[inventoryItem.id];
 
             // Verifica se há um objeto no tile alvo
             const objectIndex = floorData.mapObjects.findIndex(obj => obj.x === tX && obj.y === tY);
@@ -2031,6 +2138,31 @@
             if (tileId === 10 && (!objectOnTile || (objectOnTile.type !== 9 && objectOnTile.type !== 10))) return false; // Vazio é intransponível, a menos que tenha uma escada
 
             if (objectOnTile) { if (objectOnTile.type === 0 || objectOnTile.type === 1 || objectOnTile.type === 2 || objectOnTile.type === 8 || objectOnTile.type === 11) return false; if ((objectOnTile.type === 4 || objectOnTile.type === 5 || objectOnTile.type === 6 || objectOnTile.type === 7) && !objectOnTile.isOpen) return false; }
+            return true;
+        }
+
+        function isAnimalWalkable(pixelX, pixelY, movingAnimal) {
+            const tX = Math.floor(pixelX / TILE_SIZE);
+            const tY = Math.floor(pixelY / TILE_SIZE);
+            const floorData = worldData[movingAnimal.floor]; // Usa o andar do animal
+
+            // Usa a função base de caminhada para verificar terreno e objetos
+            if (!isWalkable(pixelX, pixelY)) return false;
+
+            // Verifica colisão com o jogador
+            const playerTileX = Math.floor(player.x / TILE_SIZE);
+            const playerTileY = Math.floor(player.y / TILE_SIZE);
+            if (tX === playerTileX && tY === playerTileY) return false;
+
+            // Verifica colisão com outros animais
+            for (const otherAnimal of floorData.animals) {
+                if (otherAnimal !== movingAnimal) {
+                    const otherAnimalTileX = Math.floor(otherAnimal.x / TILE_SIZE);
+                    const otherAnimalTileY = Math.floor(otherAnimal.y / TILE_SIZE);
+                    if (tX === otherAnimalTileX && tY === otherAnimalTileY) return false;
+                }
+            }
+
             return true;
         }
 
@@ -2454,7 +2586,7 @@
                     currentFloor: player.currentFloor,
                     lastMoveDir: { dx: player.lastMoveDir.dx, dy: player.lastMoveDir.dy }
                 },
-                worldData: worldData.map(floor => ({ map: floor.map, mapObjects: floor.mapObjects, plantGrowthData: floor.plantGrowthData, animals: floor.animals })),
+                worldData: worldData.map(floor => ({ map: floor.map, mapObjects: floor.mapObjects, plantGrowthData: floor.plantGrowthData, animals: floor.animals.map(a => ({...a, path: []})) })), // Não salva o path
                 backpackData: backpackInventory,
                 hotbarMapData: hotbarMapping,
                 activeSlotData: activeHotbarSlot,
@@ -2531,8 +2663,10 @@
                 }
             } else {
                 console.log("Nenhum save encontrado, iniciando novo jogo.");
-                worldData.push(createNewFloorData(WORLD_LAYOUT, validatedInitialObjects)); // Andar 0 com objetos validados
-                worldData[0].animals = JSON.parse(JSON.stringify(initialAnimals)); // Adiciona animais ao novo jogo
+                const floor0 = createNewFloorData(WORLD_LAYOUT, validatedInitialObjects);
+                // Adiciona a propriedade 'floor' a cada animal inicial
+                floor0.animals = JSON.parse(JSON.stringify(initialAnimals)).map(a => ({ ...a, floor: 0 }));
+                worldData.push(floor0);
                 worldData.push(createNewFloorData(createFloor1Layout(), floor1Objects)); // Andar 1
                 backpackInventory = new Array(BACKPACK_SIZE).fill(null);
                 hotbarMapping = new Array(HOTBAR_SIZE).fill(-1);
@@ -2680,7 +2814,7 @@
                      isHolding = false; // Reset state
                      return;
                  }
-
+ 
                  const touchedWorldX = touchStartX + camera.x;
                  const touchedWorldY = touchStartY + camera.y;
                  const touchedTileX = Math.floor(touchedWorldX / TILE_SIZE);
@@ -2719,7 +2853,7 @@
              isHolding = false; // Reseta estado de hold ao soltar
          }
 
-        function findPath(startX, startY, endX, endY) {
+        function findPath(startX, startY, endX, endY, walkableCheckFn = isWalkable) {
             let path = [];
             let currentX = startX;
             let currentY = startY;
@@ -2738,18 +2872,18 @@
                     nextY += Math.sign(dy);
                 }
 
-                if (isWalkable(nextX * TILE_SIZE, nextY * TILE_SIZE)) {
+                if (walkableCheckFn(nextX * TILE_SIZE, nextY * TILE_SIZE)) {
                     currentX = nextX;
                     currentY = nextY;
                     path.push({ x: currentX, y: currentY });
                 } else {
                     // Tenta mover na outra direção se a principal estiver bloqueada
                     if (Math.abs(dx) > Math.abs(dy)) { // Tentou X, agora tenta Y
-                        if (isWalkable(startX * TILE_SIZE, (currentY + Math.sign(dy)) * TILE_SIZE)) {
+                        if (walkableCheckFn(startX * TILE_SIZE, (currentY + Math.sign(dy)) * TILE_SIZE)) {
                              currentY += Math.sign(dy); path.push({ x: currentX, y: currentY });
                         } else break; // Bloqueado
                     } else { // Tentou Y, agora tenta X
-                        if (isWalkable((currentX + Math.sign(dx)) * TILE_SIZE, startY * TILE_SIZE)) {
+                        if (walkableCheckFn((currentX + Math.sign(dx)) * TILE_SIZE, startY * TILE_SIZE)) {
                             currentX += Math.sign(dx); path.push({ x: currentX, y: currentY });
                         } else break; // Bloqueado
                     }
