@@ -709,9 +709,9 @@
 
         // --- Animais Iniciais ---
         const initialAnimals = [
-            { type: 'sheep', x: 36 * TILE_SIZE, y: 32 * TILE_SIZE, state: 'idle', woolLevel: 0, hunger: 0, path: [], isMoving: false, speed: 1, walkBob: 0, walkBobSpeed: 0.1, lastMoveDir: { dx: 0, dy: 1 }, stateTimer: 0 },
-            { type: 'sheep', x: 38 * TILE_SIZE, y: 34 * TILE_SIZE, state: 'idle', woolLevel: 20, hunger: 0, path: [], isMoving: false, speed: 1, walkBob: 0, walkBobSpeed: 0.1, lastMoveDir: { dx: 0, dy: 1 }, stateTimer: 0 },
-            { type: 'sheep', x: 40 * TILE_SIZE, y: 33 * TILE_SIZE, state: 'idle', woolLevel: 50, hunger: 0, path: [], isMoving: false, speed: 1, walkBob: 0, walkBobSpeed: 0.1, lastMoveDir: { dx: 0, dy: 1 }, stateTimer: 0 },
+            { type: 'sheep', gender: 'male', age: 100, x: 36 * TILE_SIZE, y: 32 * TILE_SIZE, state: 'idle', woolLevel: 0, hunger: 0, path: [], isMoving: false, speed: 1, walkBob: 0, walkBobSpeed: 0.1, lastMoveDir: { dx: 0, dy: 1 }, stateTimer: 0 },
+            { type: 'sheep', gender: 'female', age: 100, x: 38 * TILE_SIZE, y: 34 * TILE_SIZE, state: 'idle', woolLevel: 20, hunger: 0, path: [], isMoving: false, speed: 1, walkBob: 0, walkBobSpeed: 0.1, lastMoveDir: { dx: 0, dy: 1 }, stateTimer: 0 },
+            { type: 'sheep', gender: 'female', age: 100, x: 40 * TILE_SIZE, y: 33 * TILE_SIZE, state: 'idle', woolLevel: 50, hunger: 0, path: [], isMoving: false, speed: 1, walkBob: 0, walkBobSpeed: 0.1, lastMoveDir: { dx: 0, dy: 1 }, stateTimer: 0 },
         ];
 
         // --- Estrutura de Dados do Mundo ---
@@ -1049,14 +1049,19 @@
             const bodyColor = '#ECEFF1';
             const faceColor = '#37474F';
             const legColor = '#455A64';
+            const hornColor = '#BCAAA4';
             const woolSize = animal.woolLevel >= 100 ? 2 : 0; // Lã extra
+            const isAdult = animal.age >= 100;
+            const scale = isAdult ? 1.0 : 0.7; // Filhotes são 70% do tamanho
             
             // Animação da cabeça a comer
             const headBob = animal.state === 'eating' ? Math.sin(animal.stateTimer * 0.1) * 4 + 4 : 0;
 
             ctx.save();
             // Centraliza o desenho e inverte se estiver a olhar para a esquerda
-            ctx.translate(x + 16, y + 16);
+            ctx.translate(x + 16, y + 16 + (1 - scale) * 16); // Ajusta a posição Y para filhotes
+            ctx.scale(scale, scale);
+
             if (animal.lastMoveDir.dx < 0) {
                 ctx.scale(-1, 1);
             }
@@ -1081,6 +1086,14 @@
                 ctx.fillRect(12, -5 + headBob, 3, 3); // Orelha
                 ctx.fill();
 
+                // Chifre na vista lateral
+                if (animal.gender === 'male') {
+                    ctx.fillStyle = hornColor;
+                    ctx.beginPath();
+                    ctx.arc(8, -4 + headBob, 3, Math.PI * 1.5, Math.PI * 0.5, false);
+                    ctx.fill();
+                }
+
             } else { // Vista Frontal ou Traseira
                 // Pernas
                 ctx.fillStyle = legColor;
@@ -1104,12 +1117,29 @@
                     ctx.fillRect(-8, -8 + headBob, 3, 3); // Orelha esquerda
                     ctx.fillRect(5, -8 + headBob, 3, 3);  // Orelha direita
                     ctx.fill();
+
+                    // Chifres para o carneiro (macho)
+                    if (animal.gender === 'male') {
+                        ctx.fillStyle = hornColor;
+                        ctx.fillRect(-10, -12 + headBob, 4, 4);
+                        ctx.fillRect(6, -12 + headBob, 4, 4);
+                    }
+                    ctx.fill();
                 } else { // Olhando para cima/trás
                     // Apenas a parte de cima da cabeça é visível
                     ctx.fillStyle = faceColor;
                     ctx.beginPath();
                     ctx.arc(0, -10, 5, 0, Math.PI * 2);
                     ctx.fill();
+
+                    // Chifres na vista traseira
+                    if (animal.gender === 'male') {
+                        ctx.fillStyle = hornColor;
+                        ctx.beginPath();
+                        ctx.arc(-5, -9, 3, Math.PI, Math.PI * 2);
+                        ctx.arc(5, -9, 3, Math.PI, Math.PI * 2);
+                        ctx.fill();
+                    }
                 }
             }
 
@@ -1132,7 +1162,7 @@
             }
 
             // Barra de Progresso da Lã
-            if (animal.woolLevel < 100) {
+            if (isAdult && animal.woolLevel < 100) {
                 const barWidth = 28;
                 ctx.fillStyle = '#333';
                 ctx.fillRect(x + 2, indicatorY, barWidth, 6);
@@ -1446,9 +1476,42 @@
             const floorData = worldData[player.currentFloor];
             if (!floorData || !floorData.animals) return;
 
+            // --- Lógica de Reprodução (executada uma vez por frame) ---
+            const ANIMAL_CAP = 10;
+            const ADULT_AGE = 100;
+            if (Math.random() < 0.0001 && floorData.animals.length < ANIMAL_CAP) {
+                const males = floorData.animals.filter(a => a.gender === 'male' && a.age >= ADULT_AGE);
+                const females = floorData.animals.filter(a => a.gender === 'female' && a.age >= ADULT_AGE);
+
+                if (males.length > 0 && females.length > 0) {
+                    const mother = females[Math.floor(Math.random() * females.length)];
+                    const newGender = Math.random() < 0.5 ? 'male' : 'female';
+                    const newAnimal = {
+                        type: 'sheep',
+                        gender: newGender,
+                        age: 0, // Nasce como filhote
+                        x: mother.x, y: mother.y,
+                        state: 'idle', woolLevel: 0, hunger: 0, path: [], isMoving: false, speed: 1, walkBob: 0, walkBobSpeed: 0.1, lastMoveDir: { dx: 0, dy: 1 }, stateTimer: 0,
+                        floor: mother.floor
+                    };
+                    floorData.animals.push(newAnimal);
+                    console.log("Um novo cordeiro nasceu!");
+
+                    // Feedback visual de coração
+                    activeAnimations.push({ type: 'heart_feedback', x: mother.x + 16, y: mother.y, startTime: timestamp, duration: 2000 });
+                }
+            }
+
+
+            // --- Lógica Individual de cada Animal ---
             for (const animal of floorData.animals) {
-                // Crescimento da lã
-                if (animal.woolLevel < 100) animal.woolLevel += 0.02;
+                // Crescimento (idade e lã)
+                if (animal.age < ADULT_AGE) {
+                    animal.age += 0.01; // Taxa de crescimento
+                } else {
+                    // A lã só cresce em adultos
+                    if (animal.woolLevel < 100) animal.woolLevel += 0.02;
+                }
                 
                 // Aumento da fome
                 if (animal.hunger < 100) animal.hunger += 0.01;
@@ -1664,6 +1727,22 @@
                 }
             });
 
+            // Animação de coração da reprodução
+            activeAnimations.forEach(anim => {
+                if (anim.type === 'heart_feedback') {
+                    const elapsed = timestamp - anim.startTime;
+                    const progress = elapsed / anim.duration;
+                    if (progress < 1) {
+                        const yOffset = -10 - (progress * 20);
+                        const alpha = 1 - (progress * progress);
+                        ctx.font = '24px sans-serif';
+                        ctx.globalAlpha = alpha;
+                        ctx.fillText('❤️', anim.x, anim.y + yOffset);
+                        ctx.globalAlpha = 1.0;
+                    }
+                }
+            });
+
             // 5. Verifica se o jogador está "debaixo" de algo no andar de cima
             let isPlayerUnderSomething = false;
             if (worldData[player.currentFloor + 1]) { // Só verifica se houver um andar de cima
@@ -1841,7 +1920,7 @@
             // --- Lógica de Interação com Animais ---
             const animal = floorData.animals.find(a => tX >= Math.floor(a.x / TILE_SIZE) && tX < Math.ceil((a.x + TILE_SIZE) / TILE_SIZE) && tY >= Math.floor(a.y / TILE_SIZE) && tY < Math.ceil((a.y + TILE_SIZE) / TILE_SIZE));
             if (animal) {
-                if (item.id === 'shears' && animal.type === 'sheep' && animal.woolLevel >= 100) {
+                if (item.id === 'shears' && animal.type === 'sheep' && animal.woolLevel >= 100 && animal.age >= 100) {
                     animal.woolLevel = 0;
                     addItemToInventory('wool', 1);
                     saveGame();
@@ -2928,7 +3007,7 @@
             // Verifica se há um animal no tile
             const animalOnTile = floorData.animals.find(a => tileX >= Math.floor(a.x / TILE_SIZE) && tileX < Math.ceil((a.x + TILE_SIZE) / TILE_SIZE) && tileY >= Math.floor(a.y / TILE_SIZE) && tileY < Math.ceil((a.y + TILE_SIZE) / TILE_SIZE));
             if (animalOnTile) {
-                if (item.id === 'shears' && animalOnTile.type === 'sheep' && animalOnTile.woolLevel >= 100) return true;
+                if (item.id === 'shears' && animalOnTile.type === 'sheep' && animalOnTile.woolLevel >= 100 && animalOnTile.age >= 100) return true;
                 return false; // Bloqueia outras ações no tile do animal
             }
 
