@@ -1552,7 +1552,7 @@
                     if (objectIndex !== -1) break; // Não constrói sobre objetos existentes
 
                     if (player.toolSubAction === 'build_wall') {
-                        if (tId === 0 || tId === 1) {
+                        if (tId === 0 || tId === 1 || tId === 8) { // Permite construir muro em piso de madeira
                             const wallItemIdx = backpackInventory.findIndex(i => i && i.id === 'wall' && i.count > 0);
                             const stoneIdx = backpackInventory.findIndex(i => i && i.id === 'stone' && i.count >= 5);
                             if (wallItemIdx !== -1) { backpackInventory[wallItemIdx].count--; }
@@ -2450,7 +2450,7 @@
                         }
                     }
                     if (player.toolSubAction === 'build_wall') {
-                        return ((tId === 0 || tId === 1) && (backpackInventory.some(i => i && i.id === 'wall' && i.count > 0) || backpackInventory.some(i => i && i.id === 'stone' && i.count >= 5)));
+                        return ((tId === 0 || tId === 1 || tId === 8) && (backpackInventory.some(i => i && i.id === 'wall' && i.count > 0) || backpackInventory.some(i => i && i.id === 'stone' && i.count >= 5)));
                     }
                     if (player.toolSubAction === 'build_stairs') {
                         const targetFloorIndex = player.currentFloor + 1;
