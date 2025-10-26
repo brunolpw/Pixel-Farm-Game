@@ -603,7 +603,10 @@
         initialMapObjects.push({ type: 9, x: 19, y: 14, targetFloor: 1, targetX: 19, targetY: 13 });
         // Escada para baixo no primeiro andar (será adicionada ao array de objetos do andar 1)
         const floor1Objects = [
-            { type: 10, x: 19, y: 13, targetFloor: 0, targetX: 19, targetY: 14 }
+            { type: 10, x: 19, y: 13, targetFloor: 0, targetX: 19, targetY: 14 },
+            // Adiciona algumas árvores no andar de cima para teste visual
+            { type: 1, x: 16, y: 11 }, { type: 1, x: 22, y: 12 }, { type: 1, x: 18, y: 13 },
+            { type: 1, x: 23, y: 10 }
         ];
 
         // --- Adiciona a base da "montanha" para o sistema de andares ---
@@ -765,14 +768,17 @@
             const yT = y_px - TILE_SIZE * 1.5 + 8;
             const xC = x_px + TILE_SIZE / 2;
             
-            // Verifica se o jogador está atrás da árvore
-            const isPlayerBehind = player.y < y_px + TILE_SIZE && 
-                                  player.y + player.height > y_px - TILE_SIZE && 
-                                  player.x + player.width > x_px - TILE_SIZE && 
-                                  player.x < x_px + TILE_SIZE * 2;
-
-            // Define a opacidade baseada na posição do jogador
-            ctx.globalAlpha = isPlayerBehind ? 0.3 : 1.0;
+            // A lógica de opacidade só se aplica se não estivermos já em modo de transparência (para a pré-visualização)
+            const isPreviewing = ctx.globalAlpha < 1.0;
+            if (!isPreviewing) {
+                // Verifica se o jogador está atrás da árvore
+                const isPlayerBehind = player.y < y_px + TILE_SIZE && 
+                                      player.y + player.height > y_px - TILE_SIZE && 
+                                      player.x + player.width > x_px - TILE_SIZE && 
+                                      player.x < x_px + TILE_SIZE * 2;
+                // Define a opacidade baseada na posição do jogador
+                ctx.globalAlpha = isPlayerBehind ? 0.3 : 1.0;
+            }
 
             // Desenha a copa mais escura
             ctx.fillStyle = '#388E3C';
@@ -790,8 +796,10 @@
             ctx.ellipse(xC + TILE_SIZE * 0.4, yT + TILE_SIZE * 1.0, TILE_SIZE * 0.6, TILE_SIZE * 0.5, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // Restaura a opacidade original
-            ctx.globalAlpha = 1.0;
+            // Restaura a opacidade original apenas se a tivermos alterado
+            if (!isPreviewing) {
+                ctx.globalAlpha = 1.0;
+            }
         }
         function drawCampfire(ctx, x_px, y_px, timestamp) {
             // Logs
@@ -1172,11 +1180,13 @@
             ctx.scale(zoomLevel, zoomLevel);
             ctx.translate(-camera.x, -camera.y);
 
-            // 1. Lógica de desenho de andares
+            // --- Lógica de Desenho de Andares (Refatorada) ---
+
+            // 1. Desenha o ANDAR DE BAIXO (se aplicável)
             if (player.currentFloor > 0 && worldData[player.currentFloor - 1]) {
                 const lowerFloor = worldData[player.currentFloor - 1];
-                // 1a. Desenha o chão e a água do andar de baixo
                 ctx.drawImage(lowerFloor.preRenderedMapCanvas, 0, 0);
+                // Desenha a água animada do andar de baixo
                 for (let y = 0; y < MAP_HEIGHT_TILES; y++) {
                     for (let x = 0; x < MAP_WIDTH_TILES; x++) {
                         if (lowerFloor.map[y][x] === 3) {
@@ -1184,16 +1194,19 @@
                         }
                     }
                 }
-                // 1b. Aplica o escurecimento
+                // Aplica o escurecimento
                 ctx.globalAlpha = 0.2;
                 ctx.fillStyle = 'black';
                 ctx.fillRect(0, 0, MAP_WIDTH_PX, MAP_HEIGHT_PX);
                 ctx.globalAlpha = 1.0;
+            }
 
-                // 1c. Desenha as partes não vazias do andar atual por cima
-                const currentFloorCanvas = worldData[player.currentFloor].preRenderedMapCanvas;
-                const currentMap = worldData[player.currentFloor].map;
-                for (let y = 0; y < MAP_HEIGHT_TILES; y++) {
+            // 2. Desenha o chão do andar atual
+            const currentFloorCanvas = worldData[player.currentFloor].preRenderedMapCanvas; // Re-obtém para clareza
+            const currentMap = worldData[player.currentFloor].map;
+            // Se estiver em um andar superior, desenha apenas os tiles não vazios
+            if (player.currentFloor > 0) {
+                 for (let y = 0; y < MAP_HEIGHT_TILES; y++) {
                     for (let x = 0; x < MAP_WIDTH_TILES; x++) {
                         if (currentMap[y][x] !== 10) { // 10 é o tile de Vazio
                             ctx.drawImage(currentFloorCanvas, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
@@ -1201,12 +1214,10 @@
                     }
                 }
             } else {
-                // Se estiver no térreo, apenas desenha o mapa normal
-                ctx.drawImage(worldData[player.currentFloor].preRenderedMapCanvas, 0, 0);
+                // Se estiver no térreo, desenha o mapa inteiro de uma vez
+                ctx.drawImage(currentFloorCanvas, 0, 0);
             }
-
-            // 1.5. Desenha a água animada
-            const currentMap = worldData[player.currentFloor].map;
+            // Desenha a água animada do andar atual
             for (let y = 0; y < MAP_HEIGHT_TILES; y++) {
                 for (let x = 0; x < MAP_WIDTH_TILES; x++) {
                     if (currentMap[y][x] === 3) {
@@ -1215,7 +1226,7 @@
                 }
             }
 
-            // 2. Coleta "desenháveis"
+            // 3. Coleta e desenha os OBJETOS do andar atual
             const mapObjects = worldData[player.currentFloor].mapObjects;
             let drawables = [];
             drawables.push({ type: 'player', x_px: player.x, y_px: player.y, y_sort: player.y + player.height - 4, draw: (ts) => drawPlayer(ts) });
@@ -1250,17 +1261,63 @@
                     drawables.push({ type: 'stairs_down', x_px: x_px, y_px: y_px, y_sort: y_base, draw: () => drawStairs(ctx, x_px, y_px, TILE_SIZE, 'down') });
                 }
             }
-            // 3. Ordena
             drawables.sort((a, b) => a.y_sort - b.y_sort);
-            // 4. Desenha
             for (const item of drawables) { item.draw(timestamp); }
-            // 5. Animações e Timers
+
+            // 4. Desenha os EFEITOS do andar atual
             drawAnimations(timestamp); drawPlantTimers(timestamp);
             drawTileSelector();
             drawPlantingPreview();
             drawPathIndicator(timestamp);
             drawConstructionPreview();
             drawConstructionGrid();
+
+            // 5. Desenha a pré-visualização do ANDAR DE CIMA (se aplicável)
+            if (worldData[player.currentFloor + 1]) {
+                const playerTileX = Math.floor((player.x + player.width / 2) / TILE_SIZE);
+                const playerTileY = Math.floor((player.y + player.height / 2) / TILE_SIZE);
+                let minDistanceToWall = 999; // Inicializa com um valor alto, mas finito
+
+                const currentFloorObjects = worldData[player.currentFloor].mapObjects;
+                for (const obj of currentFloorObjects) {
+                    if (obj.type === 8) { // Parede de Montanha
+                        const dist = Math.sqrt(Math.pow(playerTileX - obj.x, 2) + Math.pow(playerTileY - obj.y, 2));
+                        if (dist < minDistanceToWall) minDistanceToWall = dist;
+                    }
+                }
+
+                // Se estiver a 2+ tiles de distância, mostra o andar de cima com opacidade
+                if (minDistanceToWall >= 2) {
+                    const upperFloor = worldData[player.currentFloor + 1];
+                    const upperFloorCanvas = upperFloor.preRenderedMapCanvas;
+
+                    ctx.globalAlpha = 0.8;
+
+                    // 1. Desenha o CHÃO do andar de cima (ignorando os vazios)
+                    for (let y = 0; y < MAP_HEIGHT_TILES; y++) {
+                        for (let x = 0; x < MAP_WIDTH_TILES; x++) {
+                            const tileId = upperFloor.map[y][x];
+                            if (tileId !== 10) { // Se não for Vazio
+                                ctx.drawImage(upperFloorCanvas, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                            }
+                        }
+                    }
+
+                    // 2. Desenha os OBJETOS do andar de cima
+                    // Não precisa de y-sort aqui, pois é apenas uma pré-visualização "chapada"
+                    for (const obj of upperFloor.mapObjects) {
+                        const x_px = obj.x * TILE_SIZE;
+                        const y_px = obj.y * TILE_SIZE;
+                        if (obj.type === 1) { drawTreeTrunk(ctx, x_px, y_px); drawTreeCanopy(ctx, x_px, y_px); }
+                        else if (obj.type === 0) { drawRock(ctx, x_px, y_px); }
+                        else if (obj.type === 10) { drawStairs(ctx, x_px, y_px, TILE_SIZE, 'down'); }
+                        // Adicionar outros objetos se necessário
+                    }
+
+                    ctx.globalAlpha = 1.0; // Restaura a opacidade
+                }
+            }
+
             ctx.restore();
         }
 
