@@ -661,12 +661,13 @@
             'hoe': { id: 'hoe', name: 'Enxada', description: '<strong>Enxada</strong><br>Prepara a terra para o plantio.', category: 'ferramenta', stackable: false },
             'seed_tomato': { id: 'seed_tomato', name: 'Semente', description: '<strong>Semente</strong><br>Plante em solo arado para cultivar tomates.', category: 'material', stackable: true, actions: [ { label: "Plantar Tomate", action: "log", value: "Ainda só temos um tipo de semente." }, { label: "Plantar Milho", action: "log", value: "Semente de milho não implementada." }, { label: "Plantar Árvore", action: "log", value: "Semente de árvore não implementada." } ] },
             'tomato': { id: 'tomato', name: 'Colheita', description: '<strong>Colheita</strong><br>O fruto do seu trabalho. Um tomate suculento.', category: 'material', stackable: true },
-            'shovel': { id: 'shovel', name: 'Pá', description: '<strong>Pá</strong><br>Remove plantações e outros erros.', category: 'ferramenta', stackable: false },
+            'shovel': { id: 'shovel', name: 'Pá', description: '<strong>Pá</strong><br>Coleta argila, remove cercas, pisos e plantações. Permite cavar ou aterrar água.', category: 'ferramenta', stackable: false },
             'watering_can': { id: 'watering_can', name: 'Regador', description: '<strong>Regador</strong><br>Acelera o crescimento das plantas.', category: 'ferramenta', stackable: false },
             'axe': { id: 'axe', name: 'Machado', description: '<strong>Machado</strong><br>Corta árvores para obter madeira.', category: 'ferramenta', stackable: false },
             'pickaxe': { id: 'pickaxe', name: 'Picareta', description: '<strong>Picareta</strong><br>Quebra pedras para obter minerais.', category: 'ferramenta', stackable: false },
             'stone': { id: 'stone', name: 'Pedra', description: '<strong>Pedra</strong><br>Material de construção básico.', category: 'material_construcao', stackable: true },
             'wood': { id: 'wood', name: 'Madeira', description: '<strong>Madeira</strong><br>Material de construção básico.', category: 'material_construcao', stackable: true },
+            'clay': { id: 'clay', name: 'Argila', description: '<strong>Argila</strong><br>Material úmido, pode ser usado para criar itens mais resistentes.', category: 'material_construcao', stackable: true },
             'fence': { id: 'fence', name: 'Cerca', description: '<strong>Cerca</strong><br>Uma cerca pré-fabricada.', category: 'construcao', stackable: true },
             'wall': { id: 'wall', name: 'Muro', description: '<strong>Muro</strong><br>Um muro de tijolos resistente.', category: 'construcao', stackable: true },
             'door': { id: 'door', name: 'Porta', description: '<strong>Porta</strong><br>Uma porta de madeira.', category: 'construcao', stackable: true },
@@ -882,6 +883,18 @@
             ctx.fillRect(x_px + 4, y_px + 16, 2, 16);
             ctx.fillRect(x_px + 18, y_px + 16, 2, 16);
         }
+        function drawClayTile(ctx, x_px, y_px, size) { // Sprite simplificado sem bordas
+            const baseColor = '#A1887F'; // Um marrom mais acinzentado
+            const highlightColor = 'rgba(255, 255, 255, 0.1)';
+            
+            ctx.fillStyle = baseColor;
+            ctx.fillRect(x_px, y_px, size, size);
+
+            // Detalhes de umidade
+            ctx.fillStyle = highlightColor;
+            ctx.beginPath(); ctx.ellipse(x_px + size * 0.7, y_px + size * 0.6, size * 0.2, size * 0.1, Math.PI / 4, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(x_px + size * 0.3, y_px + size * 0.3, size * 0.15, size * 0.1, -Math.PI / 4, 0, Math.PI * 2); ctx.fill();
+        }
         function preRenderMap() { for(let y=0; y<MAP_HEIGHT_TILES; y++){ for(let x=0; x<MAP_WIDTH_TILES; x++){ updatePreRenderedTile(x, y, map[y][x]); } } console.log("Mapa pré-renderizado!"); }
         function updatePreRenderedTile(tileX, tileY, tileId) {
             const dX=tileX*TILE_SIZE; const dY=tileY*TILE_SIZE;
@@ -900,6 +913,7 @@
                 case 6: drawPlantTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break;
                 case 7: drawHarvestableTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break;
                 case 8: drawFloorTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break;
+                case 9: drawClayTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break;
                 default: drawGrassTile(preRenderedMapCtx, dX, dY, TILE_SIZE);
             }
         }
@@ -1302,7 +1316,16 @@
                 case "Enxada": if (tId === 0 || tId === 1) { map[tY][tX] = 2; updatePreRenderedTile(tX, tY, 2); saveGame(); } break;
                 case "Semente": if (tId === 2 && inventoryItem.count > 0) { map[tY][tX] = 4; plantGrowthData[tK] = { plantedAt: timestamp, boosted: false }; inventoryItem.count--; updatePreRenderedTile(tX, tY, 4); saveGame(); updateHotbarUI(); updateBackpackUI(); } break;
                 case "Pá":
-                    if (tId === 8) { // Remove piso de madeira
+                    if (tId === 9) { // Coleta argila
+                        const clayGained = Math.floor(Math.random() * 5) + 1; // 1 a 5
+                        addItemToInventory('clay', clayGained);
+                        map[tY][tX] = 1; // Volta para terra
+                        updatePreRenderedTile(tX, tY, 1);
+                        console.log(`Coletou ${clayGained} de argila.`);
+                        saveGame();
+                        updateHotbarUI();
+                        updateBackpackUI();
+                    } else if (tId === 8) { // Remove piso de madeira
                         map[tY][tX] = 0; // Volta para grama
                         addItemToInventory('wood', 1); // Devolve 1 madeira
                         updatePreRenderedTile(tX, tY, 0);
@@ -1315,7 +1338,20 @@
                         map[tY][tX] = 0; updatePreRenderedTile(tX, tY, 0); saveGame();
                     }
                     break;
-                case "Regador": if (tId === 3) { inventoryItem.count = 10; updateHotbarUI(); updateBackpackUI(); saveGame(); } else if (tId >= 4 && tId <= 6 && inventoryItem.count > 0) { const pD = plantGrowthData[tK]; if (pD && !pD.boosted) { pD.boosted = true; inventoryItem.count--; activeAnimations.push({ type: 'water', x: tX, y: tY, startTime: timestamp, duration: 500 }); updateHotbarUI(); updateBackpackUI(); saveGame(); } } break;
+                case "Regador": {
+                    if (tId === 3) { inventoryItem.count = 10; updateHotbarUI(); updateBackpackUI(); saveGame(); }
+                    else if (inventoryItem.count > 0) {
+                        let actionTaken = false;
+                        if (tId === 1 || tId === 2) { // Terra ou Arado -> Argila
+                            map[tY][tX] = 9; updatePreRenderedTile(tX, tY, 9); actionTaken = true;
+                        } else if (tId >= 4 && tId <= 6) { // Regar planta
+                            const pD = plantGrowthData[tK]; if (pD && !pD.boosted) { pD.boosted = true; actionTaken = true; }
+                        }
+                        if (actionTaken) {
+                            inventoryItem.count--; activeAnimations.push({ type: 'water', x: tX, y: tY, startTime: timestamp, duration: 500 }); updateHotbarUI(); updateBackpackUI(); saveGame();
+                        }
+                    }
+                    break; }
                 case "Construção":
                     if (objectIndex !== -1) break; // Não constrói sobre objetos existentes
 
@@ -2140,8 +2176,8 @@
             switch (item.id) {
                 case 'hoe': return (tId === 0 || tId === 1);
                 case 'seed_tomato': return (tId === 2 && backpackInventory[bpIdx].count > 0);
-                case 'shovel': return (tId === 1 || tId === 2 || (tId >= 4 && tId <= 7) || tId === 0 || tId === 3 || tId === 8);
-                case 'watering_can': return (tId === 3 || (tId >= 4 && tId <= 6 && backpackInventory[bpIdx].count > 0));
+                case 'shovel': return (tId === 1 || tId === 2 || (tId >= 4 && tId <= 7) || tId === 0 || tId === 3 || tId === 8 || tId === 9);
+                case 'watering_can': return (tId === 3 || (tId >= 4 && tId <= 6 && backpackInventory[bpIdx].count > 0) || ((tId === 1 || tId === 2) && backpackInventory[bpIdx].count > 0));
                 case 'construction_tool':
                     if (player.toolSubAction === 'pickup_mode') { // Pega piso
                         return tId === 8;
