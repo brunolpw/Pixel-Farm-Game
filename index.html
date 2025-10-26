@@ -526,98 +526,89 @@
         const MAP_HEIGHT_TILES = 50;
         const BORDER_SIZE = 5;
 
-        // 0=Grama, 1=Terra, 2=Arado, 3=Água, 4=Semente, 5=Muda, 6=Planta, 7=Colheita
-        // Layout do mapa original (para ser "colado" no mapa maior)
-        const originalMapLayout = [
-            [0,0,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,3,3,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0],
-            [0,0,3,3,0,0,0,0,0,1,2,2,2,2,1,0,0,0,0,0,0,0,0,0,0],
-            [0,0,3,3,0,0,0,0,0,1,2,1,1,2,1,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,3,3,0,3,0,0,1,2,1,1,2,1,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,3,3,3,3,0,0,1,2,2,2,2,1,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,3,3,3,3,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,3,3,3,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,3,3,3,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,3,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,3,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
-        ];
-        const originalMapWidth = originalMapLayout[0].length;
-        const originalMapHeight = originalMapLayout.length;
+        // Função para gerar o layout do mundo uma única vez
+        function createWorldLayout() {
+            // 0=Grama, 1=Terra, 2=Arado, 3=Água, 4=Semente, 5=Muda, 6=Planta, 7=Colheita, 8=Piso, 9=Argila
+            const baseLayout = [
+                [0,0,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                [0,0,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                [0,0,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                [0,0,3,3,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0],
+                [0,0,3,3,0,0,0,0,0,1,2,2,2,2,1,0,0,0,0,0,0,0,0,0,0],
+                [0,0,3,3,0,0,0,0,0,1,2,1,1,2,1,0,0,0,0,0,0,0,0,0,0],
+                [0,0,0,3,3,0,3,0,0,1,2,1,1,2,1,0,0,0,0,0,0,0,0,0,0],
+                [0,0,0,3,3,3,3,0,0,1,2,2,2,2,1,0,0,0,0,0,0,0,0,0,0],
+                [0,0,0,0,3,3,3,3,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0],
+                [0,0,0,0,0,3,3,3,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                [0,0,0,0,0,3,3,3,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                [0,0,0,0,0,0,0,3,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                [0,0,0,0,0,0,0,3,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
 
-        // Calcula o deslocamento para centralizar o mapa antigo
-        const mapOffsetX = Math.floor((MAP_WIDTH_TILES - originalMapWidth) / 2);
-        const mapOffsetY = Math.floor((MAP_HEIGHT_TILES - originalMapHeight) / 2);
+            ];
+            const baseWidth = baseLayout[0].length;
+            const baseHeight = baseLayout.length;
+            const offsetX = Math.floor((MAP_WIDTH_TILES - baseWidth) / 2);
+            const offsetY = Math.floor((MAP_HEIGHT_TILES - baseHeight) / 2);
 
-        let map = [];
-        for (let y = 0; y < MAP_HEIGHT_TILES; y++) {
-            let row = [];
-            for (let x = 0; x < MAP_WIDTH_TILES; x++) {
-                // Adiciona a borda de água
-                if (x < BORDER_SIZE || x >= MAP_WIDTH_TILES - BORDER_SIZE || y < BORDER_SIZE || y >= MAP_HEIGHT_TILES - BORDER_SIZE) {
-                    row.push(3); // Água
-                } else {
-                    // Verifica se estamos na área do mapa antigo
-                    const oldX = x - mapOffsetX;
-                    const oldY = y - mapOffsetY;
-                    if (oldY >= 0 && oldY < originalMapHeight && oldX >= 0 && oldX < originalMapWidth) {
-                        row.push(originalMapLayout[oldY][oldX]);
+            const finalLayout = [];
+            for (let y = 0; y < MAP_HEIGHT_TILES; y++) {
+                const row = [];
+                for (let x = 0; x < MAP_WIDTH_TILES; x++) {
+                    if (x < BORDER_SIZE || x >= MAP_WIDTH_TILES - BORDER_SIZE || y < BORDER_SIZE || y >= MAP_HEIGHT_TILES - BORDER_SIZE) {
+                        row.push(3); // Borda de água
                     } else {
-                        row.push(0); // Grama para o resto
+                        const relativeX = x - offsetX;
+                        const relativeY = y - offsetY;
+                        if (relativeY >= 0 && relativeY < baseHeight && relativeX >= 0 && relativeX < baseWidth) {
+                            row.push(baseLayout[relativeY][relativeX]); // Cola o mapa base
+                        } else {
+                            row.push(0); // Grama no resto
+                        }
                     }
                 }
+                finalLayout.push(row);
             }
-            map.push(row);
+            return finalLayout;
         }
+
+        const WORLD_LAYOUT = createWorldLayout();
+        // O mapa do jogo é uma cópia profunda do layout, para que possa ser modificado.
+        let map = JSON.parse(JSON.stringify(WORLD_LAYOUT));
 
         const MAP_WIDTH_PX = MAP_WIDTH_TILES * TILE_SIZE; const MAP_HEIGHT_PX = MAP_HEIGHT_TILES * TILE_SIZE;
 
         let plantGrowthData = {};
 
         // type: 0=Rocha, 1=Árvore, 2=Fogueira, 3=Tocha
-        // As coordenadas são ajustadas com o offset para centralizar
+        // As coordenadas agora são ABSOLUTAS, pré-calculadas.
         let mapObjects = [
             // Árvores
-            { type: 1, x: 0 + mapOffsetX, y: 0 + mapOffsetY }, 
-            { type: 1, x: 4 + mapOffsetX, y: 7 + mapOffsetY }, { type: 1, x: 6 + mapOffsetX, y: 10 + mapOffsetY }, { type: 1, x: 18 + mapOffsetX, y: 8 + mapOffsetY }, { type: 1, x: 20 + mapOffsetX, y: 12 + mapOffsetY }, { type: 1, x: 22 + mapOffsetX, y: 5 + mapOffsetY },
-            { type: 1, x: 2 + mapOffsetX, y: 15 + mapOffsetY }, { type: 1, x: 10 + mapOffsetX, y: 20 + mapOffsetY }, { type: 1, x: 15 + mapOffsetX, y: 25 + mapOffsetY }, { type: 1, x: 23 + mapOffsetX, y: 20 + mapOffsetY }, { type: 1, x: 5 + mapOffsetX, y: 22 + mapOffsetY },
+            { type: 1, x: 12, y: 16 }, { type: 1, x: 16, y: 23 }, { type: 1, x: 18, y: 26 }, { type: 1, x: 30, y: 24 }, { type: 1, x: 32, y: 28 }, { type: 1, x: 34, y: 21 },
+            { type: 1, x: 14, y: 31 }, { type: 1, x: 22, y: 36 }, { type: 1, x: 27, y: 41 }, { type: 1, x: 35, y: 36 }, { type: 1, x: 17, y: 38 },
             // Rochas
-            { type: 0, x: 0 + mapOffsetX, y: 3 + mapOffsetY },
-            { type: 0, x: 5 + mapOffsetX, y: 8 + mapOffsetY }, { type: 0, x: 19 + mapOffsetX, y: 6 + mapOffsetY }, { type: 0, x: 21 + mapOffsetX, y: 11 + mapOffsetY }, { type: 0, x: 23 + mapOffsetX, y: 14 + mapOffsetY }, { type: 0, x: 17 + mapOffsetX, y: 13 + mapOffsetY },
-            { type: 0, x: 8 + mapOffsetX, y: 16 + mapOffsetY }, { type: 0, x: 12 + mapOffsetX, y: 22 + mapOffsetY }, { type: 0, x: 1 + mapOffsetX, y: 20 + mapOffsetY }, { type: 0, x: 16 + mapOffsetX, y: 18 + mapOffsetY }, { type: 0, x: 20 + mapOffsetX, y: 26 + mapOffsetY },
+            { type: 0, x: 10, y: 19 }, { type: 0, x: 17, y: 24 }, { type: 0, x: 31, y: 22 }, { type: 0, x: 33, y: 27 }, { type: 0, x: 35, y: 30 }, { type: 0, x: 29, y: 29 },
+            { type: 0, x: 20, y: 32 }, { type: 0, x: 24, y: 38 }, { type: 0, x: 13, y: 36 }, { type: 0, x: 28, y: 34 }, { type: 0, x: 32, y: 42 },
             // Fogueiras e Tochas
-            { type: 2, x: 13 + mapOffsetX, y: 12 + mapOffsetY }, { type: 2, x: 8 + mapOffsetX, y: 18 + mapOffsetY },
-            { type: 3, x: 16 + mapOffsetX, y: 1 + mapOffsetY }, { type: 3, x: 1 + mapOffsetX, y: 15 + mapOffsetY }, { type: 3, x: 23 + mapOffsetX, y: 1 + mapOffsetY }, { type: 3, x: 12 + mapOffsetX, y: 24 + mapOffsetY },
+            { type: 2, x: 25, y: 28 }, { type: 2, x: 20, y: 34 },
+            { type: 3, x: 28, y: 17 }, { type: 3, x: 13, y: 31 }, { type: 3, x: 35, y: 17 }, { type: 3, x: 24, y: 40 },
         ];
 
-        // Adiciona as novas áreas de recursos densos (também com offset)
-        // Floresta Densa (originalmente em x: 30-38, y: 5-15)
+        // Floresta Densa (coordenadas absolutas)
         for (let y = 5; y <= 15; y++) {
             for (let x = 30; x <= 38; x++) {
-                mapObjects.push({ type: 1, x: x + mapOffsetX, y: y + mapOffsetY });
+                mapObjects.push({ type: 1, x: x + 12, y: y + 16 });
             }
         }
 
-        // Campo de Rochas (originalmente em x: 5-15, y: 30-38)
+        // Campo de Rochas (coordenadas absolutas)
         for (let y = 30; y <= 38; y++) {
             for (let x = 5; x <= 15; x++) {
-                mapObjects.push({ type: 0, x: x + mapOffsetX, y: y + mapOffsetY });
+                mapObjects.push({ type: 0, x: x + 12, y: y + 16 });
             }
         }
 
