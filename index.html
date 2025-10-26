@@ -631,10 +631,10 @@
         const initialMapObjects = [
             // Árvores
             { type: 1, x: 12, y: 16 }, { type: 1, x: 16, y: 23 }, { type: 1, x: 18, y: 26 }, { type: 1, x: 30, y: 24 }, { type: 1, x: 32, y: 28 }, { type: 1, x: 34, y: 21 },
-            { type: 1, x: 14, y: 31 }, { type: 1, x: 22, y: 36 }, { type: 1, x: 27, y: 41 }, { type: 1, x: 35, y: 36 }, { type: 1, x: 17, y: 38 },
+            { type: 1, x: 14, y: 31 }, { type: 1, x: 22, y: 36 }, { type: 1, x: 27, y: 41 }, { type: 1, x: 34, y: 38 }, { type: 1, x: 17, y: 38 }, // Movida árvore de (35,36)
             // Rochas
-            { type: 0, x: 10, y: 19 }, { type: 0, x: 17, y: 24 }, { type: 0, x: 31, y: 22 }, { type: 0, x: 33, y: 27 }, { type: 0, x: 35, y: 30 }, { type: 0, x: 29, y: 29 },
-            { type: 0, x: 20, y: 32 }, { type: 0, x: 24, y: 38 }, { type: 0, x: 13, y: 36 }, { type: 0, x: 28, y: 34 }, { type: 0, x: 32, y: 42 },
+            { type: 0, x: 10, y: 19 }, { type: 0, x: 17, y: 24 }, { type: 0, x: 31, y: 22 }, { type: 0, x: 33, y: 27 }, { type: 0, x: 29, y: 29 },
+            { type: 0, x: 20, y: 32 }, { type: 0, x: 24, y: 38 }, { type: 0, x: 13, y: 36 }, { type: 0, x: 28, y: 34 }, { type: 0, x: 32, y: 42 }, { type: 0, x: 34, y: 29 }, // Movida rocha de (35,30)
             // Fogueiras e Tochas
             { type: 2, x: 25, y: 28 }, { type: 2, x: 20, y: 34 },
             { type: 3, x: 28, y: 17 }, { type: 3, x: 13, y: 31 }, { type: 3, x: 35, y: 17 }, { type: 3, x: 24, y: 40 },
@@ -663,7 +663,7 @@
         }
 
         // Floresta Densa (coordenadas absolutas)
-        for (let y = 5; y <= 15; y++) {
+        for (let y = 5; y <= 13; y++) { // Ajustado para não sobrepor a cerca
             for (let x = 30; x <= 38; x++) {
                 initialMapObjects.push({ type: 1, x: x + 12, y: y + 16 });
             }
@@ -676,25 +676,25 @@
             }
         }
 
-        // --- Adiciona um cercadinho pré-construído perto da fazenda ---
-        const fenceStartX = 20; // Posição X inicial da cerca
-        const fenceStartY = 18; // Posição Y inicial (movido para baixo)
-        const fenceEndX = 27;   // Posição X final
-        const fenceEndY = 25;   // Posição Y final (movido para baixo)
-        const gateX = 23; // Posição X do portão
+        // --- Adiciona o novo cercado para as ovelhas no canto sudeste ---
+        const newFenceStartX = 35;
+        const newFenceStartY = 30;
+        const newFenceEndX = 43;
+        const newFenceEndY = 37;
+        const newGateY = 33; // Posição Y da porteira na parede esquerda
 
-        // Paredes superior e inferior (horizontais)
-        for (let x = fenceStartX; x <= fenceEndX; x++) {
-            initialMapObjects.push({ type: 4, x: x, y: fenceStartY, orientation: 'horizontal' });
-            if (x < gateX || x > gateX + 1) { // Deixa um espaço de 2 tiles para o portão
-                initialMapObjects.push({ type: 4, x: x, y: fenceEndY, orientation: 'horizontal' });
+        for (let x = newFenceStartX; x <= newFenceEndX; x++) {
+            initialMapObjects.push({ type: 4, x: x, y: newFenceStartY });
+            initialMapObjects.push({ type: 4, x: x, y: newFenceEndY });
+        }
+        for (let y = newFenceStartY + 1; y < newFenceEndY; y++) {
+            if (y < newGateY || y > newGateY + 1) {
+                initialMapObjects.push({ type: 4, x: newFenceStartX, y: y });
             }
+            initialMapObjects.push({ type: 4, x: newFenceEndX, y: y });
         }
-        // Paredes laterais (verticais)
-        for (let y = fenceStartY + 1; y < fenceEndY; y++) {
-            initialMapObjects.push({ type: 4, x: fenceStartX, y: y, orientation: 'vertical' });
-            initialMapObjects.push({ type: 4, x: fenceEndX, y: y, orientation: 'vertical' });
-        }
+        initialMapObjects.push({ type: 7, x: newFenceStartX, y: newGateY, orientation: 'horizontal', isOpen: false });
+        initialMapObjects.push({ type: 7, x: newFenceStartX, y: newGateY + 1, orientation: 'horizontal', isOpen: false });
 
         // --- Validação de Posição de Objetos Iniciais ---
         const validatedInitialObjects = initialMapObjects.filter(obj => {
@@ -706,6 +706,13 @@
             }
             return true;
         });
+
+        // --- Animais Iniciais ---
+        const initialAnimals = [
+            { type: 'sheep', x: 36 * TILE_SIZE, y: 32 * TILE_SIZE, state: 'idle', woolLevel: 0, hunger: 0, path: [], isMoving: false, speed: 1, walkBob: 0, walkBobSpeed: 0.1 },
+            { type: 'sheep', x: 38 * TILE_SIZE, y: 34 * TILE_SIZE, state: 'idle', woolLevel: 20, hunger: 0, path: [], isMoving: false, speed: 1, walkBob: 0, walkBobSpeed: 0.1 },
+            { type: 'sheep', x: 40 * TILE_SIZE, y: 33 * TILE_SIZE, state: 'idle', woolLevel: 50, hunger: 0, path: [], isMoving: false, speed: 1, walkBob: 0, walkBobSpeed: 0.1 },
+        ];
 
         // --- Estrutura de Dados do Mundo ---
         let worldData = [];
@@ -722,6 +729,7 @@
                 map: JSON.parse(JSON.stringify(layout)),
                 mapObjects: JSON.parse(JSON.stringify(objects)),
                 plantGrowthData: {},
+                animals: [],
                 preRenderedMapCanvas: preRenderedCanvas,
                 preRenderedMapCtx: preRenderedCtx
             };
@@ -775,6 +783,8 @@
             'door': { id: 'door', name: 'Porta', description: '<strong>Porta</strong><br>Uma porta de madeira.', category: 'construcao', stackable: true },
             'gate': { id: 'gate', name: 'Porteira', description: '<strong>Porteira</strong><br>Uma porteira de fazenda.', category: 'construcao', stackable: true },
             'roof': { id: 'roof', name: 'Telhado', description: '<strong>Telhado</strong><br>Cobre as suas construções. Custa 1 Argila.', category: 'construcao', stackable: true },
+            'shears': { id: 'shears', name: 'Tesoura', description: '<strong>Tesoura de Tosquia</strong><br>Use para tosquiar ovelhas e obter lã.', category: 'ferramenta', stackable: false },
+            'wool': { id: 'wool', name: 'Lã', description: '<strong>Lã</strong><br>Lã macia de ovelha. Pode ser usada para artesanato.', category: 'material', stackable: true },
             'construction_tool': { id: 'construction_tool', name: 'Construção', description: '<strong>Construção</strong><br>Permite construir e remover estruturas.', category: 'ferramenta', stackable: false, actions: [
                     { label: "Mudar para modo 'Pegar'", action: "set_sub_action", value: "pickup_mode" },
                     { label: "Construir Escada", action: "set_sub_action", value: "build_stairs" },
@@ -1032,6 +1042,32 @@
 
             // Restaura o estado do canvas, removendo a máscara de recorte
             ctx.restore();
+        }
+        function drawSheep(ctx, animal) {
+            const x = animal.x;
+            const y = animal.y + Math.sin(animal.walkBob) * 2; // Bobbing motion
+            const bodyColor = '#ECEFF1';
+            const faceColor = '#37474F';
+
+            // Lã (corpo)
+            ctx.fillStyle = bodyColor;
+            ctx.beginPath();
+            ctx.ellipse(x + 16, y + 18, 12, 8, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Lã extra se estiver pronta para tosquia
+            if (animal.woolLevel >= 100) {
+                ctx.ellipse(x + 16, y + 12, 10, 6, 0, 0, Math.PI * 2);
+                ctx.ellipse(x + 10, y + 18, 8, 5, 0, 0, Math.PI * 2);
+                ctx.ellipse(x + 22, y + 18, 8, 5, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Cabeça
+            ctx.fillStyle = faceColor;
+            ctx.beginPath();
+            ctx.arc(x + 16, y + 10, 5, 0, Math.PI * 2);
+            ctx.fill();
         }
         function drawClayTile(ctx, x_px, y_px, size) { // Sprite simplificado sem bordas
             const baseColor = '#A1887F'; // Um marrom mais acinzentado
@@ -1335,9 +1371,55 @@
             }
         }
         function updateToolAnimation(timestamp) { if(player.isUsingTool){if(timestamp-player.toolAnimStart>TOOL_ANIM_DURATION){player.isUsingTool=false; useTool(timestamp);}} }
-        function updateAnimations(timestamp) { /* ... */ }
+        function updateAnimals(timestamp) {
+            const floorData = worldData[player.currentFloor];
+            if (!floorData || !floorData.animals) return;
+
+            for (const animal of floorData.animals) {
+                // Crescimento da lã
+                if (animal.woolLevel < 100) {
+                    animal.woolLevel += 0.01; // Ajuste a velocidade conforme necessário
+                }
+
+                // Lógica de movimento
+                if (!animal.isMoving) {
+                    if (Math.random() < 0.005) { // Chance de começar a passear
+                        const range = 4; // Raio de passeio
+                        const currentTileX = Math.floor(animal.x / TILE_SIZE);
+                        const currentTileY = Math.floor(animal.y / TILE_SIZE);
+                        const targetTileX = currentTileX + Math.floor(Math.random() * (range * 2 + 1)) - range;
+                        const targetTileY = currentTileY + Math.floor(Math.random() * (range * 2 + 1)) - range;
+
+                        // Garante que o alvo está dentro do cercado
+                        if (targetTileX > 35 && targetTileX < 42 && targetTileY > 30 && targetTileY < 37) {
+                            animal.path = findPath(currentTileX, currentTileY, targetTileX, targetTileY);
+                            if (animal.path.length > 0) {
+                                animal.isMoving = true;
+                            }
+                        }
+                    }
+                } else { // Se estiver se movendo
+                    if (animal.path.length > 0 && (Math.abs(animal.x - animal.targetX) < animal.speed && Math.abs(animal.y - animal.targetY) < animal.speed)) {
+                        const nextTile = animal.path.shift();
+                        animal.targetX = nextTile.x * TILE_SIZE;
+                        animal.targetY = nextTile.y * TILE_SIZE;
+                    }
+
+                    let dx = animal.targetX - animal.x;
+                    let dy = animal.targetY - animal.y;
+                    if (Math.abs(dx) < animal.speed) animal.x = animal.targetX; else animal.x += Math.sign(dx) * animal.speed;
+                    if (Math.abs(dy) < animal.speed) animal.y = animal.targetY; else animal.y += Math.sign(dy) * animal.speed;
+                    animal.walkBob += animal.walkBobSpeed;
+
+                    if (animal.x === animal.targetX && animal.y === animal.targetY && animal.path.length === 0) {
+                        animal.isMoving = false;
+                        animal.walkBob = 0;
+                    }
+                }
+            }
+        }
         function updateCamera() { const tX=player.x-(640/2)+(player.width/2); const tY=player.y-(480/2)+(player.height/2); camera.x=Math.max(0,Math.min(tX,MAP_WIDTH_PX-canvas.width)); camera.y=Math.max(0,Math.min(tY,MAP_HEIGHT_PX-canvas.height)); }
-        function update(timestamp) { updatePlayerMovement(timestamp); updateToolAnimation(timestamp); updateAnimations(timestamp); updateCamera(); }
+        function update(timestamp) { updatePlayerMovement(timestamp); updateToolAnimation(timestamp); updateAnimals(timestamp); updateCamera(); }
         function draw(timestamp) {
             const fireAnimFrame = Math.floor(timestamp / 150) % 8; // 8 quadros, muda a cada 150ms
             const waterAnimFrame = Math.floor(timestamp / 250) % 8; // 8 quadros, muda a cada 250ms
@@ -1446,11 +1528,12 @@
                     drawables.push({ type: 'roof', x_px: x_px, y_px: y_px, y_sort: y_base + TILE_SIZE, draw: () => drawRoof(ctx, x_px, y_px, obj.x, obj.y, player.currentFloor) });
                 }
             }
+
             drawables.sort((a, b) => a.y_sort - b.y_sort);
             for (const item of drawables) { item.draw(timestamp); }
 
             // 4. Desenha os EFEITOS do andar atual
-            drawAnimations(timestamp); drawPlantTimers(timestamp);
+            drawAnimations(timestamp);
             drawTileSelector();
             drawPlantingPreview();
             drawPathIndicator(timestamp);
@@ -1642,6 +1725,21 @@
             if (!floorData) return;
 
             if (bpIdx < 0 || !backpackInventory[bpIdx]) return;
+
+            // --- Lógica de Interação com Animais ---
+            const animal = floorData.animals.find(a => tX >= Math.floor(a.x / TILE_SIZE) && tX < Math.ceil((a.x + TILE_SIZE) / TILE_SIZE) && tY >= Math.floor(a.y / TILE_SIZE) && tY < Math.ceil((a.y + TILE_SIZE) / TILE_SIZE));
+            if (animal) {
+                const item = ITEMS[inventoryItem.id];
+                if (item.id === 'shears' && animal.type === 'sheep' && animal.woolLevel >= 100) {
+                    animal.woolLevel = 0;
+                    addItemToInventory('wool', 1);
+                    saveGame();
+                    updateHotbarUI();
+                    updateBackpackUI();
+                    return; // Ação concluída
+                }
+            }
+
             const inventoryItem = backpackInventory[bpIdx];
             if (!inventoryItem) return;
             const item = ITEMS[inventoryItem.id];
@@ -2356,7 +2454,7 @@
                     currentFloor: player.currentFloor,
                     lastMoveDir: { dx: player.lastMoveDir.dx, dy: player.lastMoveDir.dy }
                 },
-                worldData: worldData.map(floor => ({ map: floor.map, mapObjects: floor.mapObjects, plantGrowthData: floor.plantGrowthData })),
+                worldData: worldData.map(floor => ({ map: floor.map, mapObjects: floor.mapObjects, plantGrowthData: floor.plantGrowthData, animals: floor.animals })),
                 backpackData: backpackInventory,
                 hotbarMapData: hotbarMapping,
                 activeSlotData: activeHotbarSlot,
@@ -2369,7 +2467,7 @@
         }
         // CORRIGIDO: loadGame
         function loadGame() {
-            const defaultItems = [ { id: 'hoe', count: 1 }, { id: 'seed_tomato', count: 10 }, { id: 'shovel', count: 1 }, { id: 'watering_can', count: 0 }, { id: 'construction_tool', count: 1 }, { id: 'axe', count: 1 }, { id: 'pickaxe', count: 1 } ];
+            const defaultItems = [ { id: 'hoe', count: 1 }, { id: 'seed_tomato', count: 10 }, { id: 'shovel', count: 1 }, { id: 'watering_can', count: 0 }, { id: 'shears', count: 1 }, { id: 'construction_tool', count: 1 }, { id: 'axe', count: 1 }, { id: 'pickaxe', count: 1 } ];
 
             const savedData = localStorage.getItem('pixelFarmSaveData');
             if (savedData) {
@@ -2380,6 +2478,7 @@
                         worldData = data.worldData.map(floorData => {
                             const newFloor = createNewFloorData(floorData.map || WORLD_LAYOUT, floorData.mapObjects || []);
                             newFloor.plantGrowthData = floorData.plantGrowthData || {};
+                            newFloor.animals = floorData.animals || [];
                             return newFloor;
                         });
                     } else { // Migração de save antigo
@@ -2433,6 +2532,7 @@
             } else {
                 console.log("Nenhum save encontrado, iniciando novo jogo.");
                 worldData.push(createNewFloorData(WORLD_LAYOUT, validatedInitialObjects)); // Andar 0 com objetos validados
+                worldData[0].animals = JSON.parse(JSON.stringify(initialAnimals)); // Adiciona animais ao novo jogo
                 worldData.push(createNewFloorData(createFloor1Layout(), floor1Objects)); // Andar 1
                 backpackInventory = new Array(BACKPACK_SIZE).fill(null);
                 hotbarMapping = new Array(HOTBAR_SIZE).fill(-1);
@@ -2690,6 +2790,13 @@
 
             const tId = floorData.map[tileY][tileX];
             const objectIndex = floorData.mapObjects.findIndex(obj => obj.x === tileX && obj.y === tileY);
+
+            // Verifica se há um animal no tile
+            const animalOnTile = floorData.animals.find(a => tileX >= Math.floor(a.x / TILE_SIZE) && tileX < Math.ceil((a.x + TILE_SIZE) / TILE_SIZE) && tileY >= Math.floor(a.y / TILE_SIZE) && tileY < Math.ceil((a.y + TILE_SIZE) / TILE_SIZE));
+            if (animalOnTile) {
+                if (item.id === 'shears' && animalOnTile.type === 'sheep' && animalOnTile.woolLevel >= 100) return true;
+                return false; // Bloqueia outras ações no tile do animal
+            }
 
             if (objectIndex !== -1) {
                 const targetObject = floorData.mapObjects[objectIndex];
