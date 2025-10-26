@@ -599,7 +599,17 @@
                         if (relativeY >= 0 && relativeY < baseHeight && relativeX >= 0 && relativeX < baseWidth) {
                             row.push(baseLayout[relativeY][relativeX]); // Cola o mapa base
                         } else {
-                            row.push(0); // Grama no resto
+                            // Adiciona vegetação aleatória para dar vida ao mapa
+                            const rand = Math.random();
+                            if (rand < 0.015) { // 1.5% de chance
+                                row.push(12); // Flor Vermelha
+                            } else if (rand < 0.03) { // 1.5% de chance
+                                row.push(13); // Flor Amarela
+                            } else if (rand < 0.05) { // 2% de chance
+                                row.push(14); // Arbusto Pequeno
+                            } else {
+                                row.push(0); // Grama no resto
+                            }
                         }
                     }
                 }
@@ -686,6 +696,17 @@
             initialMapObjects.push({ type: 4, x: fenceEndX, y: y, orientation: 'vertical' });
         }
 
+        // --- Validação de Posição de Objetos Iniciais ---
+        const validatedInitialObjects = initialMapObjects.filter(obj => {
+            if (obj.y < 0 || obj.y >= MAP_HEIGHT_TILES || obj.x < 0 || obj.x >= MAP_WIDTH_TILES) return false;
+            const tileId = WORLD_LAYOUT[obj.y][obj.x];
+            if (tileId === 3) { // Remove objetos que estão na água (tile 3)
+                console.warn(`Objeto inicial (tipo ${obj.type}) em [${obj.x}, ${obj.y}] removido por estar na água.`);
+                return false;
+            }
+            return true;
+        });
+
         // --- Estrutura de Dados do Mundo ---
         let worldData = [];
 
@@ -762,8 +783,7 @@
                     { label: "Construir Piso", action: "set_sub_action", value: "build_floor" },
                     { label: "Construir Muro", action: "set_sub_action", value: "build_wall" },
                     { label: "Construir Telhado", action: "set_sub_action", value: "build_roof" },
-                    { label: "Construir Cerca Vertical", action: "set_sub_action", value: "vertical_fence" },
-                    { label: "Construir Cerca Horizontal", action: "set_sub_action", value: "horizontal_fence" }
+                    { label: "Construir Cerca", action: "set_sub_action", value: "build_fence" }
                 ]
             }
         };
@@ -864,22 +884,54 @@
             }
         }
         function drawTorch(ctx, x_px, y_px, timestamp) { const tX=x_px+TILE_SIZE/2-2; const tY=y_px+TILE_SIZE/2; ctx.fillStyle='#795548'; ctx.fillRect(tX, tY, 4, 10); ctx.fillStyle='#A0A0A0'; ctx.fillRect(tX-1, tY-2, 6, 2); const fH=(Math.sin(timestamp*0.007)*0.1+0.9)*30; const fS=Math.sin(timestamp*0.004)*0.5+1.5; ctx.fillStyle=`hsl(${fH}, 100%, 50%)`; ctx.fillRect(tX+1, tY-6-fS, 2, 4+fS); ctx.fillStyle=`hsl(${fH+10}, 100%, 60%)`; ctx.fillRect(tX, tY-4-fS/2, 4, 2+fS/2); }
-        function drawFence(ctx, x_px, y_px, orientation) {
-            ctx.fillStyle = '#3E2723'; // Cor da madeira da cerca
-            if (orientation === 'horizontal') {
-                // Poste esquerdo e direito
-                ctx.fillRect(x_px + 4, y_px + 6, 4, 20);
-                ctx.fillRect(x_px + 24, y_px + 6, 4, 20);
-                // Barras horizontais
-                ctx.fillRect(x_px + 4, y_px + 10, 24, 3);
-                ctx.fillRect(x_px + 4, y_px + 18, 24, 3);
-            } else { // 'vertical' ou padrão
-                // Poste principal
-                ctx.fillRect(x_px + 14, y_px + 4, 4, 24);
-                // Barras curtas no poste
-                ctx.fillRect(x_px + 10, y_px + 8, 12, 3);
-                ctx.fillRect(x_px + 10, y_px + 18, 12, 3);
-            }
+        function drawFence(ctx, x_px, y_px, tileX, tileY, floor) {
+            const floorData = worldData[floor];
+            if (!floorData) return;
+            const fenceObjects = floorData.mapObjects.filter(obj => obj.type === 4);
+
+            const hasN = fenceObjects.some(o => o.x === tileX && o.y === tileY - 1);
+            const hasS = fenceObjects.some(o => o.x === tileX && o.y === tileY + 1);
+            const hasE = fenceObjects.some(o => o.x === tileX + 1 && o.y === tileY);
+            const hasW = fenceObjects.some(o => o.x === tileX - 1 && o.y === tileY);
+
+            const postColor = '#5D4037';
+            const railColor = '#3E2723';
+
+            // Desenha o poste central
+            ctx.fillStyle = postColor;
+            ctx.fillRect(x_px + 12, y_px + 12, 8, 8);
+
+            // Desenha as barras de ligação com base nos vizinhos
+            ctx.fillStyle = railColor;
+            if (hasN) ctx.fillRect(x_px + 14, y_px, 4, 14);
+            if (hasS) ctx.fillRect(x_px + 14, y_px + 16, 4, 16);
+            if (hasW) ctx.fillRect(x_px, y_px + 14, 14, 4);
+            if (hasE) ctx.fillRect(x_px + 16, y_px + 14, 16, 4);
+        }
+        function drawRedFlowerTile(ctx, x, y, size) {
+            drawGrassTile(ctx, x, y, size); // Base de grama
+            ctx.fillStyle = '#4CAF50'; // Caule
+            ctx.fillRect(x + size / 2 - 1, y + size / 2, 2, 10);
+            ctx.fillStyle = '#E53935'; // Pétalas vermelhas
+            ctx.beginPath();
+            ctx.arc(x + size / 2, y + size / 2 - 2, 5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        function drawYellowFlowerTile(ctx, x, y, size) {
+            drawGrassTile(ctx, x, y, size); // Base de grama
+            ctx.fillStyle = '#689F38'; // Caule
+            ctx.fillRect(x + size / 2 - 1, y + size / 2 + 2, 2, 8);
+            ctx.fillStyle = '#FFEB3B'; // Pétalas amarelas
+            ctx.beginPath();
+            ctx.arc(x + size / 2, y + size / 2, 6, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        function drawSmallBushTile(ctx, x, y, size) {
+            drawGrassTile(ctx, x, y, size); // Base de grama
+            ctx.fillStyle = '#388E3C'; // Cor do arbusto
+            ctx.beginPath();
+            ctx.ellipse(x + size / 2, y + size * 0.7, size * 0.4, size * 0.25, 0, 0, Math.PI * 2);
+            ctx.fill();
         }
         function drawFloorTile(ctx, x, y, size) { // Sprite aprimorado
             const plankColor = '#A1887F'; // Um marrom médio para as tábuas
@@ -1091,6 +1143,9 @@
                 case 8: drawFloorTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break;
                 case 9: drawClayTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break;
                 case 10: drawVoidTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break;
+                case 12: drawRedFlowerTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break;
+                case 13: drawYellowFlowerTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break;
+                case 14: drawSmallBushTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break;
                 default: drawGrassTile(preRenderedMapCtx, dX, dY, TILE_SIZE);
             }
         }
@@ -1155,11 +1210,8 @@
                 case 'build_floor':
                     drawFloorTile(ctx, x_px, y_px, TILE_SIZE);
                     break;
-                case 'vertical_fence':
-                    drawFence(ctx, x_px, y_px, 'vertical');
-                    break;
-                case 'horizontal_fence':
-                    drawFence(ctx, x_px, y_px, 'horizontal');
+                case 'build_fence':
+                    drawFence(ctx, x_px, y_px, mouseHoverTile.x, mouseHoverTile.y, constructionTargetFloor);
                     break;
                 case 'build_door':
                     const hasHorizontalWall = mapObjects.some(obj => obj.type === 5 && obj.y === mouseHoverTile.y && (obj.x === mouseHoverTile.x - 1 || obj.x === mouseHoverTile.x + 1));
@@ -1377,7 +1429,7 @@
                 } else if (obj.type === 3) { // Tocha
                     drawables.push({ type: 'torch', x_px: x_px, y_px: y_px, y_sort: y_base, draw: () => ctx.drawImage(torchSpritesheetCanvas, fireAnimFrame * TILE_SIZE, 0, TILE_SIZE, TILE_SIZE, x_px, y_px, TILE_SIZE, TILE_SIZE) });
                 } else if (obj.type === 4) { // Cerca - usa a orientação do objeto
-                    drawables.push({ type: 'fence', x_px: x_px, y_px: y_px, y_sort: y_base, draw: () => drawFence(ctx, x_px, y_px, obj.orientation) });
+                    drawables.push({ type: 'fence', x_px: x_px, y_px: y_px, y_sort: y_base, draw: () => drawFence(ctx, x_px, y_px, obj.x, obj.y, player.currentFloor) });
                 } else if (obj.type === 5) { // Muro
                     drawables.push({ type: 'wall', x_px: x_px, y_px: y_px, y_sort: y_base, draw: () => drawWall(ctx, x_px, y_px) });
                 } else if (obj.type === 6) { // Porta
@@ -1798,7 +1850,7 @@
                             floorData.mapObjects.push({ type: 7, x: tX, y: tY, orientation: orientation, isOpen: false }); // type 7 = Porteira
                             console.log("Porteira construída!");
                         }
-                    } else if (player.toolSubAction === 'vertical_fence' || player.toolSubAction === 'horizontal_fence' || player.toolSubAction === null) {
+                    } else if (player.toolSubAction === 'build_fence' || player.toolSubAction === null) {
                         if (tId === 0 || tId === 1) {
                             if (player.toolSubAction === 'pickup_mode') break; // Modo pegar não constrói
                             const fenceItemIdx = backpackInventory.findIndex(i => i && i.id === 'fence' && i.count > 0);
@@ -1809,17 +1861,10 @@
                             } else if (woodIdx !== -1) {
                                 backpackInventory[woodIdx].count--;
                                 triggerResourceFeedback(-1, 'Madeira');
+                            } else { console.log("Sem cercas ou madeira para construir."); break; }
+                            floorData.mapObjects.push({ type: 4, x: tX, y: tY }); // A orientação é determinada dinamicamente
                             }
-                            else { console.log("Sem cercas ou madeira para construir."); break; }
-                            let orientation;
-                            if (player.toolSubAction === 'vertical_fence' || player.toolSubAction === 'horizontal_fence') {
-                                orientation = player.toolSubAction === 'vertical_fence' ? 'vertical' : 'horizontal';
-                            } else {
-                                orientation = (player.lastMoveDir.dx !== 0) ? 'vertical' : 'horizontal';
-                            }
-                            floorData.mapObjects.push({ type: 4, x: tX, y: tY, orientation: orientation });
                             console.log("Cerca construída!");
-                        }
                     } else if (player.toolSubAction === 'build_stairs') { // Lógica atualizada para usar constructionTargetFloor
                         const upperFloorIndex = targetFloorIndex + 1;
                         if (tId === 8) { // A escada é construída no andar alvo, sobre um piso
@@ -2387,7 +2432,7 @@
                 }
             } else {
                 console.log("Nenhum save encontrado, iniciando novo jogo.");
-                worldData.push(createNewFloorData(WORLD_LAYOUT, initialMapObjects)); // Andar 0
+                worldData.push(createNewFloorData(WORLD_LAYOUT, validatedInitialObjects)); // Andar 0 com objetos validados
                 worldData.push(createNewFloorData(createFloor1Layout(), floor1Objects)); // Andar 1
                 backpackInventory = new Array(BACKPACK_SIZE).fill(null);
                 hotbarMapping = new Array(HOTBAR_SIZE).fill(-1);
@@ -2709,8 +2754,9 @@
 
                         return lowerFloor.map[tileY][tileX] !== 10 || lowerFloor.mapObjects.some(obj => obj.x === tileX && obj.y === tileY);
                     }
-                    // Para construir cerca (padrão ou explícito)
-                    return ((tId === 0 || tId === 1) && (backpackInventory.some(i => i && i.id === 'fence' && i.count > 0) || backpackInventory.some(i => i && i.id === 'wood' && i.count > 0)));
+                    if (player.toolSubAction === 'build_fence') {
+                        return ((tId === 0 || tId === 1) && (backpackInventory.some(i => i && i.id === 'fence' && i.count > 0) || backpackInventory.some(i => i && i.id === 'wood' && i.count > 0)));
+                    }
             }
 
             return false;
