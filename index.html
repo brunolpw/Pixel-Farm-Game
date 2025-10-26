@@ -1486,7 +1486,7 @@
             if (!floorData || !floorData.animals) return;
 
             // --- Lógica de Reprodução (executada uma vez por frame) ---
-            const ANIMAL_CAP = 10;
+            const ANIMAL_CAP = calculateAnimalCapacity(player.currentFloor);
             const ADULT_AGE = 100;
             if (Math.random() < 0.0001 && floorData.animals.length < ANIMAL_CAP) {
                 const males = floorData.animals.filter(a => a.gender === 'male' && a.age >= ADULT_AGE);
@@ -1496,8 +1496,7 @@
                     const mother = females[Math.floor(Math.random() * females.length)];
                     const newGender = Math.random() < 0.5 ? 'male' : 'female';
                     const newAnimal = {
-                        type: 'sheep',
-                        gender: newGender,
+                        type: 'sheep', gender: newGender,
                         age: 0, // Nasce como filhote
                         x: mother.x, y: mother.y,
                         state: 'idle', woolLevel: 0, hunger: 0, path: [], isMoving: false, speed: 1, walkBob: 0, walkBobSpeed: 0.1, lastMoveDir: { dx: 0, dy: 1 }, stateTimer: 0, timeAtMaxHunger: 0,
@@ -1576,15 +1575,13 @@
                         const targetTileX = currentTileX + Math.floor(Math.random() * (range * 2 + 1)) - range;
                         const targetTileY = currentTileY + Math.floor(Math.random() * (range * 2 + 1)) - range;
 
-                        // Garante que o alvo está dentro do cercado
-                        if (targetTileX > 35 && targetTileX < 42 && targetTileY > 30 && targetTileY < 37) {
-                            animal.path = findPath(currentTileX, currentTileY, targetTileX, targetTileY, (px, py) => isAnimalWalkable(px, py, animal));
-                            if (animal.path.length > 0) {
-                                animal.isMoving = true;
-                                const firstStep = animal.path.shift();
-                                animal.targetX = firstStep.x * TILE_SIZE;
-                                animal.targetY = firstStep.y * TILE_SIZE;
-                            }
+                        // O animal agora pode passear livremente, o pathfinding cuidará dos obstáculos
+                        animal.path = findPath(currentTileX, currentTileY, targetTileX, targetTileY, (px, py) => isAnimalWalkable(px, py, animal));
+                        if (animal.path.length > 0) {
+                            animal.isMoving = true;
+                            const firstStep = animal.path.shift();
+                            animal.targetX = firstStep.x * TILE_SIZE;
+                            animal.targetY = firstStep.y * TILE_SIZE;
                         }
                     }
                 } else { // Se estiver se movendo
@@ -1998,6 +1995,15 @@
                     updateBackpackUI();
                     return; // Ação concluída
                 }
+                if (item.name === "Pá" && targetObject.type === 15) { // Esqueleto
+                    floorData.mapObjects.splice(objectIndex, 1); // Remove o esqueleto
+                    console.log("Esqueleto removido.");
+                    saveGame();
+                    updateHotbarUI();
+                    updateBackpackUI();
+                    return; // Ação concluída
+                }
+
                 // Lógica Universal de "Pegar"
                 if (item.name === "Construção" && player.toolSubAction === 'pickup_mode') {
                     let pickedUpItem = null;
@@ -2278,6 +2284,19 @@
             }
 
             return true;
+        }
+
+        function calculateAnimalCapacity(floorIndex) {
+            const floorData = worldData[floorIndex];
+            if (!floorData) return 0;
+
+            let grassTiles = 0;
+            for (let y = 0; y < MAP_HEIGHT_TILES; y++) {
+                for (let x = 0; x < MAP_WIDTH_TILES; x++) {
+                    if (floorData.map[y][x] === 0) grassTiles++;
+                }
+            }
+            return Math.floor(grassTiles / 4); // 1 animal para cada 4 tiles de grama
         }
 
         function updatePlantGrowth(timestamp) { const floorData = worldData[player.currentFloor]; let mC=false; for(const key in floorData.plantGrowthData){ const[x,y]=key.split(',').map(Number); const data=floorData.plantGrowthData[key]; const tP=timestamp-data.plantedAt; const eA=tP; const cId=floorData.map[y][x]; const bM=data.boosted?0.5:1; const tS=GROWTH_TIME_SPROUT*bM; const tP_=GROWTH_TIME_PLANT*bM; const tH=GROWTH_TIME_HARVEST*bM; let nId=-1; if(eA>tH&&cId===6)nId=7; else if(eA>tP_&&cId===5)nId=6; else if(eA>tS&&cId===4)nId=5; if(nId!==-1){floorData.map[y][x]=nId; updatePreRenderedTile(x,y,nId); mC=true;} } if(mC){saveGame();} }
@@ -3050,7 +3069,7 @@
                 const targetObject = floorData.mapObjects[objectIndex];
                 if (item.id === 'pickaxe' && targetObject.type === 0) return true;
                 if (item.id === 'axe' && targetObject.type === 1) return true;
-                if (item.id === 'shovel' && targetObject.type === 4) return true;
+                if (item.id === 'shovel' && (targetObject.type === 4 || targetObject.type === 15)) return true; // Cerca ou Esqueleto
                 // Ação universal de pegar
                 if (item.id === 'construction_tool' && player.toolSubAction === 'pickup_mode' && [4, 5, 6, 7, 9, 10, 11].includes(targetObject.type)) return true; // Escadas e telhados podem ser pegos
                 // if (targetObject.type === 9 || targetObject.type === 10) return true; // Escadas agora são automáticas
