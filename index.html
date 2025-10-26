@@ -910,22 +910,36 @@
             }
         }
         function drawWall(ctx, x_px, y_px) {
-            const baseColor = '#BCAAA4'; // Cor do tijolo
-            const mortarColor = '#8D6E63'; // Cor da argamassa
+            const brickColor = '#c25b5b';  // Cor de tijolo avermelhada
+            const mortarColor = '#a19a93'; // Cor da argamassa
+            const brickHeight = 8;
+            const brickWidth = 16;
 
-            ctx.fillStyle = baseColor;
+            // Salva o estado do canvas e cria uma máscara de recorte para o tile
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(x_px, y_px, TILE_SIZE, TILE_SIZE);
+            ctx.clip();
+
+            // Pinta o fundo com a cor da argamassa
+            ctx.fillStyle = mortarColor;
             ctx.fillRect(x_px, y_px, TILE_SIZE, TILE_SIZE);
 
-            // Argamassa
-            ctx.fillStyle = mortarColor;
-            // Linhas horizontais
-            ctx.fillRect(x_px, y_px + 15, TILE_SIZE, 2);
+            ctx.fillStyle = brickColor;
 
-            // Linhas verticais (desencontradas)
-            ctx.fillRect(x_px + 10, y_px, 2, 16);
-            ctx.fillRect(x_px + 24, y_px, 2, 16);
-            ctx.fillRect(x_px + 4, y_px + 16, 2, 16);
-            ctx.fillRect(x_px + 18, y_px + 16, 2, 16);
+            // Desenha as linhas de tijolos, garantindo que o padrão se repita
+            for (let row = 0; row < TILE_SIZE / brickHeight; row++) {
+                const y = y_px + row * brickHeight;
+                // Desloca as linhas pares para criar o padrão de amarração
+                const xOffset = (row % 2 === 0) ? 0 : -brickWidth / 2;
+                for (let col = -1; col < TILE_SIZE / brickWidth + 1; col++) {
+                    const x = x_px + col * brickWidth + xOffset;
+                    ctx.fillRect(x, y, brickWidth - 1, brickHeight - 1);
+                }
+            }
+
+            // Restaura o estado do canvas, removendo a máscara de recorte
+            ctx.restore();
         }
         function drawClayTile(ctx, x_px, y_px, size) { // Sprite simplificado sem bordas
             const baseColor = '#A1887F'; // Um marrom mais acinzentado
@@ -1109,7 +1123,34 @@
             ctx.globalAlpha = 1.0;
         }
         function drawAnimations(timestamp) { activeAnimations=activeAnimations.filter(an=>{const el=timestamp-an.startTime; if(el>an.duration)return false; if(an.type==='water'){drawWaterAnimation(an, timestamp);} return true;}); }
-        function drawPlantTimers(timestamp) { const floorData = worldData[player.currentFloor]; ctx.font='bold 12px Consolas'; ctx.textAlign='center'; ctx.shadowColor='black'; ctx.shadowBlur=2; for(const key in floorData.plantGrowthData){ const[x,y]=key.split(',').map(Number); const data=floorData.plantGrowthData[key]; const tId=floorData.map[y][x]; if(tId>=4&&tId<=6){ const tP=timestamp-data.plantedAt; const eA=tP; let taT=0; if(tId===4)taT=GROWTH_TIME_SPROUT; else if(tId===5)taT=GROWTH_TIME_PLANT; else if(tId===6)taT=GROWTH_TIME_HARVEST; if(data.boosted){taT=taT*0.5;} const tL=Math.max(0, taT-eA); const sL=Math.ceil(tL/1000); const dX=x*TILE_SIZE+(TILE_SIZE/2); const dY=y*TILE_SIZE-5; ctx.fillStyle='white'; ctx.fillText(`${sL}s`, dX, dY); } } ctx.shadowBlur=0; }
+        function drawPlantTimers(timestamp) {
+            const floorData = worldData[player.currentFloor];
+            ctx.font = 'bold 12px Consolas';
+            ctx.textAlign = 'center';
+            ctx.shadowColor = 'black';
+            ctx.shadowBlur = 2;
+            for (const key in floorData.plantGrowthData) {
+                const [x, y] = key.split(',').map(Number);
+                const data = floorData.plantGrowthData[key];
+                const tId = floorData.map[y][x];
+                if (tId >= 4 && tId <= 6) {
+                    const tP = timestamp - data.plantedAt;
+                    const eA = tP;
+                    let taT = 0;
+                    if (tId === 4) taT = GROWTH_TIME_SPROUT;
+                    else if (tId === 5) taT = GROWTH_TIME_PLANT;
+                    else if (tId === 6) taT = GROWTH_TIME_HARVEST;
+                    if (data.boosted) { taT = taT * 0.5; }
+                    const tL = Math.max(0, taT - eA);
+                    const sL = Math.ceil(tL / 1000);
+                    const dX = x * TILE_SIZE + (TILE_SIZE / 2);
+                    const dY = y * TILE_SIZE - 5;
+                    ctx.fillStyle = 'white';
+                    ctx.fillText(`${sL}s`, dX, dY);
+                }
+            }
+            ctx.shadowBlur = 0;
+        }
         function updateGameTime() {
             const n=new Date(); const rH=n.getHours(); const rM=n.getMinutes(); const rS=n.getSeconds();
             const tS=(rH*3600 + rM*60 + rS) % (24 * 3600); // Segundos totais no dia real
@@ -1272,6 +1313,21 @@
             drawConstructionPreview();
             drawConstructionGrid();
 
+            // Desenha animações de feedback de recursos
+            activeAnimations.forEach(anim => {
+                if (anim.type === 'resource_feedback') {
+                    const elapsed = timestamp - anim.startTime;
+                    const progress = elapsed / anim.duration;
+                    if (progress < 1) {
+                        const yOffset = -20 - (progress * 30); // Move para cima
+                        const alpha = 1 - progress; // Desaparece
+                        ctx.font = 'bold 16px Consolas';
+                        ctx.fillStyle = `rgba(${anim.color}, ${alpha})`;
+                        ctx.fillText(anim.text, anim.x, anim.y + yOffset);
+                    }
+                }
+            });
+
             // 5. Desenha a pré-visualização do ANDAR DE CIMA (se aplicável)
             if (worldData[player.currentFloor + 1]) {
                 const playerTileX = Math.floor((player.x + player.width / 2) / TILE_SIZE);
@@ -1409,6 +1465,16 @@
                     console.warn(`Mochila cheia, não foi possível adicionar ${quantity} de ${itemDefinition.name}.`);
                 }
             }
+            // Adiciona feedback visual de ganho
+            activeAnimations.push({
+                type: 'resource_feedback',
+                text: `+${quantity}`,
+                color: '144, 238, 144', // Verde claro
+                x: player.x + player.width / 2,
+                y: player.y,
+                startTime: lastTime,
+                duration: 1500
+            });
         }
 
         function useTool(timestamp) {
@@ -1555,8 +1621,13 @@
                         if (tId === 0 || tId === 1 || tId === 8) { // Permite construir muro em piso de madeira
                             const wallItemIdx = backpackInventory.findIndex(i => i && i.id === 'wall' && i.count > 0);
                             const stoneIdx = backpackInventory.findIndex(i => i && i.id === 'stone' && i.count >= 5);
-                            if (wallItemIdx !== -1) { backpackInventory[wallItemIdx].count--; }
-                            else if (stoneIdx !== -1) { backpackInventory[stoneIdx].count -= 5; }
+                            if (wallItemIdx !== -1) {
+                                backpackInventory[wallItemIdx].count--;
+                                triggerResourceFeedback(-1, 'Muro');
+                            } else if (stoneIdx !== -1) {
+                                backpackInventory[stoneIdx].count -= 5;
+                                triggerResourceFeedback(-5, 'Pedra');
+                            }
                             else { console.log("Sem muros ou pedras (mín. 5) para construir."); break; } floorData.mapObjects.push({ type: 5, x: tX, y: tY });
                             console.log("Muro construído!");
                         }
@@ -1565,6 +1636,7 @@
                             const woodIdx = backpackInventory.findIndex(i => i && i.id === 'wood' && i.count > 0);
                             if (woodIdx !== -1) {
                                 backpackInventory[woodIdx].count--;
+                                triggerResourceFeedback(-1, 'Madeira');
                                 floorData.map[tY][tX] = 8; // type 8 = Piso
                                 updatePreRenderedTile(tX, tY, 8);
                                 console.log("Piso construído!");
@@ -1578,8 +1650,13 @@
 
                             const doorItemIdx = backpackInventory.findIndex(i => i && i.id === 'door' && i.count > 0);
                             const woodIdx = backpackInventory.findIndex(i => i && i.id === 'wood' && i.count >= 4);
-                            if (doorItemIdx !== -1) { backpackInventory[doorItemIdx].count--; } 
-                            else if (woodIdx !== -1) { backpackInventory[woodIdx].count -= 4; } 
+                            if (doorItemIdx !== -1) {
+                                backpackInventory[doorItemIdx].count--;
+                                triggerResourceFeedback(-1, 'Porta');
+                            } else if (woodIdx !== -1) {
+                                backpackInventory[woodIdx].count -= 4;
+                                triggerResourceFeedback(-4, 'Madeira');
+                            }
                             else { console.log("Sem Portas ou Madeira (mín. 4) para construir."); break; }
                             const orientation = hasHorizontalWall ? 'vertical' : 'horizontal';
                             floorData.mapObjects.push({ type: 6, x: tX, y: tY, orientation: orientation, isOpen: false }); // type 6 = Porta
@@ -1593,8 +1670,13 @@
 
                             const gateItemIdx = backpackInventory.findIndex(i => i && i.id === 'gate' && i.count > 0);
                             const woodIdx = backpackInventory.findIndex(i => i && i.id === 'wood' && i.count >= 4);
-                            if (gateItemIdx !== -1) { backpackInventory[gateItemIdx].count--; } 
-                            else if (woodIdx !== -1) { backpackInventory[woodIdx].count -= 4; } 
+                            if (gateItemIdx !== -1) {
+                                backpackInventory[gateItemIdx].count--;
+                                triggerResourceFeedback(-1, 'Porteira');
+                            } else if (woodIdx !== -1) {
+                                backpackInventory[woodIdx].count -= 4;
+                                triggerResourceFeedback(-4, 'Madeira');
+                            }
                             else { console.log("Sem Porteiras ou Madeira (mín. 4) para construir."); break; }
                             const orientation = hasHorizontalFence ? 'vertical' : 'horizontal';
                             floorData.mapObjects.push({ type: 7, x: tX, y: tY, orientation: orientation, isOpen: false }); // type 7 = Porteira
@@ -1605,8 +1687,13 @@
                             if (player.toolSubAction === 'pickup_mode') break; // Modo pegar não constrói
                             const fenceItemIdx = backpackInventory.findIndex(i => i && i.id === 'fence' && i.count > 0);
                             const woodIdx = backpackInventory.findIndex(i => i && i.id === 'wood' && i.count > 0);
-                            if (fenceItemIdx !== -1) { backpackInventory[fenceItemIdx].count--; } 
-                            else if (woodIdx !== -1) { backpackInventory[woodIdx].count--; } 
+                            if (fenceItemIdx !== -1) {
+                                backpackInventory[fenceItemIdx].count--;
+                                triggerResourceFeedback(-1, 'Cerca');
+                            } else if (woodIdx !== -1) {
+                                backpackInventory[woodIdx].count--;
+                                triggerResourceFeedback(-1, 'Madeira');
+                            }
                             else { console.log("Sem cercas ou madeira para construir."); break; }
                             let orientation;
                             if (player.toolSubAction === 'vertical_fence' || player.toolSubAction === 'horizontal_fence') {
@@ -1625,6 +1712,7 @@
                                 const woodIdx = backpackInventory.findIndex(i => i && i.id === 'wood' && i.count >= 5);
                                 if (woodIdx !== -1) {
                                     backpackInventory[woodIdx].count -= 5;
+                                    triggerResourceFeedback(-5, 'Madeira');
                                     floorData.mapObjects.push({ type: 9, x: tX, y: tY, targetFloor: targetFloorIndex, targetX: tX, targetY: tY });
                                     worldData[targetFloorIndex].mapObjects.push({ type: 10, x: tX, y: tY, targetFloor: player.currentFloor, targetX: tX, targetY: tY });
                                     console.log("Escada construída!");
@@ -2755,6 +2843,20 @@
             player.targetY = finalY;
             player.path = []; // Limpa o caminho para evitar movimentos indesejados
             preRenderMap(); // Re-renderiza o mapa do novo andar
+        }
+
+        function triggerResourceFeedback(quantity, resourceName) {
+            const isGain = quantity > 0;
+            activeAnimations.push({
+                type: 'resource_feedback',
+                text: `${isGain ? '+' : ''}${quantity}`,
+                color: isGain ? '144, 238, 144' : '255, 99, 71', // Verde claro ou Tomate
+                x: player.x + player.width / 2,
+                y: player.y,
+                startTime: lastTime,
+                duration: 1500
+            });
+            console.log(`Feedback: ${quantity} ${resourceName}`);
         }
 
         document.addEventListener('DOMContentLoaded', init);
