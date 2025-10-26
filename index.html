@@ -709,9 +709,9 @@
 
         // --- Animais Iniciais ---
         const initialAnimals = [
-            { type: 'sheep', gender: 'male', age: 100, x: 36 * TILE_SIZE, y: 32 * TILE_SIZE, state: 'idle', woolLevel: 0, hunger: 0, path: [], isMoving: false, speed: 1, walkBob: 0, walkBobSpeed: 0.1, lastMoveDir: { dx: 0, dy: 1 }, stateTimer: 0 },
-            { type: 'sheep', gender: 'female', age: 100, x: 38 * TILE_SIZE, y: 34 * TILE_SIZE, state: 'idle', woolLevel: 20, hunger: 0, path: [], isMoving: false, speed: 1, walkBob: 0, walkBobSpeed: 0.1, lastMoveDir: { dx: 0, dy: 1 }, stateTimer: 0 },
-            { type: 'sheep', gender: 'female', age: 100, x: 40 * TILE_SIZE, y: 33 * TILE_SIZE, state: 'idle', woolLevel: 50, hunger: 0, path: [], isMoving: false, speed: 1, walkBob: 0, walkBobSpeed: 0.1, lastMoveDir: { dx: 0, dy: 1 }, stateTimer: 0 },
+            { type: 'sheep', gender: 'male', age: 100, x: 36 * TILE_SIZE, y: 32 * TILE_SIZE, state: 'idle', woolLevel: 0, hunger: 0, path: [], isMoving: false, speed: 1, walkBob: 0, walkBobSpeed: 0.1, lastMoveDir: { dx: 0, dy: 1 }, stateTimer: 0, timeAtMaxHunger: 0 },
+            { type: 'sheep', gender: 'female', age: 100, x: 38 * TILE_SIZE, y: 34 * TILE_SIZE, state: 'idle', woolLevel: 20, hunger: 0, path: [], isMoving: false, speed: 1, walkBob: 0, walkBobSpeed: 0.1, lastMoveDir: { dx: 0, dy: 1 }, stateTimer: 0, timeAtMaxHunger: 0 },
+            { type: 'sheep', gender: 'female', age: 100, x: 40 * TILE_SIZE, y: 33 * TILE_SIZE, state: 'idle', woolLevel: 50, hunger: 0, path: [], isMoving: false, speed: 1, walkBob: 0, walkBobSpeed: 0.1, lastMoveDir: { dx: 0, dy: 1 }, stateTimer: 0, timeAtMaxHunger: 0 },
         ];
 
         // --- Estrutura de Dados do Mundo ---
@@ -1170,6 +1170,15 @@
                 ctx.fillRect(x + 2, indicatorY, barWidth * (animal.woolLevel / 100), 6);
             }
         }
+        function drawSkeleton(ctx, x_px, y_px) {
+            const boneColor = '#F5F5F5';
+            ctx.fillStyle = boneColor;
+            // Crânio
+            ctx.fillRect(x_px + 12, y_px + 18, 8, 6);
+            // Costelas
+            ctx.fillRect(x_px + 8, y_px + 24, 16, 2);
+            ctx.fillRect(x_px + 8, y_px + 27, 16, 2);
+        }
         function drawClayTile(ctx, x_px, y_px, size) { // Sprite simplificado sem bordas
             const baseColor = '#A1887F'; // Um marrom mais acinzentado
             const highlightColor = 'rgba(255, 255, 255, 0.1)';
@@ -1491,7 +1500,7 @@
                         gender: newGender,
                         age: 0, // Nasce como filhote
                         x: mother.x, y: mother.y,
-                        state: 'idle', woolLevel: 0, hunger: 0, path: [], isMoving: false, speed: 1, walkBob: 0, walkBobSpeed: 0.1, lastMoveDir: { dx: 0, dy: 1 }, stateTimer: 0,
+                        state: 'idle', woolLevel: 0, hunger: 0, path: [], isMoving: false, speed: 1, walkBob: 0, walkBobSpeed: 0.1, lastMoveDir: { dx: 0, dy: 1 }, stateTimer: 0, timeAtMaxHunger: 0,
                         floor: mother.floor
                     };
                     floorData.animals.push(newAnimal);
@@ -1504,13 +1513,30 @@
 
 
             // --- Lógica Individual de cada Animal ---
-            for (const animal of floorData.animals) {
+            floorData.animals = floorData.animals.filter(animal => {
                 // Crescimento (idade e lã)
                 if (animal.age < ADULT_AGE) {
                     animal.age += 0.01; // Taxa de crescimento
                 } else {
-                    // A lã só cresce em adultos
-                    if (animal.woolLevel < 100) animal.woolLevel += 0.02;
+                    // A lã só cresce em adultos e se não estiverem com fome
+                    if (animal.hunger < 60 && animal.woolLevel < 100) {
+                        animal.woolLevel += 0.02;
+                    }
+                }
+
+                // Morte por fome
+                if (animal.hunger >= 100) {
+                    animal.timeAtMaxHunger = (animal.timeAtMaxHunger || 0) + 1;
+                    const DEATH_THRESHOLD = 10800; // 3 minutos a 60fps
+                    if (animal.timeAtMaxHunger > DEATH_THRESHOLD) {
+                        const tileX = Math.floor(animal.x / TILE_SIZE);
+                        const tileY = Math.floor(animal.y / TILE_SIZE);
+                        floorData.mapObjects.push({ type: 15, x: tileX, y: tileY }); // type 15 = Esqueleto
+                        console.log("Uma ovelha morreu de fome.");
+                        return false; // Remove o animal da lista
+                    }
+                } else {
+                    animal.timeAtMaxHunger = 0;
                 }
                 
                 // Aumento da fome
@@ -1532,6 +1558,12 @@
                 }
 
                 // Lógica de movimento
+                let currentSpeed = animal.speed;
+                if (animal.hunger >= 80) {
+                    currentSpeed = animal.speed * 0.5; // Fica mais lento
+                }
+
+
                 if (!animal.isMoving && animal.state === 'idle') {
                     // Tenta comer se estiver com fome
                     const currentTileX = Math.floor(animal.x / TILE_SIZE);
@@ -1556,7 +1588,7 @@
                         }
                     }
                 } else { // Se estiver se movendo
-                    if (animal.path.length > 0 && (Math.abs(animal.x - animal.targetX) < animal.speed && Math.abs(animal.y - animal.targetY) < animal.speed)) {
+                    if (animal.path.length > 0 && (Math.abs(animal.x - animal.targetX) < currentSpeed && Math.abs(animal.y - animal.targetY) < currentSpeed)) {
                         const nextTile = animal.path.shift();
                         animal.targetX = nextTile.x * TILE_SIZE;
                         animal.targetY = nextTile.y * TILE_SIZE;
@@ -1572,8 +1604,8 @@
                         animal.lastMoveDir = { dx: 0, dy: Math.sign(dy) };
                     }
 
-                    if (Math.abs(dx) < animal.speed) animal.x = animal.targetX; else animal.x += Math.sign(dx) * animal.speed;
-                    if (Math.abs(dy) < animal.speed) animal.y = animal.targetY; else animal.y += Math.sign(dy) * animal.speed;
+                    if (Math.abs(dx) < currentSpeed) animal.x = animal.targetX; else animal.x += Math.sign(dx) * currentSpeed;
+                    if (Math.abs(dy) < currentSpeed) animal.y = animal.targetY; else animal.y += Math.sign(dy) * currentSpeed;
                     animal.walkBob += animal.walkBobSpeed;
 
                     if (animal.x === animal.targetX && animal.y === animal.targetY && animal.path.length === 0) {
@@ -1581,7 +1613,8 @@
                         animal.walkBob = 0;
                     }
                 }
-            }
+                return true; // Mantém o animal na lista
+            });
         }
         function updateCamera() { const tX=player.x-(640/2)+(player.width/2); const tY=player.y-(480/2)+(player.height/2); camera.x=Math.max(0,Math.min(tX,MAP_WIDTH_PX-canvas.width)); camera.y=Math.max(0,Math.min(tY,MAP_HEIGHT_PX-canvas.height)); }
         function update(timestamp) { updatePlayerMovement(timestamp); updateToolAnimation(timestamp); updateAnimals(timestamp); updateCamera(); }
@@ -1689,6 +1722,8 @@
                     drawables.push({ type: 'stairs_up', x_px: x_px, y_px: y_px, y_sort: y_base, draw: () => drawStairs(ctx, x_px, y_px, TILE_SIZE, 'up') });
                 } else if (obj.type === 10) { // Escada para Baixo
                     drawables.push({ type: 'stairs_down', x_px: x_px, y_px: y_px, y_sort: y_base, draw: () => drawStairs(ctx, x_px, y_px, TILE_SIZE, 'down') });
+                } else if (obj.type === 15) { // Esqueleto
+                    drawables.push({ type: 'skeleton', x_px: x_px, y_px: y_px, y_sort: y_base, draw: () => drawSkeleton(ctx, x_px, y_px) });
                 } else if (obj.type === 11) { // Telhado
                     drawables.push({ type: 'roof', x_px: x_px, y_px: y_px, y_sort: y_base + TILE_SIZE, draw: () => drawRoof(ctx, x_px, y_px, obj.x, obj.y, player.currentFloor) });
                 }
