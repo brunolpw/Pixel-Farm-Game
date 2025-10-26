@@ -1318,6 +1318,9 @@
                     if (obj.type === 1) { drawTreeTrunk(ctx, x_px, y_px); drawTreeCanopy(ctx, x_px, y_px); }
                     else if (obj.type === 0) { drawRock(ctx, x_px, y_px); }
                     else if (obj.type === 9) { drawStairs(ctx, x_px, y_px, TILE_SIZE, 'up'); }
+                    else if (obj.type === 4) { drawFence(ctx, x_px, y_px, obj.orientation); }
+                    else if (obj.type === 2) { drawCampfire(ctx, x_px, y_px, timestamp); }
+                    else if (obj.type === 3) { drawTorch(ctx, x_px, y_px, timestamp); }
                 }
 
                 // 1c. Aplica o escurecimento, que aumenta com a distância
