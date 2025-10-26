@@ -513,7 +513,7 @@
         let player = {
             x: 11 * TILE_SIZE, y: 11 * TILE_SIZE, width: 20, height: 28,
             colorHead: '#FFDAB9', colorBody: '#007BFF', colorLegs: '#0056B3',
-            speed: 2, isMoving: false, targetX: 11 * TILE_SIZE, targetY: 11 * TILE_SIZE,
+            speed: 2, isMoving: false, targetX: 11 * TILE_SIZE, targetY: 11 * TILE_SIZE, currentFloor: 0,
             path: [], // Para o movimento point-and-click
             walkBob: 0, walkBobSpeed: 0.15, isUsingTool: false, toolAnimStart: 0, toolTarget: null, toolSubAction: null,
             lastMoveDir: { dx: 0, dy: 1 }
@@ -578,15 +578,15 @@
 
         const WORLD_LAYOUT = createWorldLayout();
         // O mapa do jogo é uma cópia profunda do layout, para que possa ser modificado.
-        let map = JSON.parse(JSON.stringify(WORLD_LAYOUT));
+        // let map = JSON.parse(JSON.stringify(WORLD_LAYOUT)); // Movido para a estrutura worldData
 
         const MAP_WIDTH_PX = MAP_WIDTH_TILES * TILE_SIZE; const MAP_HEIGHT_PX = MAP_HEIGHT_TILES * TILE_SIZE;
 
-        let plantGrowthData = {};
+        // let plantGrowthData = {}; // Movido para a estrutura worldData
 
         // type: 0=Rocha, 1=Árvore, 2=Fogueira, 3=Tocha
         // As coordenadas agora são ABSOLUTAS, pré-calculadas.
-        let mapObjects = [
+        const initialMapObjects = [
             // Árvores
             { type: 1, x: 12, y: 16 }, { type: 1, x: 16, y: 23 }, { type: 1, x: 18, y: 26 }, { type: 1, x: 30, y: 24 }, { type: 1, x: 32, y: 28 }, { type: 1, x: 34, y: 21 },
             { type: 1, x: 14, y: 31 }, { type: 1, x: 22, y: 36 }, { type: 1, x: 27, y: 41 }, { type: 1, x: 35, y: 36 }, { type: 1, x: 17, y: 38 },
@@ -598,38 +598,87 @@
             { type: 3, x: 28, y: 17 }, { type: 3, x: 13, y: 31 }, { type: 3, x: 35, y: 17 }, { type: 3, x: 24, y: 40 },
         ];
 
+        // Adiciona escadas para o sistema de andares
+        // Escada para cima no térreo
+        initialMapObjects.push({ type: 9, x: 19, y: 14, targetFloor: 1, targetX: 19, targetY: 13 });
+        // Escada para baixo no primeiro andar (será adicionada ao array de objetos do andar 1)
+        const floor1Objects = [
+            { type: 10, x: 19, y: 13, targetFloor: 0, targetX: 19, targetY: 14 }
+        ];
+
+        // --- Adiciona a base da "montanha" para o sistema de andares ---
+        const mountainStartX = 15;
+        const mountainStartY = 10;
+        const mountainWidth = 10;
+        const mountainHeight = 5;
+        for (let y = 0; y < mountainHeight; y++) {
+            for (let x = 0; x < mountainWidth; x++) {
+                initialMapObjects.push({ type: 8, x: mountainStartX + x, y: mountainStartY + y }); // type 8 = Parede de Montanha
+            }
+        }
+
         // Floresta Densa (coordenadas absolutas)
         for (let y = 5; y <= 15; y++) {
             for (let x = 30; x <= 38; x++) {
-                mapObjects.push({ type: 1, x: x + 12, y: y + 16 });
+                initialMapObjects.push({ type: 1, x: x + 12, y: y + 16 });
             }
         }
 
         // Campo de Rochas (coordenadas absolutas)
         for (let y = 30; y <= 38; y++) {
             for (let x = 5; x <= 15; x++) {
-                mapObjects.push({ type: 0, x: x + 12, y: y + 16 });
+                initialMapObjects.push({ type: 0, x: x + 12, y: y + 16 });
             }
         }
 
         // --- Adiciona um cercadinho pré-construído perto da fazenda ---
-        const fenceStartX = 20;
-        const fenceStartY = 13;
-        const fenceEndX = 27;
-        const fenceEndY = 20;
+        const fenceStartX = 20; // Posição X inicial da cerca
+        const fenceStartY = 18; // Posição Y inicial (movido para baixo)
+        const fenceEndX = 27;   // Posição X final
+        const fenceEndY = 25;   // Posição Y final (movido para baixo)
         const gateX = 23; // Posição X do portão
 
         // Paredes superior e inferior (horizontais)
         for (let x = fenceStartX; x <= fenceEndX; x++) {
-            mapObjects.push({ type: 4, x: x, y: fenceStartY, orientation: 'horizontal' });
+            initialMapObjects.push({ type: 4, x: x, y: fenceStartY, orientation: 'horizontal' });
             if (x < gateX || x > gateX + 1) { // Deixa um espaço de 2 tiles para o portão
-                mapObjects.push({ type: 4, x: x, y: fenceEndY, orientation: 'horizontal' });
+                initialMapObjects.push({ type: 4, x: x, y: fenceEndY, orientation: 'horizontal' });
             }
         }
         // Paredes laterais (verticais)
         for (let y = fenceStartY + 1; y < fenceEndY; y++) {
-            mapObjects.push({ type: 4, x: fenceStartX, y: y, orientation: 'vertical' });
-            mapObjects.push({ type: 4, x: fenceEndX, y: y, orientation: 'vertical' });
+            initialMapObjects.push({ type: 4, x: fenceStartX, y: y, orientation: 'vertical' });
+            initialMapObjects.push({ type: 4, x: fenceEndX, y: y, orientation: 'vertical' });
+        }
+
+        // --- Estrutura de Dados do Mundo ---
+        let worldData = [];
+
+        function createNewFloorData(layout, objects) {
+            // Garante que o canvas de pré-renderização seja criado corretamente
+            const preRenderedCanvas = document.createElement('canvas');
+            preRenderedCanvas.width = MAP_WIDTH_PX;
+            preRenderedCanvas.height = MAP_HEIGHT_PX;
+            const preRenderedCtx = preRenderedCanvas.getContext('2d');
+            preRenderedCtx.imageSmoothingEnabled = false;
+
+            return {
+                map: JSON.parse(JSON.stringify(layout)),
+                mapObjects: JSON.parse(JSON.stringify(objects)),
+                plantGrowthData: {},
+                preRenderedMapCanvas: preRenderedCanvas,
+                preRenderedMapCtx: preRenderedCtx
+            };
+        }
+
+        function createFloor1Layout() {
+            const layout = Array(MAP_HEIGHT_TILES).fill(0).map(() => Array(MAP_WIDTH_TILES).fill(10)); // 10 = Vazio
+            for (let y = mountainStartY; y < mountainStartY + mountainHeight; y++) {
+                for (let x = mountainStartX; x < mountainStartX + mountainWidth; x++) {
+                    layout[y][x] = 0; // Grama no topo da montanha
+                }
+            }
+            return layout;
         }
 
         // --- Estrutura de Inventário ---
@@ -665,6 +714,7 @@
             'gate': { id: 'gate', name: 'Porteira', description: '<strong>Porteira</strong><br>Uma porteira de fazenda.', category: 'construcao', stackable: true },
             'construction_tool': { id: 'construction_tool', name: 'Construção', description: '<strong>Construção</strong><br>Permite construir e remover estruturas.', category: 'ferramenta', stackable: false, actions: [
                     { label: "Mudar para modo 'Pegar'", action: "set_sub_action", value: "pickup_mode" },
+                    { label: "Construir Escada", action: "set_sub_action", value: "build_stairs" },
                     { label: "Construir Porta", action: "set_sub_action", value: "build_door" },
                     { label: "Construir Porteira", action: "set_sub_action", value: "build_gate" },
                     { label: "Construir Piso", action: "set_sub_action", value: "build_floor" },
@@ -687,11 +737,6 @@
         let touchHoldTimeout = null; // Timeout para detectar "hold"
         let isHolding = false; // Flag para indicar se está segurando para mover
         let isContextMenuOpen = false;
-
-        const preRenderedMapCanvas = document.createElement('canvas');
-        preRenderedMapCanvas.width = MAP_WIDTH_PX; preRenderedMapCanvas.height = MAP_HEIGHT_PX;
-        const preRenderedMapCtx = preRenderedMapCanvas.getContext('2d');
-        preRenderedMapCtx.imageSmoothingEnabled = false;
 
         const waterSpritesheetCanvas = document.createElement('canvas');
         const waterSpritesheetCtx = waterSpritesheetCanvas.getContext('2d');
@@ -886,10 +931,53 @@
             ctx.beginPath(); ctx.ellipse(x_px + size * 0.7, y_px + size * 0.6, size * 0.2, size * 0.1, Math.PI / 4, 0, Math.PI * 2); ctx.fill();
             ctx.beginPath(); ctx.ellipse(x_px + size * 0.3, y_px + size * 0.3, size * 0.15, size * 0.1, -Math.PI / 4, 0, Math.PI * 2); ctx.fill();
         }
-        function preRenderMap() { for(let y=0; y<MAP_HEIGHT_TILES; y++){ for(let x=0; x<MAP_WIDTH_TILES; x++){ updatePreRenderedTile(x, y, map[y][x]); } } console.log("Mapa pré-renderizado!"); }
-        function updatePreRenderedTile(tileX, tileY, tileId) {
+        function drawMountainWall(ctx, x_px, y_px, size) {
+            const tileX = x_px / size;
+            const tileY = y_px / size;
+            const topColor = '#689F38'; // Verde do topo
+            const mapObjects = worldData[player.currentFloor].mapObjects;
+            const faceColor = '#6D4C41'; // Cor da face da rocha
+            const shadowColor = '#4E342E'; // Sombra da rocha
+
+            // Face da rocha (sempre visível)
+            ctx.fillStyle = faceColor;
+            ctx.fillRect(x_px, y_px, size, size);
+            ctx.fillStyle = shadowColor;
+            ctx.fillRect(x_px, y_px + size * 0.5, size, size * 0.5); // Metade inferior mais escura
+
+            // Verifica se há uma parede de montanha acima
+            const hasNeighborNorth = mapObjects.some(obj => obj.type === 8 && obj.x === tileX && obj.y === tileY - 1);
+
+            // Desenha o topo de grama apenas se não houver vizinho ao norte
+            if (!hasNeighborNorth) {
+                ctx.fillStyle = topColor;
+                ctx.fillRect(x_px, y_px, size, 8); // Tira de grama no topo
+                ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                ctx.fillRect(x_px, y_px + 8, size, 3); // Pequena sombra abaixo da grama
+            }
+        }
+        function drawVoidTile(ctx, x_px, y_px, size) {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(x_px, y_px, size, size);
+        }
+        function drawStairs(ctx, x_px, y_px, size, direction) {
+            ctx.fillStyle = '#795548'; // Cor de madeira
+            ctx.fillRect(x_px + 4, y_px + 4, size - 8, size - 8);
+            ctx.strokeStyle = '#5D4037';
+            ctx.lineWidth = 2;
+            for (let i = 8; i < size - 4; i += 6) {
+                ctx.strokeRect(x_px + 4, y_px + i, size - 8, 0);
+            }
+            ctx.fillStyle = '#FFD700'; // Seta amarela
+            ctx.font = 'bold 16px sans-serif';
+            ctx.fillText(direction === 'up' ? '▲' : '▼', x_px + size / 2 - 5, y_px + size / 2 + 6);
+        }
+        function preRenderMap() { for(let y=0; y<MAP_HEIGHT_TILES; y++){ for(let x=0; x<MAP_WIDTH_TILES; x++){ updatePreRenderedTile(x, y, worldData[player.currentFloor].map[y][x]); } } console.log(`Mapa do andar ${player.currentFloor} pré-renderizado!`); }
+        function updatePreRenderedTile(tileX, tileY, tileId, floorIndex = player.currentFloor) {
             const dX=tileX*TILE_SIZE; const dY=tileY*TILE_SIZE;
             // A água (3) não é pré-renderizada, pois será animada
+            if (!worldData[floorIndex]) return; // Segurança
+            const preRenderedMapCtx = worldData[floorIndex].preRenderedMapCtx;
             if (tileId === 3) {
                 preRenderedMapCtx.clearRect(dX, dY, TILE_SIZE, TILE_SIZE);
                 return;
@@ -905,6 +993,7 @@
                 case 7: drawHarvestableTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break;
                 case 8: drawFloorTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break;
                 case 9: drawClayTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break;
+                case 10: drawVoidTile(preRenderedMapCtx, dX, dY, TILE_SIZE); break;
                 default: drawGrassTile(preRenderedMapCtx, dX, dY, TILE_SIZE);
             }
         }
@@ -960,6 +1049,7 @@
 
             const x_px = mouseHoverTile.x * TILE_SIZE;
             const y_px = mouseHoverTile.y * TILE_SIZE;
+            const mapObjects = worldData[player.currentFloor].mapObjects;
 
             ctx.globalAlpha = 0.5; // Set transparency for the preview
 
@@ -984,6 +1074,9 @@
                     const hasHorizontalFence = mapObjects.some(obj => obj.type === 4 && obj.y === mouseHoverTile.y && (obj.x === mouseHoverTile.x - 1 || obj.x === mouseHoverTile.x + 1));
                     drawGate(ctx, x_px, y_px, hasHorizontalFence ? 'vertical' : 'horizontal', false);
                     break;
+                case 'build_stairs':
+                    drawStairs(ctx, x_px, y_px, TILE_SIZE, 'up');
+                    break;
             }
 
             ctx.globalAlpha = 1.0; // Reset transparency
@@ -997,7 +1090,7 @@
             const item = ITEMS[backpackInventory[bpIdx].id];
             if (!item || !item.id.startsWith('seed_')) return;
 
-            const tId = map[mouseHoverTile.y][mouseHoverTile.x];
+            const tId = worldData[player.currentFloor].map[mouseHoverTile.y][mouseHoverTile.x];
             if (tId !== 2) return; // Só mostra em solo arado
 
             const x_px = mouseHoverTile.x * TILE_SIZE;
@@ -1008,7 +1101,7 @@
             ctx.globalAlpha = 1.0;
         }
         function drawAnimations(timestamp) { activeAnimations=activeAnimations.filter(an=>{const el=timestamp-an.startTime; if(el>an.duration)return false; if(an.type==='water'){drawWaterAnimation(an, timestamp);} return true;}); }
-        function drawPlantTimers(timestamp) { ctx.font='bold 12px Consolas'; ctx.textAlign='center'; ctx.shadowColor='black'; ctx.shadowBlur=2; for(const key in plantGrowthData){ const[x,y]=key.split(',').map(Number); const data=plantGrowthData[key]; const tId=map[y][x]; if(tId>=4&&tId<=6){ const tP=timestamp-data.plantedAt; const eA=tP; let taT=0; if(tId===4)taT=GROWTH_TIME_SPROUT; else if(tId===5)taT=GROWTH_TIME_PLANT; else if(tId===6)taT=GROWTH_TIME_HARVEST; if(data.boosted){taT=taT*0.5;} const tL=Math.max(0, taT-eA); const sL=Math.ceil(tL/1000); const dX=x*TILE_SIZE+(TILE_SIZE/2); const dY=y*TILE_SIZE-5; ctx.fillStyle='white'; ctx.fillText(`${sL}s`, dX, dY); } } ctx.shadowBlur=0; }
+        function drawPlantTimers(timestamp) { const floorData = worldData[player.currentFloor]; ctx.font='bold 12px Consolas'; ctx.textAlign='center'; ctx.shadowColor='black'; ctx.shadowBlur=2; for(const key in floorData.plantGrowthData){ const[x,y]=key.split(',').map(Number); const data=floorData.plantGrowthData[key]; const tId=floorData.map[y][x]; if(tId>=4&&tId<=6){ const tP=timestamp-data.plantedAt; const eA=tP; let taT=0; if(tId===4)taT=GROWTH_TIME_SPROUT; else if(tId===5)taT=GROWTH_TIME_PLANT; else if(tId===6)taT=GROWTH_TIME_HARVEST; if(data.boosted){taT=taT*0.5;} const tL=Math.max(0, taT-eA); const sL=Math.ceil(tL/1000); const dX=x*TILE_SIZE+(TILE_SIZE/2); const dY=y*TILE_SIZE-5; ctx.fillStyle='white'; ctx.fillText(`${sL}s`, dX, dY); } } ctx.shadowBlur=0; }
         function updateGameTime() {
             const n=new Date(); const rH=n.getHours(); const rM=n.getMinutes(); const rS=n.getSeconds();
             const tS=(rH*3600 + rM*60 + rS) % (24 * 3600); // Segundos totais no dia real
@@ -1016,10 +1109,10 @@
             let tM=Math.floor(GAME_MINUTES_PER_DAY*p); const oM=gameTimeOffset*60; tM=(tM+oM)%GAME_MINUTES_PER_DAY; gameHour=Math.floor(tM/60); gameMinute=tM%60;
             if (timeRangeSlider) { timeRangeSlider.value = gameHour; } // Sincroniza o slider com a hora do jogo
         }
-        function updateNightOverlay() { if(!nightOverlay)return; const mO=0.7; let tO=0; if(gameHour>=20||gameHour<4)tO=mO; else if(gameHour===4)tO=mO*0.66; else if(gameHour===5)tO=mO*0.33; else if(gameHour>=6&&gameHour<18)tO=0; else if(gameHour===18)tO=mO*0.33; else if(gameHour===19)tO=mO*0.66; nightOverlay.style.opacity=tO; drawLighting(lastTime); }
+        function updateNightOverlay() { if(!nightOverlay)return; const mO=0.7; let tO=0; if(gameHour>=20||gameHour<4)tO=mO; else if(gameHour===4)tO=mO*0.66; else if(gameHour===5)tO=mO*0.33; else if(gameHour>=6&&gameHour<18)tO=0; else if(gameHour===18)tO=mO*0.33; else if(gameHour===19)tO=mO*0.66; nightOverlay.style.opacity=tO; }
         function drawTimeIcon() { timeIconCtx.clearRect(0,0,timeIconCanvas.width,timeIconCanvas.height); const cX=timeIconCanvas.width/2; const cY=timeIconCanvas.height/2; const r=8; if(gameHour>=6&&gameHour<18){timeIconCtx.fillStyle='#FFD700'; timeIconCtx.beginPath(); timeIconCtx.arc(cX,cY,r,0,Math.PI*2); timeIconCtx.fill();}else{timeIconCtx.fillStyle='#A0A0A0'; timeIconCtx.beginPath(); timeIconCtx.arc(cX,cY,r,0,Math.PI*2); timeIconCtx.fill(); timeIconCtx.fillStyle='rgba(0,0,0,0)'; timeIconCtx.globalCompositeOperation='destination-out'; timeIconCtx.beginPath(); timeIconCtx.arc(cX+r*0.4,cY-r*0.4,r,0,Math.PI*2); timeIconCtx.fill(); timeIconCtx.globalCompositeOperation='source-over';} }
         function drawGameClock() { if(!gameClockSpan)return; const hS=String(gameHour).padStart(2,'0'); const mS=String(gameMinute).padStart(2,'0'); gameClockSpan.textContent=`${hS}:${mS}`; drawTimeIcon(); }
-        function drawLighting(timestamp) { lightCtx.clearRect(0,0,lightCanvas.width,lightCanvas.height); if(gameHour>=18||gameHour<6){ lightCtx.save(); const cNO=nightOverlay?parseFloat(nightOverlay.style.opacity):0; lightCtx.fillStyle=`rgba(0,0,30,${cNO*0.9})`; lightCtx.fillRect(0,0,lightCanvas.width,lightCanvas.height); lightCtx.globalCompositeOperation='destination-out'; for(const obj of mapObjects){ const xOS=obj.x*TILE_SIZE-camera.x; const yOS=obj.y*TILE_SIZE-camera.y; let lR=0; let lX=xOS+TILE_SIZE/2; let lY=yOS+TILE_SIZE/2; if(obj.type===2){lR=3.5*TILE_SIZE;}else if(obj.type===3){lR=2.5*TILE_SIZE; lY=yOS+TILE_SIZE*0.75;} if(lR>0){if(lX+lR>0&&lX-lR<lightCanvas.width&&lY+lR>0&&lY-lR<lightCanvas.height){ const pu=Math.sin(timestamp*0.005)*0.05+0.95; const gr=lightCtx.createRadialGradient(lX,lY,0,lX,lY,lR*pu); gr.addColorStop(0,'rgba(255,255,255,1)'); gr.addColorStop(0.3,'rgba(255,255,255,0.9)'); gr.addColorStop(0.7,'rgba(255,255,255,0.5)'); gr.addColorStop(1,'rgba(255,255,255,0)'); lightCtx.fillStyle=gr; lightCtx.beginPath(); lightCtx.arc(lX,lY,lR*pu,0,Math.PI*2); lightCtx.fill();}}} lightCtx.globalCompositeOperation='source-over'; lightCtx.restore();} }
+        function drawLighting(timestamp) { lightCtx.clearRect(0,0,lightCanvas.width,lightCanvas.height); if(gameHour>=18||gameHour<6){ lightCtx.save(); const cNO=nightOverlay?parseFloat(nightOverlay.style.opacity):0; lightCtx.fillStyle=`rgba(0,0,30,${cNO*0.9})`; lightCtx.fillRect(0,0,lightCanvas.width,lightCanvas.height); lightCtx.globalCompositeOperation='destination-out'; for(const obj of worldData[player.currentFloor].mapObjects){ const xOS=obj.x*TILE_SIZE-camera.x; const yOS=obj.y*TILE_SIZE-camera.y; let lR=0; let lX=xOS+TILE_SIZE/2; let lY=yOS+TILE_SIZE/2; if(obj.type===2){lR=3.5*TILE_SIZE;}else if(obj.type===3){lR=2.5*TILE_SIZE; lY=yOS+TILE_SIZE*0.75;} if(lR>0){if(lX+lR>0&&lX-lR<lightCanvas.width&&lY+lR>0&&lY-lR<lightCanvas.height){ const pu=Math.sin(timestamp*0.005)*0.05+0.95; const gr=lightCtx.createRadialGradient(lX,lY,0,lX,lY,lR*pu); gr.addColorStop(0,'rgba(255,255,255,1)'); gr.addColorStop(0.3,'rgba(255,255,255,0.9)'); gr.addColorStop(0.7,'rgba(255,255,255,0.5)'); gr.addColorStop(1,'rgba(255,255,255,0)'); lightCtx.fillStyle=gr; lightCtx.beginPath(); lightCtx.arc(lX,lY,lR*pu,0,Math.PI*2); lightCtx.fill();}}} lightCtx.globalCompositeOperation='source-over'; lightCtx.restore();} }
         
         function updatePlayerMovement(timestamp) {
             // Se não está se movendo, verifica se há um caminho a seguir
@@ -1051,6 +1144,17 @@
                     player.walkBob = 0;
                     if (player.path.length === 0) { // Chegou ao destino final
                         saveGame();
+
+                        // --- Lógica de Transição Automática de Andar ---
+                        // Verifica a escada DEPOIS que o movimento termina.
+                        const playerTileX = Math.floor(player.x / TILE_SIZE);
+                        const playerTileY = Math.floor(player.y / TILE_SIZE);
+                        const stairIndex = worldData[player.currentFloor].mapObjects.findIndex(obj => obj.x === playerTileX && obj.y === playerTileY && (obj.type === 9 || obj.type === 10));
+                        if (stairIndex !== -1) {
+                            const stair = worldData[player.currentFloor].mapObjects[stairIndex];
+                            changeFloor(stair);
+                            return; // Interrompe para evitar bugs pós-transição
+                        }
                     }
                 }
             }
@@ -1067,19 +1171,52 @@
             ctx.save();
             ctx.scale(zoomLevel, zoomLevel);
             ctx.translate(-camera.x, -camera.y);
-            // 1. Chão
-            ctx.drawImage(preRenderedMapCanvas, 0, 0);
+
+            // 1. Lógica de desenho de andares
+            if (player.currentFloor > 0 && worldData[player.currentFloor - 1]) {
+                const lowerFloor = worldData[player.currentFloor - 1];
+                // 1a. Desenha o chão e a água do andar de baixo
+                ctx.drawImage(lowerFloor.preRenderedMapCanvas, 0, 0);
+                for (let y = 0; y < MAP_HEIGHT_TILES; y++) {
+                    for (let x = 0; x < MAP_WIDTH_TILES; x++) {
+                        if (lowerFloor.map[y][x] === 3) {
+                            ctx.drawImage(waterSpritesheetCanvas, waterAnimFrame * TILE_SIZE, 0, TILE_SIZE, TILE_SIZE, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                        }
+                    }
+                }
+                // 1b. Aplica o escurecimento
+                ctx.globalAlpha = 0.2;
+                ctx.fillStyle = 'black';
+                ctx.fillRect(0, 0, MAP_WIDTH_PX, MAP_HEIGHT_PX);
+                ctx.globalAlpha = 1.0;
+
+                // 1c. Desenha as partes não vazias do andar atual por cima
+                const currentFloorCanvas = worldData[player.currentFloor].preRenderedMapCanvas;
+                const currentMap = worldData[player.currentFloor].map;
+                for (let y = 0; y < MAP_HEIGHT_TILES; y++) {
+                    for (let x = 0; x < MAP_WIDTH_TILES; x++) {
+                        if (currentMap[y][x] !== 10) { // 10 é o tile de Vazio
+                            ctx.drawImage(currentFloorCanvas, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                        }
+                    }
+                }
+            } else {
+                // Se estiver no térreo, apenas desenha o mapa normal
+                ctx.drawImage(worldData[player.currentFloor].preRenderedMapCanvas, 0, 0);
+            }
 
             // 1.5. Desenha a água animada
+            const currentMap = worldData[player.currentFloor].map;
             for (let y = 0; y < MAP_HEIGHT_TILES; y++) {
                 for (let x = 0; x < MAP_WIDTH_TILES; x++) {
-                    if (map[y][x] === 3) {
+                    if (currentMap[y][x] === 3) {
                         ctx.drawImage(waterSpritesheetCanvas, waterAnimFrame * TILE_SIZE, 0, TILE_SIZE, TILE_SIZE, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
                     }
                 }
             }
 
             // 2. Coleta "desenháveis"
+            const mapObjects = worldData[player.currentFloor].mapObjects;
             let drawables = [];
             drawables.push({ type: 'player', x_px: player.x, y_px: player.y, y_sort: player.y + player.height - 4, draw: (ts) => drawPlayer(ts) });
             drawables.push({ type: 'shadow', x_px: player.x, y_px: player.y, y_sort: player.y + player.height - 5, draw: ()=>{ctx.fillStyle='rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(player.x+player.width/2, player.y+player.height+2, player.width/2.5, 4, 0, 0, 2*Math.PI); ctx.fill();} });
@@ -1105,6 +1242,12 @@
                     drawables.push({ type: 'door', x_px: x_px, y_px: y_px, y_sort: y_base, draw: () => drawDoor(ctx, x_px, y_px, obj.orientation, obj.isOpen) });
                 } else if (obj.type === 7) { // Porteira
                     drawables.push({ type: 'gate', x_px: x_px, y_px: y_px, y_sort: y_base, draw: () => drawGate(ctx, x_px, y_px, obj.orientation, obj.isOpen) });
+                } else if (obj.type === 8) { // Parede de Montanha
+                    drawables.push({ type: 'mountain_wall', x_px: x_px, y_px: y_px, y_sort: y_base, draw: () => drawMountainWall(ctx, x_px, y_px, TILE_SIZE) });
+                } else if (obj.type === 9) { // Escada para Cima
+                    drawables.push({ type: 'stairs_up', x_px: x_px, y_px: y_px, y_sort: y_base, draw: () => drawStairs(ctx, x_px, y_px, TILE_SIZE, 'up') });
+                } else if (obj.type === 10) { // Escada para Baixo
+                    drawables.push({ type: 'stairs_down', x_px: x_px, y_px: y_px, y_sort: y_base, draw: () => drawStairs(ctx, x_px, y_px, TILE_SIZE, 'down') });
                 }
             }
             // 3. Ordena
@@ -1123,7 +1266,7 @@
 
         let lastTime = 0;
         function gameLoop(timestamp) { if (!lastTime) lastTime = timestamp; lastTime = timestamp; update(timestamp); draw(timestamp); drawLighting(timestamp); requestAnimationFrame(gameLoop); }
-
+        
         // --- Lógica do Jogo ---
         // CORRIGIDO: Keydown listener
         document.addEventListener('keydown', (e) => {
@@ -1207,17 +1350,18 @@
             const currentMapping = isConstructionModeActive ? constructionHotbarMapping : hotbarMapping;
             const currentSlot = isConstructionModeActive ? activeConstructionHotbarSlot : activeHotbarSlot;
             const bpIdx = currentMapping[currentSlot];
+            const floorData = worldData[player.currentFloor];
             if (bpIdx < 0 || !backpackInventory[bpIdx]) return;
             const inventoryItem = backpackInventory[bpIdx];
             if (!inventoryItem) return;
             const item = ITEMS[inventoryItem.id];
 
             // Verifica se há um objeto no tile alvo
-            const objectIndex = mapObjects.findIndex(obj => obj.x === tX && obj.y === tY);
+            const objectIndex = floorData.mapObjects.findIndex(obj => obj.x === tX && obj.y === tY);
             if (objectIndex !== -1) {
-                const targetObject = mapObjects[objectIndex];
+                const targetObject = floorData.mapObjects[objectIndex];
                 if (item.name === "Picareta" && targetObject.type === 0) { // Rocha
-                    mapObjects.splice(objectIndex, 1); // Remove a rocha
+                    floorData.mapObjects.splice(objectIndex, 1); // Remove a rocha
                     const stoneGained = Math.floor(Math.random() * 11) + 5; // Ganho de 5 a 15 pedras
                     addItemToInventory('stone', stoneGained);
                     console.log(`Rocha quebrada! Ganhou ${stoneGained} pedras.`);
@@ -1227,7 +1371,7 @@
                     return; // Ação concluída
                 }
                 if (item.name === "Machado" && targetObject.type === 1) { // Árvore
-                    mapObjects.splice(objectIndex, 1); // Remove a árvore
+                    floorData.mapObjects.splice(objectIndex, 1); // Remove a árvore
                     const woodGained = Math.floor(Math.random() * 11) + 5; // Ganho de 5 a 15 madeiras
                     addItemToInventory('wood', woodGained);
                     console.log(`Árvore cortada! Ganhou ${woodGained} madeiras.`);
@@ -1237,16 +1381,7 @@
                     return; // Ação concluída
                 }
                 if (item.name === "Pá" && targetObject.type === 4) { // Cerca
-                    mapObjects.splice(objectIndex, 1); // Remove a cerca
-                    addItemToInventory('wood', 1); // Devolve 1 madeira
-                    console.log("Cerca removida!");
-                    saveGame();
-                    updateHotbarUI();
-                    updateBackpackUI();
-                    return; // Ação concluída
-                }
-                if (item.name === "Pá" && targetObject.type === 4) { // Cerca
-                    mapObjects.splice(objectIndex, 1); // Remove a cerca
+                    floorData.mapObjects.splice(objectIndex, 1); // Remove a cerca
                     addItemToInventory('wood', 1); // Devolve 1 madeira
                     console.log("Cerca removida!");
                     saveGame();
@@ -1261,9 +1396,11 @@
                     else if (targetObject.type === 5) pickedUpItem = 'wall';
                     else if (targetObject.type === 6) pickedUpItem = 'door';
                     else if (targetObject.type === 7) pickedUpItem = 'gate';
+                    else if (targetObject.type === 9) { floorData.mapObjects.splice(objectIndex, 1); const otherStairIndex = worldData[targetObject.targetFloor].mapObjects.findIndex(o => o.x === targetObject.targetX && o.y === targetObject.targetY && o.type === 10); if(otherStairIndex !== -1) worldData[targetObject.targetFloor].mapObjects.splice(otherStairIndex, 1); addItemToInventory('wood', 20); pickedUpItem = 'stairs'; }
+                    else if (targetObject.type === 10) { floorData.mapObjects.splice(objectIndex, 1); const otherStairIndex = worldData[targetObject.targetFloor].mapObjects.findIndex(o => o.x === targetObject.targetX && o.y === targetObject.targetY && o.type === 9); if(otherStairIndex !== -1) worldData[targetObject.targetFloor].mapObjects.splice(otherStairIndex, 1); addItemToInventory('wood', 20); pickedUpItem = 'stairs'; }
 
                     if (pickedUpItem) {
-                        mapObjects.splice(objectIndex, 1);
+                        floorData.mapObjects.splice(objectIndex, 1);
                         addItemToInventory(pickedUpItem, 1);
                         console.log(`${pickedUpItem} coletado(a)!`);
                         saveGame();
@@ -1278,12 +1415,12 @@
 
             // Se não houver objeto, continua com a lógica para o chão
             const tK = `${tX},${tY}`;
-            const tId = map[tY][tX];
+            const tId = floorData.map[tY][tX];
 
             // Lógica de Colheita
             if (tId === 7) {
-                map[tY][tX] = 2; // Volta para solo arado
-                delete plantGrowthData[tK]; // Remove os dados de crescimento da planta
+                floorData.map[tY][tX] = 2; // Volta para solo arado
+                delete floorData.plantGrowthData[tK]; // Remove os dados de crescimento da planta
                 addItemToInventory('tomato', 1);
                 const seedsGained = Math.floor(Math.random() * 4); // 0, 1, 2 ou 3 sementes
                 if (seedsGained > 0) addItemToInventory('seed_tomato', seedsGained);
@@ -1293,7 +1430,7 @@
 
             // Lógica Universal de "Pegar" para pisos
             if (item.name === "Construção" && player.toolSubAction === 'pickup_mode' && tId === 8) {
-                map[tY][tX] = 0; // Volta para grama
+                floorData.map[tY][tX] = 0; // Volta para grama
                 addItemToInventory('wood', 1); // Devolve 1 madeira
                 updatePreRenderedTile(tX, tY, 0);
                 console.log("Piso removido!");
@@ -1304,29 +1441,29 @@
             }
 
             switch (item.name) {
-                case "Enxada": if (tId === 0 || tId === 1) { map[tY][tX] = 2; updatePreRenderedTile(tX, tY, 2); saveGame(); } break;
-                case "Semente": if (tId === 2 && inventoryItem.count > 0) { map[tY][tX] = 4; plantGrowthData[tK] = { plantedAt: timestamp, boosted: false }; inventoryItem.count--; updatePreRenderedTile(tX, tY, 4); saveGame(); updateHotbarUI(); updateBackpackUI(); } break;
+                case "Enxada": if (tId === 0 || tId === 1) { floorData.map[tY][tX] = 2; updatePreRenderedTile(tX, tY, 2); saveGame(); } break;
+                case "Semente": if (tId === 2 && inventoryItem.count > 0) { floorData.map[tY][tX] = 4; floorData.plantGrowthData[tK] = { plantedAt: timestamp, boosted: false }; inventoryItem.count--; updatePreRenderedTile(tX, tY, 4); saveGame(); updateHotbarUI(); updateBackpackUI(); } break;
                 case "Pá":
                     if (tId === 9) { // Coleta argila
                         const clayGained = Math.floor(Math.random() * 5) + 1; // 1 a 5
                         addItemToInventory('clay', clayGained);
-                        map[tY][tX] = 1; // Volta para terra
+                        floorData.map[tY][tX] = 1; // Volta para terra
                         updatePreRenderedTile(tX, tY, 1);
                         console.log(`Coletou ${clayGained} de argila.`);
                         saveGame();
                         updateHotbarUI();
                         updateBackpackUI();
                     } else if (tId === 8) { // Remove piso de madeira
-                        map[tY][tX] = 0; // Volta para grama
+                        floorData.map[tY][tX] = 0; // Volta para grama
                         addItemToInventory('wood', 1); // Devolve 1 madeira
                         updatePreRenderedTile(tX, tY, 0);
                         saveGame();
                     } else if (tId === 1 || tId === 2 || (tId >= 4 && tId <= 7)) {
-                        map[tY][tX] = 0; if (plantGrowthData[tK]) delete plantGrowthData[tK]; updatePreRenderedTile(tX, tY, 0); saveGame();
+                        floorData.map[tY][tX] = 0; if (floorData.plantGrowthData[tK]) delete floorData.plantGrowthData[tK]; updatePreRenderedTile(tX, tY, 0); saveGame();
                     } else if (tId === 0) {
-                        let aW = false; const ne = [[0, 1], [0, -1], [1, 0], [-1, 0]]; for (const [nx, ny] of ne) { const cX = tX + nx; const cY = tY + ny; if (cX >= 0 && cX < MAP_WIDTH_TILES && cY >= 0 && cY < MAP_HEIGHT_TILES) { if (map[cY][cX] === 3) { aW = true; break; } } } if (aW) { map[tY][tX] = 3; updatePreRenderedTile(tX, tY, 3); saveGame(); }
+                        let aW = false; const ne = [[0, 1], [0, -1], [1, 0], [-1, 0]]; for (const [nx, ny] of ne) { const cX = tX + nx; const cY = tY + ny; if (cX >= 0 && cX < MAP_WIDTH_TILES && cY >= 0 && cY < MAP_HEIGHT_TILES) { if (floorData.map[cY][cX] === 3) { aW = true; break; } } } if (aW) { floorData.map[tY][tX] = 3; updatePreRenderedTile(tX, tY, 3); saveGame(); }
                     } else if (tId === 3) {
-                        map[tY][tX] = 0; updatePreRenderedTile(tX, tY, 0); saveGame();
+                        floorData.map[tY][tX] = 0; updatePreRenderedTile(tX, tY, 0); saveGame();
                     }
                     break;
                 case "Regador": {
@@ -1334,9 +1471,9 @@
                     else if (inventoryItem.count > 0) {
                         let actionTaken = false;
                         if (tId === 1 || tId === 2) { // Terra ou Arado -> Argila
-                            map[tY][tX] = 9; updatePreRenderedTile(tX, tY, 9); actionTaken = true;
+                            floorData.map[tY][tX] = 9; updatePreRenderedTile(tX, tY, 9); actionTaken = true;
                         } else if (tId >= 4 && tId <= 6) { // Regar planta
-                            const pD = plantGrowthData[tK]; if (pD && !pD.boosted) { pD.boosted = true; actionTaken = true; }
+                            const pD = floorData.plantGrowthData[tK]; if (pD && !pD.boosted) { pD.boosted = true; actionTaken = true; }
                         }
                         if (actionTaken) {
                             inventoryItem.count--; activeAnimations.push({ type: 'water', x: tX, y: tY, startTime: timestamp, duration: 500 }); updateHotbarUI(); updateBackpackUI(); saveGame();
@@ -1352,8 +1489,7 @@
                             const stoneIdx = backpackInventory.findIndex(i => i && i.id === 'stone' && i.count >= 5);
                             if (wallItemIdx !== -1) { backpackInventory[wallItemIdx].count--; }
                             else if (stoneIdx !== -1) { backpackInventory[stoneIdx].count -= 5; }
-                            else { console.log("Sem muros ou pedras (mín. 5) para construir."); break; }
-                            mapObjects.push({ type: 5, x: tX, y: tY }); // type 5 = Muro
+                            else { console.log("Sem muros ou pedras (mín. 5) para construir."); break; } floorData.mapObjects.push({ type: 5, x: tX, y: tY });
                             console.log("Muro construído!");
                         }
                     } else if (player.toolSubAction === 'build_floor') {
@@ -1361,15 +1497,15 @@
                             const woodIdx = backpackInventory.findIndex(i => i && i.id === 'wood' && i.count > 0);
                             if (woodIdx !== -1) {
                                 backpackInventory[woodIdx].count--;
-                                map[tY][tX] = 8; // type 8 = Piso
+                                floorData.map[tY][tX] = 8; // type 8 = Piso
                                 updatePreRenderedTile(tX, tY, 8);
                                 console.log("Piso construído!");
                             } else { console.log("Sem madeira para construir o piso."); break; }
                         }
                     } else if (player.toolSubAction === 'build_door') {
                         if (tId === 8) { // Apenas em piso
-                            const hasHorizontalWall = mapObjects.some(obj => obj.type === 5 && obj.y === tY && (obj.x === tX - 1 || obj.x === tX + 1));
-                            const hasVerticalWall = mapObjects.some(obj => obj.type === 5 && obj.x === tX && (obj.y === tY - 1 || obj.y === tY + 1));
+                            const hasHorizontalWall = floorData.mapObjects.some(obj => obj.type === 5 && obj.y === tY && (obj.x === tX - 1 || obj.x === tX + 1));
+                            const hasVerticalWall = floorData.mapObjects.some(obj => obj.type === 5 && obj.x === tX && (obj.y === tY - 1 || obj.y === tY + 1));
                             if (!hasHorizontalWall && !hasVerticalWall) { console.log("A porta deve ser construída ao lado de um muro."); break; }
 
                             const doorItemIdx = backpackInventory.findIndex(i => i && i.id === 'door' && i.count > 0);
@@ -1378,13 +1514,13 @@
                             else if (woodIdx !== -1) { backpackInventory[woodIdx].count -= 4; } 
                             else { console.log("Sem Portas ou Madeira (mín. 4) para construir."); break; }
                             const orientation = hasHorizontalWall ? 'vertical' : 'horizontal';
-                            mapObjects.push({ type: 6, x: tX, y: tY, orientation: orientation, isOpen: false }); // type 6 = Porta
+                            floorData.mapObjects.push({ type: 6, x: tX, y: tY, orientation: orientation, isOpen: false }); // type 6 = Porta
                             console.log("Porta construída!");
                         } else { console.log("A porta deve ser construída sobre um piso de madeira."); break; }
                     } else if (player.toolSubAction === 'build_gate') {
                         if (tId === 0 || tId === 1) {
-                            const hasHorizontalFence = mapObjects.some(obj => obj.type === 4 && obj.y === tY && (obj.x === tX - 1 || obj.x === tX + 1));
-                            const hasVerticalFence = mapObjects.some(obj => obj.type === 4 && obj.x === tX && (obj.y === tY - 1 || obj.y === tY + 1));
+                            const hasHorizontalFence = floorData.mapObjects.some(obj => obj.type === 4 && obj.y === tY && (obj.x === tX - 1 || obj.x === tX + 1));
+                            const hasVerticalFence = floorData.mapObjects.some(obj => obj.type === 4 && obj.x === tX && (obj.y === tY - 1 || obj.y === tY + 1));
                             if (!hasHorizontalFence && !hasVerticalFence) { console.log("A porteira deve ser construída ao lado de uma cerca."); break; }
 
                             const gateItemIdx = backpackInventory.findIndex(i => i && i.id === 'gate' && i.count > 0);
@@ -1393,7 +1529,7 @@
                             else if (woodIdx !== -1) { backpackInventory[woodIdx].count -= 4; } 
                             else { console.log("Sem Porteiras ou Madeira (mín. 4) para construir."); break; }
                             const orientation = hasHorizontalFence ? 'vertical' : 'horizontal';
-                            mapObjects.push({ type: 7, x: tX, y: tY, orientation: orientation, isOpen: false }); // type 7 = Porteira
+                            floorData.mapObjects.push({ type: 7, x: tX, y: tY, orientation: orientation, isOpen: false }); // type 7 = Porteira
                             console.log("Porteira construída!");
                         }
                     } else if (player.toolSubAction === 'vertical_fence' || player.toolSubAction === 'horizontal_fence' || player.toolSubAction === null) {
@@ -1410,8 +1546,25 @@
                             } else {
                                 orientation = (player.lastMoveDir.dx !== 0) ? 'vertical' : 'horizontal';
                             }
-                            mapObjects.push({ type: 4, x: tX, y: tY, orientation: orientation });
+                            floorData.mapObjects.push({ type: 4, x: tX, y: tY, orientation: orientation });
                             console.log("Cerca construída!");
+                        }
+                    } else if (player.toolSubAction === 'build_stairs') {
+                        const targetFloorIndex = player.currentFloor + 1;
+                        if (tId === 8 && worldData[targetFloorIndex]) { // Só pode construir em piso, e o andar de cima deve existir
+                            const targetTileIsFree = worldData[targetFloorIndex].mapObjects.every(obj => obj.x !== tX || obj.y !== tY);
+                            if (targetTileIsFree) {
+                                const woodIdx = backpackInventory.findIndex(i => i && i.id === 'wood' && i.count >= 5);
+                                if (woodIdx !== -1) {
+                                    backpackInventory[woodIdx].count -= 5;
+                                    floorData.mapObjects.push({ type: 9, x: tX, y: tY, targetFloor: targetFloorIndex, targetX: tX, targetY: tY });
+                                    worldData[targetFloorIndex].mapObjects.push({ type: 10, x: tX, y: tY, targetFloor: player.currentFloor, targetX: tX, targetY: tY });
+                                    console.log("Escada construída!");
+                                } else { console.log("Madeira insuficiente (mín. 5)."); }
+                            } else { console.log("O local no andar de cima está bloqueado."); }
+                        } else {
+                            if (tId !== 8) console.log("Escadas devem ser construídas sobre um piso de madeira.");
+                            if (!worldData[targetFloorIndex]) console.log("Não há um andar acima para construir a escada.");
                         }
                     }
                     // Salva e atualiza a UI se qualquer ação de construção foi bem-sucedida
@@ -1424,9 +1577,9 @@
             }
         }
 
-        function isWalkable(pixelX, pixelY) { const tX=Math.floor(pixelX/TILE_SIZE); const tY=Math.floor(pixelY/TILE_SIZE); if(tX<0||tX>=MAP_WIDTH_TILES||tY<0||tY>=MAP_HEIGHT_TILES)return false; if(map[tY][tX]===3)return false; for(const obj of mapObjects){if(obj.x===tX&&obj.y===tY){if(obj.type===0||obj.type===1||obj.type===2)return false; if((obj.type===4||obj.type===5||obj.type===6||obj.type===7) && !obj.isOpen) return false;}} return true; }
+        function isWalkable(pixelX, pixelY) { const tX=Math.floor(pixelX/TILE_SIZE); const tY=Math.floor(pixelY/TILE_SIZE); const floorData = worldData[player.currentFloor]; if(tX<0||tX>=MAP_WIDTH_TILES||tY<0||tY>=MAP_HEIGHT_TILES)return false; if(floorData.map[tY][tX]===3 || floorData.map[tY][tX]===10)return false; for(const obj of floorData.mapObjects){if(obj.x===tX&&obj.y===tY){if(obj.type===0||obj.type===1||obj.type===2||obj.type===8)return false; if((obj.type===4||obj.type===5||obj.type===6||obj.type===7) && !obj.isOpen) return false;}} return true; }
 
-        function updatePlantGrowth(timestamp) { let mC=false; for(const key in plantGrowthData){ const[x,y]=key.split(',').map(Number); const data=plantGrowthData[key]; const tP=timestamp-data.plantedAt; const eA=tP; const cId=map[y][x]; const bM=data.boosted?0.5:1; const tS=GROWTH_TIME_SPROUT*bM; const tP_=GROWTH_TIME_PLANT*bM; const tH=GROWTH_TIME_HARVEST*bM; let nId=-1; if(eA>tH&&cId===6)nId=7; else if(eA>tP_&&cId===5)nId=6; else if(eA>tS&&cId===4)nId=5; if(nId!==-1){map[y][x]=nId; updatePreRenderedTile(x,y,nId); mC=true;} } if(mC){saveGame();} }
+        function updatePlantGrowth(timestamp) { const floorData = worldData[player.currentFloor]; let mC=false; for(const key in floorData.plantGrowthData){ const[x,y]=key.split(',').map(Number); const data=floorData.plantGrowthData[key]; const tP=timestamp-data.plantedAt; const eA=tP; const cId=floorData.map[y][x]; const bM=data.boosted?0.5:1; const tS=GROWTH_TIME_SPROUT*bM; const tP_=GROWTH_TIME_PLANT*bM; const tH=GROWTH_TIME_HARVEST*bM; let nId=-1; if(eA>tH&&cId===6)nId=7; else if(eA>tP_&&cId===5)nId=6; else if(eA>tS&&cId===4)nId=5; if(nId!==-1){floorData.map[y][x]=nId; updatePreRenderedTile(x,y,nId); mC=true;} } if(mC){saveGame();} }
         function startGrowthTimer() { setInterval(() => { updatePlantGrowth(lastTime); }, 1000); }
 
         // --- Funções de UI ---
@@ -1843,11 +1996,10 @@
                 player: {
                     x: player.x,
                     y: player.y,
+                    currentFloor: player.currentFloor,
                     lastMoveDir: { dx: player.lastMoveDir.dx, dy: player.lastMoveDir.dy }
                 },
-                map: map,
-                mapObjects: mapObjects,
-                plantData: plantGrowthData,
+                worldData: worldData.map(floor => ({ map: floor.map, mapObjects: floor.mapObjects, plantGrowthData: floor.plantGrowthData })),
                 backpackData: backpackInventory,
                 hotbarMapData: hotbarMapping,
                 activeSlotData: activeHotbarSlot,
@@ -1866,21 +2018,32 @@
             if (savedData) {
                 try {
                     const data = JSON.parse(savedData);
-                    // Carrega TUDO do save primeiro
-                    if (data.map) map = data.map;
+                    // Carrega a estrutura do mundo
+                    if (data.worldData && Array.isArray(data.worldData)) {
+                        worldData = data.worldData.map(floorData => {
+                            const newFloor = createNewFloorData(floorData.map || WORLD_LAYOUT, floorData.mapObjects || []);
+                            newFloor.plantGrowthData = floorData.plantGrowthData || {};
+                            return newFloor;
+                        });
+                    } else { // Migração de save antigo
+                        const floor0 = createNewFloorData(data.map || WORLD_LAYOUT, data.mapObjects || initialMapObjects);
+                        floor0.plantGrowthData = data.plantData || {};
+                        worldData.push(floor0);
+                    }
+
                     if (data.player) {
                         if (typeof data.player.x === 'number') player.x = data.player.x;
                         if (typeof data.player.y === 'number') player.y = data.player.y;
                         if (data.player.lastMoveDir && typeof data.player.lastMoveDir.dx === 'number' && typeof data.player.lastMoveDir.dy === 'number') {
                             player.lastMoveDir = { dx: data.player.lastMoveDir.dx, dy: data.player.lastMoveDir.dy };
                         }
+                        if (typeof data.player.currentFloor === 'number') player.currentFloor = data.player.currentFloor;
                         // Garante que o player não comece se movendo ou com target diferente
                         player.targetX = player.x;
                         player.targetY = player.y;
                         player.isMoving = false;
                     }
-                    if (data.mapObjects) { mapObjects = data.mapObjects.filter(obj => { if (!obj || typeof obj.x !== 'number' || typeof obj.y !== 'number') return false; if (obj.x < 0 || obj.x >= MAP_WIDTH_TILES || obj.y < 0 || obj.y >= MAP_HEIGHT_TILES) { console.warn(`Objeto em [${obj.x},${obj.y}] removido pois está fora do mapa.`); return false; } if ((obj.type === 0 || obj.type === 1 || obj.type === 2) && obj.y >= 0 && obj.y < map.length && obj.x >= 0 && obj.x < map[obj.y].length && map[obj.y][obj.x] === 3) { console.warn(`Objeto (tipo ${obj.type}) em [${obj.x},${obj.y}] removido pois está na água.`); return false; } return true; }); }
-                    if (data.plantData) { for (const key in data.plantData) { const plant = data.plantData[key]; if (typeof plant.boost === 'number' && plant.boost > 0) { plant.boosted = true; delete plant.boost; } else if (typeof plant.boosted === 'undefined') { plant.boosted = false; } } plantGrowthData = data.plantData; }
+
                     if (data.activeSlotData !== undefined && data.activeSlotData >= 0 && data.activeSlotData < HOTBAR_SIZE) { activeHotbarSlot = data.activeSlotData; }
 
                     // Carrega inventário e hotbar do save, ou usa arrays vazios se não existirem
@@ -1907,18 +2070,30 @@
                 } catch (e) {
                     console.error("Erro ao carregar o save, usando dados padrão.", e);
                      // Reset em caso de erro de parse - cria um jogo novo
+                     worldData = [createNewFloorData(WORLD_LAYOUT, initialMapObjects)];
                      backpackInventory = new Array(BACKPACK_SIZE).fill(null); hotbarMapping = new Array(HOTBAR_SIZE).fill(-1); ensureInventoryConsistency(backpackInventory, hotbarMapping, defaultItems); activeHotbarSlot = 0; gameTimeOffset = 0;
-                     mapObjects = mapObjects.filter(obj => { if (!obj || typeof obj.x !== 'number' || typeof obj.y !== 'number') return false; if (obj.x < 0 || obj.x >= MAP_WIDTH_TILES || obj.y < 0 || obj.y >= MAP_HEIGHT_TILES) return false; if ((obj.type === 0 || obj.type === 1 || obj.type === 2) && obj.y >= 0 && obj.y < map.length && obj.x >= 0 && obj.x < map[obj.y].length && map[obj.y][obj.x] === 3) return false; return true; });
-                     plantGrowthData = {};
                 }
             } else {
                 console.log("Nenhum save encontrado, iniciando novo jogo.");
-                // Garante itens e mapeamento padrão para novo jogo (já feito no início da função)
+                worldData.push(createNewFloorData(WORLD_LAYOUT, initialMapObjects)); // Andar 0
+                worldData.push(createNewFloorData(createFloor1Layout(), floor1Objects)); // Andar 1
                 backpackInventory = new Array(BACKPACK_SIZE).fill(null);
                 hotbarMapping = new Array(HOTBAR_SIZE).fill(-1);
                 activeHotbarSlot = 0;
-                mapObjects = mapObjects.filter(obj => { if (!obj || typeof obj.x !== 'number' || typeof obj.y !== 'number') return false; if (obj.x < 0 || obj.x >= MAP_WIDTH_TILES || obj.y < 0 || obj.y >= MAP_HEIGHT_TILES) return false; if ((obj.type === 0 || obj.type === 1 || obj.type === 2) && obj.y >= 0 && obj.y < map.length && obj.x >= 0 && obj.x < map[obj.y].length && map[obj.y][obj.x] === 3) return false; return true; });
                 ensureInventoryConsistency(backpackInventory, hotbarMapping, defaultItems);
+            }
+            preRenderAllFloors();
+        }
+
+        function preRenderAllFloors() {
+            if (!worldData || worldData.length === 0) return;
+            for (let i = 0; i < worldData.length; i++) {
+                for (let y = 0; y < MAP_HEIGHT_TILES; y++) {
+                    for (let x = 0; x < MAP_WIDTH_TILES; x++) {
+                        updatePreRenderedTile(x, y, worldData[i].map[y][x], i);
+                    }
+                }
+                console.log(`Mapa do andar ${i} pré-renderizado!`);
             }
         }
 
@@ -2149,16 +2324,18 @@
             if (bpIdx < 0 || !backpackInventory[bpIdx]) return false; // Slot vazio
             const item = ITEMS[backpackInventory[bpIdx].id];
             if (!item) return false; // Item desconhecido
-            const tId = map[tileY][tileX];
-            const objectIndex = mapObjects.findIndex(obj => obj.x === tileX && obj.y === tileY);
+            const floorData = worldData[player.currentFloor];
+            const tId = floorData.map[tileY][tileX];
+            const objectIndex = floorData.mapObjects.findIndex(obj => obj.x === tileX && obj.y === tileY);
 
             if (objectIndex !== -1) {
-                const targetObject = mapObjects[objectIndex];
+                const targetObject = floorData.mapObjects[objectIndex];
                 if (item.id === 'pickaxe' && targetObject.type === 0) return true;
                 if (item.id === 'axe' && targetObject.type === 1) return true;
                 if (item.id === 'shovel' && targetObject.type === 4) return true;
                 // Ação universal de pegar
-                if (item.id === 'construction_tool' && player.toolSubAction === 'pickup_mode' && [4, 5, 6, 7].includes(targetObject.type)) return true; // Pega objetos
+                if (item.id === 'construction_tool' && player.toolSubAction === 'pickup_mode' && [4, 5, 6, 7, 9, 10].includes(targetObject.type)) return true;
+                // if (targetObject.type === 9 || targetObject.type === 10) return true; // Escadas agora são automáticas
                 return false;
             }
 
@@ -2180,18 +2357,24 @@
                         if (player.toolSubAction === 'build_door') {
                             if (tId !== 8) return false; // Portas só em piso
                             const hasMaterial = backpackInventory.some(i => i && i.id === 'door' && i.count > 0) || backpackInventory.some(i => i && i.id === 'wood' && i.count >= 4);
-                            const hasAdjacentWall = mapObjects.some(obj => obj.type === 5 && ( (obj.y === tileY && (obj.x === tileX - 1 || obj.x === tileX + 1)) || (obj.x === tileX && (obj.y === tileY - 1 || obj.y === tileY + 1))));
+                            const hasAdjacentWall = floorData.mapObjects.some(obj => obj.type === 5 && ( (obj.y === tileY && (obj.x === tileX - 1 || obj.x === tileX + 1)) || (obj.x === tileX && (obj.y === tileY - 1 || obj.y === tileY + 1))));
                             return hasMaterial && hasAdjacentWall;
                         }
                         if (player.toolSubAction === 'build_gate') {
                             if (tId !== 0 && tId !== 1) return false; // Portões em grama/terra
                             const hasMaterial = backpackInventory.some(i => i && i.id === 'gate' && i.count > 0) || backpackInventory.some(i => i && i.id === 'wood' && i.count >= 4);
-                            const hasAdjacentFence = mapObjects.some(obj => obj.type === 4 && ( (obj.y === tileY && (obj.x === tileX - 1 || obj.x === tileX + 1)) || (obj.x === tileX && (obj.y === tileY - 1 || obj.y === tileY + 1))));
+                            const hasAdjacentFence = floorData.mapObjects.some(obj => obj.type === 4 && ( (obj.y === tileY && (obj.x === tileX - 1 || obj.x === tileX + 1)) || (obj.x === tileX && (obj.y === tileY - 1 || obj.y === tileY + 1))));
                             return hasMaterial && hasAdjacentFence;
                         }
                     }
                     if (player.toolSubAction === 'build_wall') {
                         return ((tId === 0 || tId === 1) && (backpackInventory.some(i => i && i.id === 'wall' && i.count > 0) || backpackInventory.some(i => i && i.id === 'stone' && i.count >= 5)));
+                    }
+                    if (player.toolSubAction === 'build_stairs') {
+                        const targetFloorIndex = player.currentFloor + 1;
+                        if (tId !== 8 || !worldData[targetFloorIndex]) return false;
+                        const targetTileIsFree = worldData[targetFloorIndex].mapObjects.every(obj => obj.x !== tileX || obj.y !== tileY);
+                        return targetTileIsFree && backpackInventory.some(i => i && i.id === 'wood' && i.count >= 5);
                     }
                     // Para construir cerca (padrão ou explícito)
                     return ((tId === 0 || tId === 1) && (backpackInventory.some(i => i && i.id === 'fence' && i.count > 0) || backpackInventory.some(i => i && i.id === 'wood' && i.count > 0)));
@@ -2205,7 +2388,7 @@
             if (isBackpackOpen || isConstructionInventoryOpen || player.isMoving || player.isUsingTool) return;
 
             const rect = canvas.getBoundingClientRect();
-            const clickX = event.clientX - rect.left;
+            const clickX = event.clientX - rect.left; // Corrigido
             const clickY = event.clientY - rect.top;
 
             const worldX = clickX + camera.x;
@@ -2221,14 +2404,15 @@
 
             // Permite o uso se a distância for pequena (adjacente ou diagonal)
             if (dist < 1.5) {
+                const floorData = worldData[player.currentFloor]; // Corrigido
                 // 1. Prioriza a ação da ferramenta
                 if (isActionable(clickedTileX, clickedTileY)) {
                     triggerUseTool({ x: clickedTileX, y: clickedTileY });
                 } else {
                     // 2. Se não houver ação da ferramenta, verifica se é uma porta/porteira para abrir/fechar
-                    const objectIndex = mapObjects.findIndex(obj => obj.x === clickedTileX && obj.y === clickedTileY && (obj.type === 6 || obj.type === 7));
+                    const objectIndex = floorData.mapObjects.findIndex(obj => obj.x === clickedTileX && obj.y === clickedTileY && (obj.type === 6 || obj.type === 7));
                     if (objectIndex === -1) return; // Não faz nada se não for porta/porteira
-                    const targetObject = mapObjects[objectIndex];
+                const targetObject = worldData[player.currentFloor].mapObjects[objectIndex];
                     targetObject.isOpen = !targetObject.isOpen;
                     console.log(`${targetObject.type === 6 ? 'Porta' : 'Porteira'} ${targetObject.isOpen ? 'aberta' : 'fechada'}.`);
                     saveGame();
@@ -2385,7 +2569,6 @@
             generateWaterSpritesheet();
             generateCampfireSpritesheet();
             generateTorchSpritesheet();
-            preRenderMap();
             updateHotbarUI();
             startGrowthTimer();
 
@@ -2466,6 +2649,30 @@
 
 
             requestAnimationFrame(gameLoop);
+        }
+
+        function changeFloor(stair) {
+            console.log(`Mudando do andar ${player.currentFloor} para ${stair.targetFloor}`);
+            
+            let landingDir = { dx: 0, dy: 0 };
+            // A direção de aterrissagem é baseada no tipo da escada, não na direção do jogador
+            if (stair.type === 9) { // Escada para Cima
+                landingDir.dy = -1; // Aterrissa um tile para "cima" (norte) no mapa
+            } else if (stair.type === 10) { // Escada para Baixo
+                landingDir.dy = 1;  // Aterrissa um tile para "baixo" (sul) no mapa
+            }
+
+            // Calcula a posição final com base na direção da escada
+            const finalX = (stair.targetX + landingDir.dx) * TILE_SIZE;
+            const finalY = (stair.targetY + landingDir.dy) * TILE_SIZE;
+
+            player.currentFloor = stair.targetFloor;
+            player.x = finalX;
+            player.y = finalY;
+            player.targetX = finalX;
+            player.targetY = finalY;
+            player.path = []; // Limpa o caminho para evitar movimentos indesejados
+            preRenderMap(); // Re-renderiza o mapa do novo andar
         }
 
         document.addEventListener('DOMContentLoaded', init);
