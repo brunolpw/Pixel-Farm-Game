@@ -1550,7 +1550,7 @@
                             console.log("Muro construído!");
                         }
                     } else if (player.toolSubAction === 'build_floor') {
-                        if (tId === 0 || tId === 1) {
+                        if (tId === 0 || tId === 1 || tId === 10) { // Permite construir piso no vazio
                             const woodIdx = backpackInventory.findIndex(i => i && i.id === 'wood' && i.count > 0);
                             if (woodIdx !== -1) {
                                 backpackInventory[woodIdx].count--;
@@ -1634,7 +1634,21 @@
             }
         }
 
-        function isWalkable(pixelX, pixelY) { const tX=Math.floor(pixelX/TILE_SIZE); const tY=Math.floor(pixelY/TILE_SIZE); const floorData = worldData[player.currentFloor]; if(tX<0||tX>=MAP_WIDTH_TILES||tY<0||tY>=MAP_HEIGHT_TILES)return false; if(floorData.map[tY][tX]===3 || floorData.map[tY][tX]===10)return false; for(const obj of floorData.mapObjects){if(obj.x===tX&&obj.y===tY){if(obj.type===0||obj.type===1||obj.type===2||obj.type===8)return false; if((obj.type===4||obj.type===5||obj.type===6||obj.type===7) && !obj.isOpen) return false;}} return true; }
+        function isWalkable(pixelX, pixelY) {
+            const tX = Math.floor(pixelX / TILE_SIZE);
+            const tY = Math.floor(pixelY / TILE_SIZE);
+            const floorData = worldData[player.currentFloor];
+            if (tX < 0 || tX >= MAP_WIDTH_TILES || tY < 0 || tY >= MAP_HEIGHT_TILES) return false;
+
+            const tileId = floorData.map[tY][tX];
+            const objectOnTile = floorData.mapObjects.find(obj => obj.x === tX && obj.y === tY);
+
+            if (tileId === 3) return false; // Água é sempre intransponível
+            if (tileId === 10 && (!objectOnTile || (objectOnTile.type !== 9 && objectOnTile.type !== 10))) return false; // Vazio é intransponível, a menos que tenha uma escada
+
+            if (objectOnTile) { if (objectOnTile.type === 0 || objectOnTile.type === 1 || objectOnTile.type === 2 || objectOnTile.type === 8) return false; if ((objectOnTile.type === 4 || objectOnTile.type === 5 || objectOnTile.type === 6 || objectOnTile.type === 7) && !objectOnTile.isOpen) return false; }
+            return true;
+        }
 
         function updatePlantGrowth(timestamp) { const floorData = worldData[player.currentFloor]; let mC=false; for(const key in floorData.plantGrowthData){ const[x,y]=key.split(',').map(Number); const data=floorData.plantGrowthData[key]; const tP=timestamp-data.plantedAt; const eA=tP; const cId=floorData.map[y][x]; const bM=data.boosted?0.5:1; const tS=GROWTH_TIME_SPROUT*bM; const tP_=GROWTH_TIME_PLANT*bM; const tH=GROWTH_TIME_HARVEST*bM; let nId=-1; if(eA>tH&&cId===6)nId=7; else if(eA>tP_&&cId===5)nId=6; else if(eA>tS&&cId===4)nId=5; if(nId!==-1){floorData.map[y][x]=nId; updatePreRenderedTile(x,y,nId); mC=true;} } if(mC){saveGame();} }
         function startGrowthTimer() { setInterval(() => { updatePlantGrowth(lastTime); }, 1000); }
@@ -2391,7 +2405,7 @@
                 if (item.id === 'axe' && targetObject.type === 1) return true;
                 if (item.id === 'shovel' && targetObject.type === 4) return true;
                 // Ação universal de pegar
-                if (item.id === 'construction_tool' && player.toolSubAction === 'pickup_mode' && [4, 5, 6, 7, 9, 10].includes(targetObject.type)) return true;
+                if (item.id === 'construction_tool' && player.toolSubAction === 'pickup_mode' && [4, 5, 6, 7, 9, 10].includes(targetObject.type)) return true; // Escadas podem ser pegas
                 // if (targetObject.type === 9 || targetObject.type === 10) return true; // Escadas agora são automáticas
                 return false;
             }
@@ -2408,7 +2422,7 @@
                         return tId === 8;
                     }
                     if (player.toolSubAction === 'build_floor') {
-                        return ((tId === 0 || tId === 1) && backpackInventory.some(i => i && i.id === 'wood' && i.count > 0));
+                        return ((tId === 0 || tId === 1 || tId === 10) && backpackInventory.some(i => i && i.id === 'wood' && i.count > 0));
                     }
                     if (player.toolSubAction === 'build_door' || player.toolSubAction === 'build_gate') {
                         if (player.toolSubAction === 'build_door') {
