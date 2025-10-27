@@ -1170,6 +1170,16 @@
                 ctx.fillRect(x + 2, indicatorY, barWidth * (animal.woolLevel / 100), 6);
             }
         }
+        function drawStump(ctx, x_px, y_px) {
+            const stumpColor = '#795548';
+            const stumpTopColor = '#A1887F';
+            // Base do toco
+            ctx.fillStyle = stumpColor;
+            ctx.fillRect(x_px + 10, y_px + 22, 12, 10);
+            // Topo do toco
+            ctx.fillStyle = stumpTopColor;
+            ctx.fillRect(x_px + 11, y_px + 22, 10, 3);
+        }
         function drawSkeleton(ctx, x_px, y_px) {
             const boneColor = '#F5F5F5';
             ctx.fillStyle = boneColor;
@@ -1495,6 +1505,17 @@
             }
         }
         function updateToolAnimation(timestamp) { if(player.isUsingTool){if(timestamp-player.toolAnimStart>TOOL_ANIM_DURATION){player.isUsingTool=false; useTool(timestamp);}} }
+        function updateStumps(timestamp) {
+            for (const floor of worldData) {
+                for (const obj of floor.mapObjects) {
+                    if (obj.type === 16 && obj.regrowAt && timestamp >= obj.regrowAt) {
+                        obj.type = 1; // Volta a ser uma árvore
+                        delete obj.regrowAt; // Remove a propriedade de regeneração
+                        console.log("Uma árvore cresceu de um toco!");
+                    }
+                }
+            }
+        }
         function updateAnimals(timestamp) {
             const floorData = worldData[player.currentFloor];
             if (!floorData || !floorData.animals) return;
@@ -1633,7 +1654,7 @@
             });
         }
         function updateCamera() { const tX=player.x-(640/2)+(player.width/2); const tY=player.y-(480/2)+(player.height/2); camera.x=Math.max(0,Math.min(tX,MAP_WIDTH_PX-canvas.width)); camera.y=Math.max(0,Math.min(tY,MAP_HEIGHT_PX-canvas.height)); }
-        function update(timestamp) { updatePlayerMovement(timestamp); updateToolAnimation(timestamp); updateAnimals(timestamp); updateCamera(); }
+        function update(timestamp) { updatePlayerMovement(timestamp); updateToolAnimation(timestamp); updateAnimals(timestamp); updateStumps(timestamp); updateCamera(); }
         function draw(timestamp) {
             const fireAnimFrame = Math.floor(timestamp / 150) % 8; // 8 quadros, muda a cada 150ms
             const waterAnimFrame = Math.floor(timestamp / 250) % 8; // 8 quadros, muda a cada 250ms
@@ -1666,7 +1687,7 @@
                     if (obj.type === 1) { drawTreeTrunk(ctx, x_px, y_px); drawTreeCanopy(ctx, x_px, y_px); }
                     else if (obj.type === 0) { drawRock(ctx, x_px, y_px); }
                     else if (obj.type === 9) { drawStairs(ctx, x_px, y_px, TILE_SIZE, 'up'); }
-                    else if (obj.type === 4) { drawFence(ctx, x_px, y_px, obj.orientation); }
+                    else if (obj.type === 4) { drawFence(ctx, x_px, y_px, obj.x, obj.y, i); }
                     else if (obj.type === 2) { drawCampfire(ctx, x_px, y_px, timestamp); }
                     else if (obj.type === 3) { drawTorch(ctx, x_px, y_px, timestamp); }
                 }
@@ -1738,6 +1759,8 @@
                     drawables.push({ type: 'stairs_up', x_px: x_px, y_px: y_px, y_sort: y_base, draw: () => drawStairs(ctx, x_px, y_px, TILE_SIZE, 'up') });
                 } else if (obj.type === 10) { // Escada para Baixo
                     drawables.push({ type: 'stairs_down', x_px: x_px, y_px: y_px, y_sort: y_base, draw: () => drawStairs(ctx, x_px, y_px, TILE_SIZE, 'down') });
+                } else if (obj.type === 16) { // Toco de árvore
+                    drawables.push({ type: 'stump', x_px: x_px, y_px: y_px, y_sort: y_base, draw: () => drawStump(ctx, x_px, y_px) });
                 } else if (obj.type === 15) { // Esqueleto
                     drawables.push({ type: 'skeleton', x_px: x_px, y_px: y_px, y_sort: y_base, draw: () => drawSkeleton(ctx, x_px, y_px) });
                 } else if (obj.type === 11) { // Telhado
@@ -2028,7 +2051,10 @@
                     return; // Ação concluída
                 }
                 if (item.name === "Machado" && targetObject.type === 1) { // Árvore
-                    floorData.mapObjects.splice(objectIndex, 1); // Remove a árvore
+                    // Transforma a árvore em um toco
+                    targetObject.type = 16; // Novo tipo: Toco
+                    targetObject.regrowAt = timestamp + 300000; // 5 minutos para crescer de volta
+
                     const woodGained = Math.floor(Math.random() * 11) + 5; // Ganho de 5 a 15 madeiras
                     triggerOnomatopoeia('Chop!', tX * TILE_SIZE + 16, tY * TILE_SIZE);
                     addItemToInventory('wood', woodGained);
@@ -2052,6 +2078,16 @@
                     floorData.mapObjects.splice(objectIndex, 1); // Remove o esqueleto
                     console.log("Esqueleto removido.");
                     triggerOnomatopoeia('Crumble...', tX * TILE_SIZE + 16, tY * TILE_SIZE);
+                    saveGame();
+                    updateHotbarUI();
+                    updateBackpackUI();
+                    return; // Ação concluída
+                }
+                if (item.name === "Pá" && targetObject.type === 16) { // Toco
+                    floorData.mapObjects.splice(objectIndex, 1); // Remove o toco
+                    addItemToInventory('wood', 1); // Ganha 1 madeira extra
+                    triggerOnomatopoeia('Pluck!', tX * TILE_SIZE + 16, tY * TILE_SIZE);
+                    console.log("Toco removido.");
                     saveGame();
                     updateHotbarUI();
                     updateBackpackUI();
@@ -3126,7 +3162,7 @@
                 const targetObject = floorData.mapObjects[objectIndex];
                 if (item.id === 'pickaxe' && targetObject.type === 0) return true;
                 if (item.id === 'axe' && targetObject.type === 1) return true;
-                if (item.id === 'shovel' && (targetObject.type === 4 || targetObject.type === 15)) return true; // Cerca ou Esqueleto
+                if (item.id === 'shovel' && (targetObject.type === 4 || targetObject.type === 15 || targetObject.type === 16)) return true; // Cerca, Esqueleto ou Toco
                 // Ação universal de pegar
                 if (item.id === 'construction_tool' && player.toolSubAction === 'pickup_mode' && [4, 5, 6, 7, 9, 10, 11].includes(targetObject.type)) return true; // Escadas e telhados podem ser pegos
                 // if (targetObject.type === 9 || targetObject.type === 10) return true; // Escadas agora são automáticas
