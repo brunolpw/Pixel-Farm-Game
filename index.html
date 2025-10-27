@@ -672,14 +672,18 @@
         }
 
         // Floresta Densa (coordenadas absolutas)
-        for (let i = 0; i < 50; i++) {
-            initialMapObjects.push({ type: 1, x: 35 + Math.floor(Math.random() * 12), y: 5 + Math.floor(Math.random() * 10) });
+        for (let i = 0; i < 80; i++) { // Aumentado para compensar possíveis falhas
+            const x = 35 + Math.floor(Math.random() * 12);
+            const y = 5 + Math.floor(Math.random() * 10);
+            if (!initialMapObjects.some(o => o.x === x && o.y === y)) initialMapObjects.push({ type: 1, x, y });
         }
 
         // Campo de Rochas (coordenadas absolutas)
-        for (let i = 0; i < 150; i++) {
-            initialMapObjects.push({ type: 0, x: 5 + Math.floor(Math.random() * 15), y: 30 + Math.floor(Math.random() * 15) });
-            }
+        for (let i = 0; i < 180; i++) { // Aumentado para compensar
+            const x = 5 + Math.floor(Math.random() * 15);
+            const y = 30 + Math.floor(Math.random() * 15);
+            if (!initialMapObjects.some(o => o.x === x && o.y === y)) initialMapObjects.push({ type: 0, x, y });
+        }
 
         // --- Adiciona o novo cercado para as ovelhas no canto sudeste ---
         const newFenceStartX = 35;
@@ -734,7 +738,7 @@
                 map: JSON.parse(JSON.stringify(layout)),
                 mapObjects: JSON.parse(JSON.stringify(objects)),
                 plantGrowthData: {},
-                treeGrowthData: {},
+                treeGrowthData: {}, // Adicionado para cada andar
                 animals: [], // Adicionado para cada andar
                 preRenderedMapCanvas: preRenderedCanvas,
                 preRenderedMapCtx: preRenderedCtx
@@ -1183,6 +1187,26 @@
                 ctx.fillRect(x + 2, indicatorY, barWidth * (animal.woolLevel / 100), 6);
             }
         }
+        function drawSmallTree(ctx, x_px, y_px) {
+            const trunkColor = '#795548';
+            const leafColor = '#689F38';
+            // Tronco
+            ctx.fillStyle = trunkColor;
+            ctx.fillRect(x_px + 13, y_px + 18, 6, 14);
+            // Copa
+            ctx.fillStyle = leafColor;
+            ctx.beginPath(); ctx.arc(x_px + 16, y_px + 12, 10, 0, Math.PI * 2); ctx.fill();
+        }
+        function drawMediumTree(ctx, x_px, y_px) {
+            const trunkColor = '#5D4037';
+            const leafColor = '#4CAF50';
+            // Tronco
+            ctx.fillStyle = trunkColor;
+            ctx.fillRect(x_px + 12, y_px + 16, 8, 16);
+            // Copa
+            ctx.fillStyle = leafColor;
+            ctx.beginPath(); ctx.arc(x_px + 16, y_px + 8, 14, 0, Math.PI * 2); ctx.ellipse(x_px + 16, y_px + 14, 12, 10, 0, 0, Math.PI * 2); ctx.fill();
+        }
         function drawSapling(ctx, x_px, y_px) {
             const trunkColor = '#A1887F';
             const leafColor = '#8BC34A';
@@ -1460,11 +1484,17 @@
                 let startTime = 0;
                 if (obj.type === 16 && obj.regrowAt) { // Toco
                     targetTime = obj.regrowAt;
-                    startTime = targetTime - 300000; // 5 minutos
-                } else if (obj.type === 17 && floorData.treeGrowthData[`${obj.x},${obj.y}`]) { // Muda
-                    startTime = floorData.treeGrowthData[`${obj.x},${obj.y}`].plantedAt;
-                    targetTime = startTime + 900000; // 15 minutos
+                } else if (obj.type >= 17 && obj.type <= 19) { // Estágios de crescimento
+                    const growthData = floorData.treeGrowthData[`${obj.x},${obj.y}`];
+                    if (growthData) {
+                        startTime = growthData.plantedAt;
+                        const STAGE_DURATION = 300000; // 5 minutos por estágio
+                        if (obj.type === 17) targetTime = startTime + STAGE_DURATION;
+                        else if (obj.type === 18) targetTime = startTime + STAGE_DURATION * 2;
+                        else if (obj.type === 19) targetTime = startTime + STAGE_DURATION * 3;
+                    }
                 }
+
                 if (targetTime > 0) {
                     const timeLeft = Math.max(0, targetTime - timestamp);
                     const secondsLeft = Math.ceil(timeLeft / 1000);
@@ -1589,13 +1619,23 @@
         function updateTreeGrowth(timestamp) {
             for (const floor of worldData) {
                 if (!floor.treeGrowthData) continue;
-                for (const key in floor.treeGrowthData) {
+                const keys = Object.keys(floor.treeGrowthData);
+                for (const key of keys) {
                     const { plantedAt, originalTile } = floor.treeGrowthData[key];
-                    if (timestamp - plantedAt > 900000) { // 15 minutos
-                        const [x, y] = key.split(',').map(Number);
-                        const saplingIndex = floor.mapObjects.findIndex(obj => obj.type === 17 && obj.x === x && obj.y === y);
-                        if (saplingIndex !== -1) { floor.mapObjects[saplingIndex].type = 1; if (originalTile === 1) { floor.map[y][x] = 0; updatePreRenderedTile(x, y, 0, worldData.indexOf(floor)); } } // Cresce para árvore e transforma terra em grama
-                        delete floor.treeGrowthData[key];
+                    const [x, y] = key.split(',').map(Number);
+                    const objIndex = floor.mapObjects.findIndex(obj => obj.x === x && obj.y === y && obj.type >= 17 && obj.type <= 19);
+                    if (objIndex === -1) continue;
+
+                    const obj = floor.mapObjects[objIndex];
+                    const elapsedTime = timestamp - plantedAt;
+                    const STAGE_DURATION = 300000; // 5 minutos
+
+                    if (obj.type === 17 && elapsedTime > STAGE_DURATION) obj.type = 18;
+                    else if (obj.type === 18 && elapsedTime > STAGE_DURATION * 2) obj.type = 19;
+                    else if (obj.type === 19 && elapsedTime > STAGE_DURATION * 3) {
+                        obj.type = 1; // Cresce para árvore adulta
+                        if (originalTile === 1) { floor.map[y][x] = 0; updatePreRenderedTile(x, y, 0, worldData.indexOf(floor)); }
+                        delete floor.treeGrowthData[key]; // Remove do ciclo de crescimento
                     }
                 }
             }
@@ -1843,6 +1883,10 @@
                     drawables.push({ type: 'stairs_up', x_px: x_px, y_px: y_px, y_sort: y_base, draw: () => drawStairs(ctx, x_px, y_px, TILE_SIZE, 'up') });
                 } else if (obj.type === 10) { // Escada para Baixo
                     drawables.push({ type: 'stairs_down', x_px: x_px, y_px: y_px, y_sort: y_base, draw: () => drawStairs(ctx, x_px, y_px, TILE_SIZE, 'down') });
+                } else if (obj.type === 18) { // Árvore Pequena
+                    drawables.push({ type: 'small_tree', x_px: x_px, y_px: y_px, y_sort: y_base, draw: () => drawSmallTree(ctx, x_px, y_px) });
+                } else if (obj.type === 19) { // Árvore Média
+                    drawables.push({ type: 'medium_tree', x_px: x_px, y_px: y_px, y_sort: y_base, draw: () => drawMediumTree(ctx, x_px, y_px) });
                 } else if (obj.type === 17) { // Muda de Árvore
                     drawables.push({ type: 'sapling', x_px: x_px, y_px: y_px, y_sort: y_base, draw: () => drawSapling(ctx, x_px, y_px) });
                 } else if (obj.type === 16) { // Toco de árvore
@@ -2187,7 +2231,7 @@
                 }
                 if (item.name === "Regador" && inventoryItem.count > 0) {
                     let actionTaken = false;
-                    if (targetObject.type === 17) { // Regar muda
+                    if (targetObject.type >= 17 && targetObject.type <= 19) { // Regar muda/árvore pequena/média
                         const growthData = floorData.treeGrowthData[`${targetObject.x},${targetObject.y}`];
                         if (growthData && !growthData.boosted) { growthData.plantedAt -= 90000; growthData.boosted = true; actionTaken = true; } // Reduz 10% de 15min
                     } else if (targetObject.type === 16) { // Regar toco
@@ -2280,7 +2324,7 @@
                         }
                     } else if (player.toolSubAction === 'plant_tree') {
                         const seedIdx = backpackInventory.findIndex(i => i && i.id === 'seed_tree' && i.count > 0);
-                        if ((tId === 0 || tId === 1) && seedIdx !== -1) {
+                        if ((tId === 0 || tId === 1 || tId === 12 || tId === 13 || tId === 14) && seedIdx !== -1) {
                             const tK = `${tX},${tY}`;
                             triggerOnomatopoeia('...', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#ccc');
                             floorData.mapObjects.push({ type: 17, x: tX, y: tY });
@@ -2333,8 +2377,9 @@
                 case "Construção":
                     if (objectIndex !== -1) break; // Não constrói sobre objetos existentes
 
+                    const isGrassOrDirt = (tId === 0 || tId === 1 || tId === 12 || tId === 13 || tId === 14);
                     if (player.toolSubAction === 'build_wall') {
-                        if (tId === 0 || tId === 1 || tId === 8) { // Permite construir muro em piso de madeira
+                        if (isGrassOrDirt || tId === 8) { // Permite construir muro em piso de madeira
                             const wallItemIdx = backpackInventory.findIndex(i => i && i.id === 'wall' && i.count > 0);
                             const stoneIdx = backpackInventory.findIndex(i => i && i.id === 'stone' && i.count >= 5);
                             if (wallItemIdx !== -1) {
@@ -2348,7 +2393,7 @@
                             console.log("Muro construído!");
                         }
                     } else if (player.toolSubAction === 'build_floor') {
-                        if (tId === 0 || tId === 1 || tId === 10) { // Permite construir piso no vazio
+                        if (isGrassOrDirt || tId === 10) { // Permite construir piso no vazio ou sobre vegetação
                             const woodIdx = backpackInventory.findIndex(i => i && i.id === 'wood' && i.count > 0);
                             if (woodIdx !== -1) {
                                 backpackInventory[woodIdx].count--;
@@ -2379,7 +2424,7 @@
                             console.log("Porta construída!");
                         } else { console.log("A porta deve ser construída sobre um piso de madeira."); break; }
                     } else if (player.toolSubAction === 'build_gate') {
-                        if (tId === 0 || tId === 1) {
+                        if (isGrassOrDirt) {
                             const hasHorizontalFence = floorData.mapObjects.some(obj => obj.type === 4 && obj.y === tY && (obj.x === tX - 1 || obj.x === tX + 1));
                             const hasVerticalFence = floorData.mapObjects.some(obj => obj.type === 4 && obj.x === tX && (obj.y === tY - 1 || obj.y === tY + 1));
                             if (!hasHorizontalFence && !hasVerticalFence) { console.log("A porteira deve ser construída ao lado de uma cerca."); break; }
@@ -2398,8 +2443,8 @@
                             floorData.mapObjects.push({ type: 7, x: tX, y: tY, orientation: orientation, isOpen: false }); // type 7 = Porteira
                             console.log("Porteira construída!");
                         }
-                    } else if (player.toolSubAction === 'build_fence' || player.toolSubAction === null) {
-                        if (tId === 0 || tId === 1) {
+                    } else if (player.toolSubAction === 'build_fence') {
+                        if (isGrassOrDirt) {
                             if (player.toolSubAction === 'pickup_mode') break; // Modo pegar não constrói
                             const fenceItemIdx = backpackInventory.findIndex(i => i && i.id === 'fence' && i.count > 0);
                             const woodIdx = backpackInventory.findIndex(i => i && i.id === 'wood' && i.count > 0);
@@ -2546,14 +2591,24 @@
                     
                     // Mostra a sub-ação no slot ativo
                     if (hotbarIndex === currentActiveSlot && player.toolSubAction) {
-                        if (player.toolSubAction === 'pickup_mode') subActionSpan.textContent = "(Pegar)";
-                        else if (player.toolSubAction === 'build_door') subActionSpan.textContent = "(Construir)";
-                        else if (player.toolSubAction === 'build_gate') subActionSpan.textContent = "(Construir)";
-                        else if (player.toolSubAction === 'build_floor') subActionSpan.textContent = "(Piso)";
-                        else if (player.toolSubAction === 'build_wall') subActionSpan.textContent = "(Construir)";
-                        else if (player.toolSubAction === 'vertical_fence') subActionSpan.textContent = "(Vertical)";
-                        else if (player.toolSubAction === 'horizontal_fence') subActionSpan.textContent = "(Horizontal)";
-                        else subActionSpan.textContent = "";
+                        let subActionText = '';
+                        if (player.toolSubAction === 'pickup_mode') {
+                            subActionText = 'Pegar';
+                        } else if (player.toolSubAction.startsWith('build_')) {
+                            const itemKey = player.toolSubAction.replace('build_', '');
+                            // Casos especiais como 'floor' que não são itens
+                            if (itemKey === 'floor') subActionText = 'Piso';
+                            else if (itemKey === 'stairs') subActionText = 'Escada';
+                            else if (ITEMS[itemKey]) subActionText = ITEMS[itemKey].name;
+                        } else if (player.toolSubAction.startsWith('plant_')) {
+                            const itemKey = player.toolSubAction.replace('plant_', '');
+                            if (itemKey === 'tree') subActionText = 'Árvore';
+                            else if (ITEMS[`seed_${itemKey}`]) subActionText = ITEMS[`seed_${itemKey}`].name.replace('Semente de ', '');
+                        }
+
+                        if (subActionText) subActionText = subActionText.charAt(0).toUpperCase() + subActionText.slice(1);
+                        
+                        subActionSpan.textContent = `(${subActionText})`;
                     } else {
                         subActionSpan.textContent = "";
                     }
@@ -2743,6 +2798,7 @@
                 case 'set_sub_action':
                     player.toolSubAction = actionInfo.value;
                     console.log("Sub-ação definida:", player.toolSubAction);
+                    updateHotbarUI(); // Atualiza a UI imediatamente
                     break;
                 case 'store':
                     const currentMapping = isConstructionModeActive ? constructionHotbarMapping : hotbarMapping;
@@ -2964,6 +3020,14 @@
                           const isMappedElsewhere = mapping.includes(foundIndex);
                           if (!isMappedElsewhere) { mapping[defaultIndex] = foundIndex; console.log(`Mapeado item padrão "${itemDef.name}" (mochila ${foundIndex}) para hotbar ${defaultIndex}`); }
                      }
+                 }
+            });
+            // Preenche a hotbar de construção
+            backpack.forEach((item, index) => {
+                 const itemDef = item ? ITEMS[item.id] : null;
+                 if (itemDef && (itemDef.category === 'construcao' || itemDef.category === 'material_construcao' || itemDef.id === 'construction_tool')) {
+                     const emptySlot = constructionHotbarMapping.findIndex(m => m === -1);
+                     if (emptySlot !== -1 && !constructionHotbarMapping.includes(index)) constructionHotbarMapping[emptySlot] = index;
                  }
             });
             for (let i = 0; i < mapping.length; i++) { if (mapping[i] !== -1 && (mapping[i] >= BACKPACK_SIZE || !backpack[mapping[i]])) { console.log(`Limpando mapeamento inválido da hotbar ${i} (apontava para ${mapping[i]})`); mapping[i] = -1; } }
@@ -3287,10 +3351,12 @@
         function toggleConstructionMode(forceState = null) {
             if (isContextMenuOpen) closeContextMenu();
             isConstructionModeActive = (forceState !== null) ? forceState : !isConstructionModeActive;
+            player.toolSubAction = null; // Reseta a sub-ação ao trocar de modo
 
             if (isConstructionModeActive) {
                 if (isBackpackOpen) toggleBackpack(false); // Fecha a mochila se estiver aberta
                 constructionTargetFloor = player.currentFloor; // Inicializa o andar de construção
+                ensureInventoryConsistency(backpackInventory, constructionHotbarMapping, []); // Popula a hotbar de construção
                 // Não abre o inventário automaticamente, apenas entra no modo
             } else {
                 if (isConstructionInventoryOpen) toggleConstructionInventory(false); // Fecha o inventário de construção se estiver aberto
@@ -3342,20 +3408,20 @@
                     if (player.toolSubAction === 'plant_tomato') {
                         return tId === 2 && backpackInventory.some(i => i && i.id === 'seed_tomato' && i.count > 0);
                     } else if (player.toolSubAction === 'plant_tree') {
-                        return (tId === 0 || tId === 1) && backpackInventory.some(i => i && i.id === 'seed_tree' && i.count > 0);
+                        return (tId === 0 || tId === 1 || tId === 12 || tId === 13 || tId === 14) && backpackInventory.some(i => i && i.id === 'seed_tree' && i.count > 0);
                     }
                     return false;
-                case 'shovel': return (tId === 1 || tId === 2 || (tId >= 4 && tId <= 7) || tId === 0 || tId === 3 || tId === 8 || tId === 9);
+                case 'shovel': return (tId === 1 || tId === 2 || (tId >= 4 && tId <= 7) || tId === 0 || tId === 3 || tId === 8 || tId === 9 || tId === 12 || tId === 13 || tId === 14);
                 case 'watering_can': return (tId === 3 || (tId >= 4 && tId <= 6 && backpackInventory[bpIdx].count > 0) || ((tId === 1 || tId === 2) && backpackInventory[bpIdx].count > 0));
                 case 'construction_tool':
                     if (player.toolSubAction === 'pickup_mode') { return tId === 8; }
-                    if (player.toolSubAction === 'build_floor') { return ((tId === 0 || tId === 1 || tId === 10) && backpackInventory.some(i => i && i.id === 'wood' && i.count > 0)); }
+                    if (player.toolSubAction === 'build_floor') { return ((tId === 0 || tId === 1 || tId === 10 || tId === 12 || tId === 13 || tId === 14) && backpackInventory.some(i => i && i.id === 'wood' && i.count > 0)); }
                     if (player.toolSubAction === 'build_door') { if (tId !== 8) return false; const hasMaterial = backpackInventory.some(i => i && i.id === 'door' && i.count > 0) || backpackInventory.some(i => i && i.id === 'wood' && i.count >= 4); const hasAdjacentWall = floorData.mapObjects.some(obj => obj.type === 5 && ( (obj.y === tileY && (obj.x === tileX - 1 || obj.x === tileX + 1)) || (obj.x === tileX && (obj.y === tileY - 1 || obj.y === tileY + 1)))); return hasMaterial && hasAdjacentWall; }
-                    if (player.toolSubAction === 'build_gate') { if (tId !== 0 && tId !== 1) return false; const hasMaterial = backpackInventory.some(i => i && i.id === 'gate' && i.count > 0) || backpackInventory.some(i => i && i.id === 'wood' && i.count >= 4); const hasAdjacentFence = floorData.mapObjects.some(obj => obj.type === 4 && ( (obj.y === tileY && (obj.x === tileX - 1 || obj.x === tileX + 1)) || (obj.x === tileX && (obj.y === tileY - 1 || obj.y === tileY + 1)))); return hasMaterial && hasAdjacentFence; }
-                    if (player.toolSubAction === 'build_wall') { return ((tId === 0 || tId === 1 || tId === 8) && (backpackInventory.some(i => i && i.id === 'wall' && i.count > 0) || backpackInventory.some(i => i && i.id === 'stone' && i.count >= 5))); }
+                    if (player.toolSubAction === 'build_gate') { if (tId !== 0 && tId !== 1 && tId !== 12 && tId !== 13 && tId !== 14) return false; const hasMaterial = backpackInventory.some(i => i && i.id === 'gate' && i.count > 0) || backpackInventory.some(i => i && i.id === 'wood' && i.count >= 4); const hasAdjacentFence = floorData.mapObjects.some(obj => obj.type === 4 && ( (obj.y === tileY && (obj.x === tileX - 1 || obj.x === tileX + 1)) || (obj.x === tileX && (obj.y === tileY - 1 || obj.y === tileY + 1)))); return hasMaterial && hasAdjacentFence; }
+                    if (player.toolSubAction === 'build_wall') { return ((tId === 0 || tId === 1 || tId === 8 || tId === 12 || tId === 13 || tId === 14) && (backpackInventory.some(i => i && i.id === 'wall' && i.count > 0) || backpackInventory.some(i => i && i.id === 'stone' && i.count >= 5))); }
                     if (player.toolSubAction === 'build_stairs') { const upperFloorIndex = targetFloorIndex + 1; if (tId !== 8) return false; let isUpperTileFree = true; if (worldData[upperFloorIndex]) { isUpperTileFree = worldData[upperFloorIndex].mapObjects.every(obj => obj.x !== tileX || obj.y !== tileY); } return isUpperTileFree && backpackInventory.some(i => i && i.id === 'wood' && i.count >= 5); }
                     if (player.toolSubAction === 'build_roof') { if (!backpackInventory.some(i => i && i.id === 'clay' && i.count >= 1)) return false; const lowerFloorIndex = targetFloorIndex - 1; if (lowerFloorIndex < 0) return false; const lowerFloor = worldData[lowerFloorIndex]; if (!lowerFloor) return false; return lowerFloor.map[tileY][tileX] !== 10 || lowerFloor.mapObjects.some(obj => obj.x === tileX && obj.y === tileY); }
-                    if (player.toolSubAction === 'build_fence') { return ((tId === 0 || tId === 1) && (backpackInventory.some(i => i && i.id === 'fence' && i.count > 0) || backpackInventory.some(i => i && i.id === 'wood' && i.count > 0))); }
+                    if (player.toolSubAction === 'build_fence') { return ((tId === 0 || tId === 1 || tId === 12 || tId === 13 || tId === 14) && (backpackInventory.some(i => i && i.id === 'fence' && i.count > 0) || backpackInventory.some(i => i && i.id === 'wood' && i.count > 0))); }
             }
 
             return false;
