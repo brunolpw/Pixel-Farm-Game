@@ -1484,14 +1484,17 @@
                 let startTime = 0;
                 if (obj.type === 16 && obj.regrowAt) { // Toco
                     targetTime = obj.regrowAt;
-                } else if (obj.type >= 17 && obj.type <= 19) { // Estágios de crescimento
+                } else if (obj.type >= 17 && obj.type <= 19) {
                     const growthData = floorData.treeGrowthData[`${obj.x},${obj.y}`];
                     if (growthData) {
                         startTime = growthData.plantedAt;
-                        const STAGE_DURATION = 300000; // 5 minutos por estágio
-                        if (obj.type === 17) targetTime = startTime + STAGE_DURATION;
-                        else if (obj.type === 18) targetTime = startTime + STAGE_DURATION * 2;
-                        else if (obj.type === 19) targetTime = startTime + STAGE_DURATION * 3;
+                        const STAGE_DURATION = 300000; // 5 minutos
+                        const boost = growthData.boosted ? 30000 : 0; // 30 segundos de bônus por estágio
+                        const effectiveStageDuration = STAGE_DURATION - boost;
+
+                        if (obj.type === 17) targetTime = startTime + effectiveStageDuration;
+                        else if (obj.type === 18) targetTime = startTime + STAGE_DURATION + effectiveStageDuration;
+                        else if (obj.type === 19) targetTime = startTime + STAGE_DURATION * 2 + effectiveStageDuration;
                     }
                 }
 
@@ -1621,18 +1624,20 @@
                 if (!floor.treeGrowthData) continue;
                 const keys = Object.keys(floor.treeGrowthData);
                 for (const key of keys) {
-                    const { plantedAt, originalTile } = floor.treeGrowthData[key];
+                    const growthData = floor.treeGrowthData[key];
+                    const { plantedAt, originalTile, boosted } = growthData;
                     const [x, y] = key.split(',').map(Number);
                     const objIndex = floor.mapObjects.findIndex(obj => obj.x === x && obj.y === y && obj.type >= 17 && obj.type <= 19);
                     if (objIndex === -1) continue;
 
                     const obj = floor.mapObjects[objIndex];
                     const elapsedTime = timestamp - plantedAt;
-                    const STAGE_DURATION = 300000; // 5 minutos
+                    const STAGE_DURATION = 300000; // 5 minutos por estágio
+                    const boost = boosted ? 30000 : 0; // 30 segundos de bônus por estágio
 
-                    if (obj.type === 17 && elapsedTime > STAGE_DURATION) obj.type = 18;
-                    else if (obj.type === 18 && elapsedTime > STAGE_DURATION * 2) obj.type = 19;
-                    else if (obj.type === 19 && elapsedTime > STAGE_DURATION * 3) {
+                    if (obj.type === 17 && elapsedTime > STAGE_DURATION - boost) obj.type = 18;
+                    else if (obj.type === 18 && elapsedTime > (STAGE_DURATION * 2) - (boost * 2)) obj.type = 19;
+                    else if (obj.type === 19 && elapsedTime > (STAGE_DURATION * 3) - (boost * 3)) {
                         obj.type = 1; // Cresce para árvore adulta
                         if (originalTile === 1) { floor.map[y][x] = 0; updatePreRenderedTile(x, y, 0, worldData.indexOf(floor)); }
                         delete floor.treeGrowthData[key]; // Remove do ciclo de crescimento
@@ -2231,9 +2236,9 @@
                 }
                 if (item.name === "Regador" && inventoryItem.count > 0) {
                     let actionTaken = false;
-                    if (targetObject.type >= 17 && targetObject.type <= 19) { // Regar muda/árvore pequena/média
+                    if (targetObject.type >= 17 && targetObject.type <= 19) { // Regar árvore em crescimento
                         const growthData = floorData.treeGrowthData[`${targetObject.x},${targetObject.y}`];
-                        if (growthData && !growthData.boosted) { growthData.plantedAt -= 90000; growthData.boosted = true; actionTaken = true; } // Reduz 10% de 15min
+                        if (growthData && !growthData.boosted) { growthData.boosted = true; actionTaken = true; } // Ativa o bônus
                     } else if (targetObject.type === 16) { // Regar toco
                         if (targetObject.regrowAt && !targetObject.boosted) { targetObject.regrowAt -= 30000; targetObject.boosted = true; actionTaken = true; } // Reduz 10% de 5min
                     }
@@ -3393,8 +3398,8 @@
                 const targetObject = floorData.mapObjects[objectIndex];
                 if (item.id === 'pickaxe' && targetObject.type === 0) return true;
                 if (item.id === 'axe' && targetObject.type === 1) return true;
-                if (item.id === 'shovel' && (targetObject.type === 4 || targetObject.type === 15 || targetObject.type === 16)) return true; // Cerca, Esqueleto ou Toco
-                if (item.id === 'watering_can' && backpackInventory[bpIdx].count > 0 && ((targetObject.type === 17 && floorData.treeGrowthData[`${targetObject.x},${targetObject.y}`] && !floorData.treeGrowthData[`${targetObject.x},${targetObject.y}`].boosted) || (targetObject.type === 16 && targetObject.regrowAt && !targetObject.boosted))) return true;
+                if (item.id === 'shovel' && (targetObject.type === 4 || targetObject.type === 15 || targetObject.type === 16)) return true;
+                if (item.id === 'watering_can' && backpackInventory[bpIdx].count > 0 && ((targetObject.type >= 17 && targetObject.type <= 19 && floorData.treeGrowthData[`${targetObject.x},${targetObject.y}`] && !floorData.treeGrowthData[`${targetObject.x},${targetObject.y}`].boosted) || (targetObject.type === 16 && targetObject.regrowAt && !targetObject.boosted))) return true;
                 if (item.id === 'construction_tool' && player.toolSubAction === 'pickup_mode' && [4, 5, 6, 7, 9, 10, 11].includes(targetObject.type)) return true; // Escadas e telhados podem ser pegos
                 // if (targetObject.type === 9 || targetObject.type === 10) return true; // Escadas agora são automáticas
                 return false;
