@@ -1394,7 +1394,21 @@
             drawHarvestableTile(ctx, x_px, y_px, TILE_SIZE); // Mostra a planta madura
             ctx.globalAlpha = 1.0;
         }
-        function drawAnimations(timestamp) { activeAnimations=activeAnimations.filter(an=>{const el=timestamp-an.startTime; if(el>an.duration)return false; if(an.type==='water'){drawWaterAnimation(an, timestamp);} return true;}); }
+        function drawAnimations(timestamp) {
+            activeAnimations = activeAnimations.filter(anim => {
+                const elapsed = timestamp - anim.startTime;
+                if (elapsed > anim.duration) return false; // Remove animação se terminou
+
+                // Desenha cada tipo de animação
+                if (anim.type === 'water') {
+                    drawWaterAnimation(anim, timestamp);
+                }
+                // As outras animações (resource_feedback, onomatopoeia, heart_feedback)
+                // são desenhadas no loop principal para controlar a ordem de sobreposição.
+
+                return true; // Mantém a animação na lista
+            });
+        }
         function drawPlantTimers(timestamp) {
             const floorData = worldData[player.currentFloor];
             ctx.font = 'bold 12px Consolas';
@@ -1485,6 +1499,11 @@
             const floorData = worldData[player.currentFloor];
             if (!floorData || !floorData.animals) return;
 
+            // --- Lógica de Som dos Animais ---
+            if (Math.random() < 0.01) { // Aumentada a frequência
+                const animal = floorData.animals[Math.floor(Math.random() * floorData.animals.length)];
+                triggerOnomatopoeia('Bééé...', animal.x + 16, animal.y, 'white', true);
+            }
             // --- Lógica de Reprodução (executada uma vez por frame) ---
             const ANIMAL_CAP = calculateAnimalCapacity(player.currentFloor);
             const ADULT_AGE = 100;
@@ -1744,37 +1763,6 @@
             drawConstructionPreview();
             drawConstructionGrid();
 
-            // 4a. Desenha animações de feedback de recursos
-            activeAnimations.forEach(anim => {
-                if (anim.type === 'resource_feedback') {
-                    const elapsed = timestamp - anim.startTime;
-                    const progress = elapsed / anim.duration;
-                    if (progress < 1) {
-                        const yOffset = -20 - (progress * 30); // Move para cima
-                        const alpha = 1 - progress; // Desaparece
-                        ctx.font = 'bold 16px Consolas';
-                        ctx.fillStyle = `rgba(${anim.color}, ${alpha})`;
-                        ctx.fillText(anim.text, anim.x, anim.y + yOffset);
-                    }
-                }
-            });
-
-            // Animação de coração da reprodução
-            activeAnimations.forEach(anim => {
-                if (anim.type === 'heart_feedback') {
-                    const elapsed = timestamp - anim.startTime;
-                    const progress = elapsed / anim.duration;
-                    if (progress < 1) {
-                        const yOffset = -10 - (progress * 20);
-                        const alpha = 1 - (progress * progress);
-                        ctx.font = '24px sans-serif';
-                        ctx.globalAlpha = alpha;
-                        ctx.fillText('❤️', anim.x, anim.y + yOffset);
-                        ctx.globalAlpha = 1.0;
-                    }
-                }
-            });
-
             // 5. Verifica se o jogador está "debaixo" de algo no andar de cima
             let isPlayerUnderSomething = false;
             if (worldData[player.currentFloor + 1]) { // Só verifica se houver um andar de cima
@@ -1841,6 +1829,67 @@
             }
 
             ctx.restore();
+
+            // --- Desenha Animações de UI (Onomatopeias, etc.) por cima de tudo ---
+            // Estas são desenhadas após o ctx.restore() para usar coordenadas de tela.
+            activeAnimations.forEach(anim => {
+                const elapsed = timestamp - anim.startTime;
+                const progress = elapsed / anim.duration;
+                if (progress >= 1) return;
+
+                if (anim.type === 'resource_feedback') {
+                    const yOffset = -20 - (progress * 30); // Move para cima
+                    const alpha = 1 - progress; // Desaparece
+                    ctx.font = 'bold 16px Consolas';
+                    ctx.textAlign = 'center';
+                    ctx.fillStyle = `rgba(${anim.color}, ${alpha})`;
+                    ctx.fillText(anim.text, anim.x, anim.y + yOffset);
+                }
+                else if (anim.type === 'onomatopoeia') {
+                    const yOffset = Math.sin(progress * Math.PI) * -15; // Efeito "salto"
+                    const alpha = 1 - Math.pow(progress, 2);
+                    ctx.font = 'bold 20px "Comic Sans MS", cursive, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.strokeStyle = 'black';
+                    ctx.lineWidth = 4;
+                    ctx.globalAlpha = alpha;
+                    
+                    // Recalcula a posição na tela a cada frame para sons posicionais
+                    let screenX = anim.x;
+                    let screenY = anim.y;
+                    if (anim.isPositional) {
+                        const playerCenterX = player.x + player.width / 2;
+                        const playerCenterY = player.y + player.height / 2;
+                        const dx = anim.worldX - playerCenterX;
+                        const dy = anim.worldY - playerCenterY;
+                        const dist = Math.sqrt(dx*dx + dy*dy);
+                        
+                        screenX = (anim.worldX - camera.x);
+                        screenY = (anim.worldY - camera.y);
+
+                        if (screenX < 0 || screenX > canvas.width || screenY < 0 || screenY > canvas.height) {
+                             const margin = 40;
+                             screenX = (player.x - camera.x + player.width/2) + (dx / dist) * (canvas.width / 2.2);
+                             screenY = (player.y - camera.y + player.height/2) + (dy / dist) * (canvas.height / 2.2);
+                             screenX = Math.max(margin, Math.min(canvas.width - margin, screenX));
+                             screenY = Math.max(margin, Math.min(canvas.height - margin, screenY));
+                        }
+                    }
+
+                    ctx.strokeText(anim.text, screenX, screenY + yOffset);
+                    ctx.fillStyle = anim.color;
+                    ctx.fillText(anim.text, screenX, screenY + yOffset);
+                    ctx.globalAlpha = 1.0;
+                }
+                else if (anim.type === 'heart_feedback') {
+                    const yOffset = -10 - (progress * 20);
+                    const alpha = 1 - (progress * progress);
+                    ctx.font = '24px sans-serif';
+                    ctx.globalAlpha = alpha;
+                    ctx.fillText('❤️', anim.x, anim.y + yOffset);
+                    ctx.globalAlpha = 1.0;
+                }
+            });
         }
 
         let lastTime = 0;
@@ -1954,6 +2003,7 @@
             if (animal) {
                 if (item.id === 'shears' && animal.type === 'sheep' && animal.woolLevel >= 100 && animal.age >= 100) {
                     animal.woolLevel = 0;
+                    triggerOnomatopoeia('Snip!', animal.x + 16, animal.y);
                     addItemToInventory('wool', 1);
                     saveGame();
                     updateHotbarUI();
@@ -1969,6 +2019,7 @@
                 if (item.name === "Picareta" && targetObject.type === 0) { // Rocha
                     floorData.mapObjects.splice(objectIndex, 1); // Remove a rocha
                     const stoneGained = Math.floor(Math.random() * 11) + 5; // Ganho de 5 a 15 pedras
+                    triggerOnomatopoeia('Clank!', tX * TILE_SIZE + 16, tY * TILE_SIZE);
                     addItemToInventory('stone', stoneGained);
                     console.log(`Rocha quebrada! Ganhou ${stoneGained} pedras.`);
                     saveGame();
@@ -1979,6 +2030,7 @@
                 if (item.name === "Machado" && targetObject.type === 1) { // Árvore
                     floorData.mapObjects.splice(objectIndex, 1); // Remove a árvore
                     const woodGained = Math.floor(Math.random() * 11) + 5; // Ganho de 5 a 15 madeiras
+                    triggerOnomatopoeia('Chop!', tX * TILE_SIZE + 16, tY * TILE_SIZE);
                     addItemToInventory('wood', woodGained);
                     console.log(`Árvore cortada! Ganhou ${woodGained} madeiras.`);
                     saveGame();
@@ -1989,6 +2041,7 @@
                 if (item.name === "Pá" && targetObject.type === 4) { // Cerca
                     floorData.mapObjects.splice(objectIndex, 1); // Remove a cerca
                     addItemToInventory('wood', 1); // Devolve 1 madeira
+                    triggerOnomatopoeia('Pluck!', tX * TILE_SIZE + 16, tY * TILE_SIZE);
                     console.log("Cerca removida!");
                     saveGame();
                     updateHotbarUI();
@@ -1998,6 +2051,7 @@
                 if (item.name === "Pá" && targetObject.type === 15) { // Esqueleto
                     floorData.mapObjects.splice(objectIndex, 1); // Remove o esqueleto
                     console.log("Esqueleto removido.");
+                    triggerOnomatopoeia('Crumble...', tX * TILE_SIZE + 16, tY * TILE_SIZE);
                     saveGame();
                     updateHotbarUI();
                     updateBackpackUI();
@@ -2046,12 +2100,12 @@
 
             // Lógica de Colheita
             if (tId === 7) {
-                floorData.map[tY][tX] = 2; // Volta para solo arado
+                triggerOnomatopoeia('Pop!', tX * TILE_SIZE + 16, tY * TILE_SIZE);
+                floorData.map[tY][tX] = 2;
                 delete floorData.plantGrowthData[tK]; // Remove os dados de crescimento da planta
                 addItemToInventory('tomato', 1);
                 const seedsGained = Math.floor(Math.random() * 4); // 0, 1, 2 ou 3 sementes
                 if (seedsGained > 0) addItemToInventory('seed_tomato', seedsGained);
-                updatePreRenderedTile(tX, tY, 2);
                 saveGame(); updateHotbarUI(); updateBackpackUI(); return;
             }
 
@@ -2059,6 +2113,7 @@
             if (item.name === "Construção" && player.toolSubAction === 'pickup_mode' && tId === 8) {
                 floorData.map[tY][tX] = 0; // Volta para grama
                 addItemToInventory('wood', 1); // Devolve 1 madeira
+                triggerOnomatopoeia('Lift!', tX * TILE_SIZE + 16, tY * TILE_SIZE);
                 updatePreRenderedTile(tX, tY, 0);
                 console.log("Piso removido!");
                 saveGame();
@@ -2068,12 +2123,13 @@
             }
 
             switch (item.name) {
-                case "Enxada": if (tId === 0 || tId === 1) { floorData.map[tY][tX] = 2; updatePreRenderedTile(tX, tY, 2); saveGame(); } break;
-                case "Semente": if (tId === 2 && inventoryItem.count > 0) { floorData.map[tY][tX] = 4; floorData.plantGrowthData[tK] = { plantedAt: timestamp, boosted: false }; inventoryItem.count--; updatePreRenderedTile(tX, tY, 4); saveGame(); updateHotbarUI(); updateBackpackUI(); } break;
+                case "Enxada": if (tId === 0 || tId === 1) { triggerOnomatopoeia('Scrape', tX * TILE_SIZE + 16, tY * TILE_SIZE); floorData.map[tY][tX] = 2; updatePreRenderedTile(tX, tY, 2); saveGame(); } break;
+                case "Semente": if (tId === 2 && inventoryItem.count > 0) { triggerOnomatopoeia('...', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#ccc'); floorData.map[tY][tX] = 4; floorData.plantGrowthData[tK] = { plantedAt: timestamp, boosted: false }; inventoryItem.count--; updatePreRenderedTile(tX, tY, 4); saveGame(); updateHotbarUI(); updateBackpackUI(); } break;
                 case "Pá":
                     if (tId === 9) { // Coleta argila
                         const clayGained = Math.floor(Math.random() * 5) + 1; // 1 a 5
                         addItemToInventory('clay', clayGained);
+                        triggerOnomatopoeia('Scoop!', tX * TILE_SIZE + 16, tY * TILE_SIZE);
                         floorData.map[tY][tX] = 1; // Volta para terra
                         updatePreRenderedTile(tX, tY, 1);
                         console.log(`Coletou ${clayGained} de argila.`);
@@ -2083,6 +2139,7 @@
                     } else if (tId === 8) { // Remove piso de madeira
                         floorData.map[tY][tX] = 0; // Volta para grama
                         addItemToInventory('wood', 1); // Devolve 1 madeira
+                        triggerOnomatopoeia('Lift!', tX * TILE_SIZE + 16, tY * TILE_SIZE);
                         updatePreRenderedTile(tX, tY, 0);
                         saveGame();
                     } else if (tId === 1 || tId === 2 || (tId >= 4 && tId <= 7)) {
@@ -2090,11 +2147,11 @@
                     } else if (tId === 0) {
                         let aW = false; const ne = [[0, 1], [0, -1], [1, 0], [-1, 0]]; for (const [nx, ny] of ne) { const cX = tX + nx; const cY = tY + ny; if (cX >= 0 && cX < MAP_WIDTH_TILES && cY >= 0 && cY < MAP_HEIGHT_TILES) { if (floorData.map[cY][cX] === 3) { aW = true; break; } } } if (aW) { floorData.map[tY][tX] = 3; updatePreRenderedTile(tX, tY, 3); saveGame(); }
                     } else if (tId === 3) {
-                        floorData.map[tY][tX] = 0; updatePreRenderedTile(tX, tY, 0); saveGame();
+                        floorData.map[tY][tX] = 0; updatePreRenderedTile(tX, tY, 0); saveGame(); triggerOnomatopoeia('Fill', tX * TILE_SIZE + 16, tY * TILE_SIZE);
                     }
                     break;
                 case "Regador": {
-                    if (tId === 3) { inventoryItem.count = 10; updateHotbarUI(); updateBackpackUI(); saveGame(); }
+                    if (tId === 3) { triggerOnomatopoeia('Glug!', tX * TILE_SIZE + 16, tY * TILE_SIZE); inventoryItem.count = 10; updateHotbarUI(); updateBackpackUI(); saveGame(); }
                     else if (inventoryItem.count > 0) {
                         let actionTaken = false;
                         if (tId === 1 || tId === 2) { // Terra ou Arado -> Argila
@@ -2103,7 +2160,7 @@
                             const pD = floorData.plantGrowthData[tK]; if (pD && !pD.boosted) { pD.boosted = true; actionTaken = true; }
                         }
                         if (actionTaken) {
-                            inventoryItem.count--; activeAnimations.push({ type: 'water', x: tX, y: tY, startTime: timestamp, duration: 500 }); updateHotbarUI(); updateBackpackUI(); saveGame();
+                            triggerOnomatopoeia('Splash!', tX * TILE_SIZE + 16, tY * TILE_SIZE); inventoryItem.count--; activeAnimations.push({ type: 'water', x: tX, y: tY, startTime: timestamp, duration: 500 }); updateHotbarUI(); updateBackpackUI(); saveGame();
                         }
                     }
                     break; }
@@ -3470,9 +3527,40 @@
             console.log(`Feedback: ${quantity} ${resourceName}`);
         }
 
+        function triggerOnomatopoeia(text, worldX, worldY, color = 'white', isPositional = false) {
+            const anim = {
+                type: 'onomatopoeia',
+                text: text,
+                color: color,
+                isPositional: isPositional,
+                // Para sons posicionais, guardamos a posição no mundo para recalcular
+                // Para sons não posicionais, guardamos a posição na tela inicial
+                x: worldX - camera.x,
+                y: worldY - camera.y,
+                worldX: worldX,
+                worldY: worldY,
+                startTime: lastTime,
+                duration: 1200
+            };
+
+            // Para sons posicionais, verifica o alcance antes de adicionar
+            if (isPositional) {
+                const playerCenterX = player.x + player.width / 2;
+                const playerCenterY = player.y + player.height / 2;
+                const dx = worldX - playerCenterX;
+                const dy = worldY - playerCenterY; // Corrigido: usa a variável definida
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const HEARING_RANGE = canvas.width * 2;
+                if (dist > HEARING_RANGE) return;
+            }
+
+            activeAnimations.push(anim);
+        }
+
         document.addEventListener('DOMContentLoaded', init);
 
 
     </script>
 </body>
 </html>
+ 
