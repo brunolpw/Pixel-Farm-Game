@@ -376,6 +376,12 @@
             cursor: pointer;
         }
 
+        #timeControlContainer input[type="checkbox"] {
+            margin-left: 15px;
+            cursor: pointer;
+        }
+
+
         /* Estilos para o botão antigo, podem ser removidos ou adaptados */
         #timeToggleButton:hover { /* Mantido caso queira reutilizar o ID */
              background-color: #777;
@@ -490,6 +496,8 @@
     <div id="timeControlContainer">
         <label for="timeRangeSlider">Hora (Teste):</label>
         <input type="range" id="timeRangeSlider" min="0" max="23" step="1" value="0">
+        <input type="checkbox" id="timeTestModeCheckbox">
+        <label for="timeTestModeCheckbox">Modo Teste</label>
     </div>
 
     <script>
@@ -512,6 +520,7 @@
         let constructionIcon = null; // Definido dentro de init()
         let timeRangeSlider = null; // Definido dentro de init()
         let itemTooltip = null; // Definido dentro de init()
+        let timeTestModeCheckbox = null;
         let mouseIcon = null; // Definido dentro de init()
         let contextMenu = null; // Definido dentro de init()
         let floorSelectorLabel = null;
@@ -802,6 +811,7 @@
 
         let gameHour = 0; let gameMinute = 0; let gameTimeOffset = 0;
         const GAME_MINUTES_PER_DAY = 1440; const REAL_SECONDS_PER_GAME_DAY = 3600;
+        let isTimeTestMode = false;
 
         // --- Variáveis de Toque ---
         let touchStartX = 0;
@@ -1448,11 +1458,19 @@
             ctx.shadowBlur = 0;
         }
         function updateGameTime() {
-            const n=new Date(); const rH=n.getHours(); const rM=n.getMinutes(); const rS=n.getSeconds();
-            const tS=(rH*3600 + rM*60 + rS) % (24 * 3600); // Segundos totais no dia real
-            const p=tS/(24*3600); // Percentual do dia real
-            let tM=Math.floor(GAME_MINUTES_PER_DAY*p); const oM=gameTimeOffset*60; tM=(tM+oM)%GAME_MINUTES_PER_DAY; gameHour=Math.floor(tM/60); gameMinute=tM%60;
-            if (timeRangeSlider) { timeRangeSlider.value = gameHour; } // Sincroniza o slider com a hora do jogo
+            if (isTimeTestMode) {
+                // Em modo teste, o tempo é controlado pelo slider, então não fazemos nada aqui.
+                return;
+            }
+
+            const n = new Date();
+            const realSecondsInHour = (n.getMinutes() * 60) + n.getSeconds();
+            // O percentual do dia do jogo é baseado em uma hora real (3600 segundos)
+            const p = realSecondsInHour / 3600;
+            let tM = Math.floor(GAME_MINUTES_PER_DAY * p); // Mapeia o percentual da hora real para o dia do jogo
+            tM = (tM + (gameTimeOffset * 60)) % GAME_MINUTES_PER_DAY; // Aplica o offset do modo teste, se houver
+            gameHour = Math.floor(tM / 60); gameMinute = tM % 60;
+            if (timeRangeSlider) { timeRangeSlider.value = gameHour; }
         }
         function updateNightOverlay() { if(!nightOverlay)return; const mO=0.7; let tO=0; if(gameHour>=20||gameHour<4)tO=mO; else if(gameHour===4)tO=mO*0.66; else if(gameHour===5)tO=mO*0.33; else if(gameHour>=6&&gameHour<18)tO=0; else if(gameHour===18)tO=mO*0.33; else if(gameHour===19)tO=mO*0.66; nightOverlay.style.opacity=tO; }
         function drawTimeIcon() { timeIconCtx.clearRect(0,0,timeIconCanvas.width,timeIconCanvas.height); const cX=timeIconCanvas.width/2; const cY=timeIconCanvas.height/2; const r=8; if(gameHour>=6&&gameHour<18){timeIconCtx.fillStyle='#FFD700'; timeIconCtx.beginPath(); timeIconCtx.arc(cX,cY,r,0,Math.PI*2); timeIconCtx.fill();}else{timeIconCtx.fillStyle='#A0A0A0'; timeIconCtx.beginPath(); timeIconCtx.arc(cX,cY,r,0,Math.PI*2); timeIconCtx.fill(); timeIconCtx.fillStyle='rgba(0,0,0,0)'; timeIconCtx.globalCompositeOperation='destination-out'; timeIconCtx.beginPath(); timeIconCtx.arc(cX+r*0.4,cY-r*0.4,r,0,Math.PI*2); timeIconCtx.fill(); timeIconCtx.globalCompositeOperation='source-over';} }
@@ -3400,6 +3418,7 @@
             if (!backpackIcon) { console.error("Ícone da mochila não encontrado!"); return; }
             timeRangeSlider = document.getElementById('timeRangeSlider');
             if (!timeRangeSlider) { console.error("Slider de tempo não encontrado!"); return; }
+            timeTestModeCheckbox = document.getElementById('timeTestModeCheckbox');
             itemTooltip = document.getElementById('itemTooltip');
             if (!itemTooltip) { console.error("Elemento do tooltip não encontrado!"); return; }
             mouseIcon = document.getElementById('mouseIcon');
@@ -3420,6 +3439,8 @@
             generateCampfireSpritesheet();
             generateTorchSpritesheet();
             updateHotbarUI();
+            // Inicializa o estado do modo de teste
+            timeTestModeCheckbox.checked = isTimeTestMode; timeRangeSlider.disabled = !isTimeTestMode;
             startGrowthTimer();
 
             // Loop do Relógio
@@ -3465,12 +3486,23 @@
 
             // Listener do Slider de Tempo
             timeRangeSlider.addEventListener('input', (e) => {
-                const targetHour = parseInt(e.target.value, 10);
-                const n = new Date();
-                const currentRealHour = n.getHours();
-                // Calcula o offset necessário para que a hora do jogo seja a hora alvo
-                gameTimeOffset = (targetHour - currentRealHour + 24) % 24;
-                updateGameTime();
+                if (isTimeTestMode) {
+                    gameHour = parseInt(e.target.value, 10);
+                    gameMinute = 0; // Simplifica para hora cheia no modo teste
+                    // Calcula o offset para que, se o modo teste for desativado, o tempo continue a partir daqui
+                    const n = new Date();
+                    const currentRealHour = n.getHours();
+                    gameTimeOffset = (gameHour - currentRealHour + 24) % 24;
+
+                    drawGameClock();
+                    updateNightOverlay();
+                }
+            });
+
+            timeTestModeCheckbox.addEventListener('change', (e) => {
+                isTimeTestMode = e.target.checked;
+                timeRangeSlider.disabled = !isTimeTestMode;
+                if (!isTimeTestMode) updateGameTime(); // Volta ao tempo real
                 drawGameClock();
                 updateNightOverlay();
             });
