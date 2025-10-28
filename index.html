@@ -672,17 +672,15 @@
         }
 
         // Floresta Densa (coordenadas absolutas)
-        for (let i = 0; i < 80; i++) { // Aumentado para compensar possíveis falhas
-            const x = 35 + Math.floor(Math.random() * 12);
-            const y = 5 + Math.floor(Math.random() * 10);
-            if (!initialMapObjects.some(o => o.x === x && o.y === y)) initialMapObjects.push({ type: 1, x, y });
+        for (let i = 0; i < 50; i++) {
+            const {x, y} = findEmptySpotForResource(initialMapObjects, 35, 5, 12, 10);
+            if (x !== -1) initialMapObjects.push({ type: 1, x, y });
         }
 
         // Campo de Rochas (coordenadas absolutas)
-        for (let i = 0; i < 180; i++) { // Aumentado para compensar
-            const x = 5 + Math.floor(Math.random() * 15);
-            const y = 30 + Math.floor(Math.random() * 15);
-            if (!initialMapObjects.some(o => o.x === x && o.y === y)) initialMapObjects.push({ type: 0, x, y });
+        for (let i = 0; i < 150; i++) {
+            const {x, y} = findEmptySpotForResource(initialMapObjects, 5, 30, 15, 15);
+            if (x !== -1) initialMapObjects.push({ type: 0, x, y });
         }
 
         // --- Adiciona o novo cercado para as ovelhas no canto sudeste ---
@@ -3829,7 +3827,7 @@
             // Regenera Rochas
             let rocksToSpawn = TARGET_ROCK_COUNT - rockCount;
             for (let i = 0; i < rocksToSpawn; i++) {
-                const { x, y } = findEmptySpot(floor);
+                const { x, y } = findEmptySpotForResource(floor.mapObjects, 0, 0, MAP_WIDTH_TILES, MAP_HEIGHT_TILES, floor.map);
                 if (x !== -1) floor.mapObjects.push({ type: 0, x, y });
             }
             if (rocksToSpawn > 0) console.log(`${rocksToSpawn} rochas regeneradas.`);
@@ -3837,17 +3835,27 @@
             // Regenera Árvores
             let treesToSpawn = TARGET_TREE_COUNT - treeCount;
             for (let i = 0; i < treesToSpawn; i++) {
-                const { x, y } = findEmptySpot(floor);
+                const { x, y } = findEmptySpotForResource(floor.mapObjects, 0, 0, MAP_WIDTH_TILES, MAP_HEIGHT_TILES, floor.map);
                 if (x !== -1) floor.mapObjects.push({ type: 1, x, y });
             }
             if (treesToSpawn > 0) console.log(`${treesToSpawn} árvores regeneradas.`);
         }
 
-        function findEmptySpot(floor) {
+        function findEmptySpotForResource(objects, startX, startY, width, height, mapLayout = WORLD_LAYOUT) {
             for (let i = 0; i < 100; i++) { // Tenta 100 vezes encontrar um local
-                const x = Math.floor(Math.random() * MAP_WIDTH_TILES);
-                const y = Math.floor(Math.random() * MAP_HEIGHT_TILES);
-                if (floor.map[y][x] === 0 && !floor.mapObjects.some(o => o.x === x && o.y === y)) {
+                const x = startX + Math.floor(Math.random() * width);
+                const y = startY + Math.floor(Math.random() * height);
+
+                // Garante que está dentro dos limites do mapa
+                if (x < 0 || x >= MAP_WIDTH_TILES || y < 0 || y >= MAP_HEIGHT_TILES) continue;
+
+                // Verifica se o tile é grama
+                if (mapLayout[y][x] !== 0) continue;
+
+                // Verifica se já existe um objeto no local
+                const isOccupied = objects.some(o => o.x === x && o.y === y);
+
+                if (!isOccupied) {
                     return { x, y };
                 }
             }
