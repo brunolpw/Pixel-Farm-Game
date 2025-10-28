@@ -3805,6 +3805,10 @@
             const animalOnTile = floorData.animals.find(a => tileX >= Math.floor(a.x / TILE_SIZE) && tileX < Math.ceil((a.x + TILE_SIZE) / TILE_SIZE) && tileY >= Math.floor(a.y / TILE_SIZE) && tileY < Math.ceil((a.y + TILE_SIZE) / TILE_SIZE));
             if (animalOnTile) {
                 if (item.id === 'shears' && animalOnTile.type === 'sheep' && animalOnTile.woolLevel >= 100 && animalOnTile.age >= 100) return true;
+                // Espada é acionável em lobos
+                if (item.id === 'sword' && animalOnTile.type === 'wolf') {
+                    return true;
+                }
                 return false; // Bloqueia outras ações no tile do animal
             }
 
@@ -3823,7 +3827,6 @@
 
             switch (item.id) {
                 case 'hoe': return (tId === 0 || tId === 1);
-                case 'sword': return true; // Espada é sempre acionável
                 case 'seed_generic':
                     if (player.toolSubAction === 'plant_tomato') {
                         return tId === 2 && backpackInventory.some(i => i && i.id === 'seed_tomato' && i.count > 0);
@@ -3860,6 +3863,21 @@
 
             const clickedTileX = Math.floor(worldX / TILE_SIZE);
             const clickedTileY = Math.floor(worldY / TILE_SIZE);
+
+            // Prioridade máxima: Clicar num lobo com a espada
+            const bpIdx = hotbarMapping[activeHotbarSlot];
+            if (bpIdx !== -1 && backpackInventory[bpIdx] && backpackInventory[bpIdx].id === 'sword') {
+                const animalOnTile = worldData[player.currentFloor].animals.find(a => a.type === 'wolf' && clickedTileX >= Math.floor(a.x / TILE_SIZE) && clickedTileX < Math.ceil((a.x + TILE_SIZE) / TILE_SIZE) && clickedTileY >= Math.floor(a.y / TILE_SIZE) && clickedTileY < Math.ceil((a.y + TILE_SIZE) / TILE_SIZE));
+                if (animalOnTile) {
+                    // Vira o jogador na direção do lobo
+                    const dx = animalOnTile.x - player.x;
+                    const dy = animalOnTile.y - player.y;
+                    if (Math.abs(dx) > Math.abs(dy)) { player.lastMoveDir = { dx: Math.sign(dx), dy: 0 }; }
+                    else { player.lastMoveDir = { dx: 0, dy: Math.sign(dy) }; }
+                    triggerUseTool({ x: clickedTileX, y: clickedTileY });
+                    return; // Ação de combate tem prioridade sobre tudo
+                }
+            }
 
             const playerTileX = Math.floor(player.x / TILE_SIZE);
             const playerTileY = Math.floor(player.y / TILE_SIZE);
