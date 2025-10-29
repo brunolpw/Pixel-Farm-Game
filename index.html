@@ -1239,9 +1239,14 @@
             const eyeColor = (animal.state === 'chasing_player' || animal.state === 'attacking_player') ? '#F44336' : '#FFEB3B';
 
             let lungeOffset = 0;
-            if (animal.state === 'attacking_player') {
+            if (animal.state === 'attacking_player') { // Animação de investida no jogador
                 const attackProgress = 1 - (animal.stateTimer / 45); // 0 to 1
                 lungeOffset = Math.sin(attackProgress * Math.PI) * 8; // Efeito de vai e vem da investida
+            } else if (animal.state === 'attacking_fence') { // Animação de investida na cerca
+                if (animal.stateTimer > 45) { // Começa a animação na segunda metade do ataque
+                    const attackProgress = (animal.stateTimer - 45) / 45; // Progresso de 0 a 1
+                    lungeOffset = Math.sin(attackProgress * Math.PI) * 6; // Investida um pouco menor
+                }
             }
 
             if (animal.isHit) {
@@ -1274,6 +1279,11 @@
                 ctx.fillStyle = eyeColor;
                 ctx.fillRect(12 + lungeOffset, -1, 2, 2);
             } else { // Vista Frontal/Traseira
+                // Cauda (visível por trás)
+                if (animal.lastMoveDir.dy < 0) {
+                    ctx.fillStyle = bodyColor;
+                    ctx.fillRect(-2, 12, 4, 6);
+                }
                 // Pernas
                 ctx.fillStyle = faceColor;
                 ctx.fillRect(-8, 10, 4, 8);
@@ -1288,8 +1298,13 @@
                 if (animal.lastMoveDir.dy >= 0) {
                     ctx.fillStyle = faceColor;
                     ctx.beginPath();
-                    ctx.ellipse(0, -2 + lungeOffset, 6, 6, 0, 0, Math.PI * 2);
+                    ctx.ellipse(0, -2 + lungeOffset, 7, 6, 0, 0, Math.PI * 2);
                     ctx.fill();
+                    // Orelhas
+                    ctx.beginPath();
+                    ctx.moveTo(-7, -5 + lungeOffset); ctx.lineTo(-3, -9 + lungeOffset); ctx.lineTo(-2, -4 + lungeOffset); ctx.fill();
+                    ctx.moveTo(7, -5 + lungeOffset); ctx.lineTo(3, -9 + lungeOffset); ctx.lineTo(2, -4 + lungeOffset); ctx.fill();
+                    // Olhos
                     ctx.fillStyle = eyeColor;
                     ctx.fillRect(-3, -3 + lungeOffset, 2, 2);
                     ctx.fillRect(1, -3 + lungeOffset, 2, 2);
@@ -1802,12 +1817,15 @@
             // --- Lógica de Spawn de Lobos ---
             const isNight = gameHour >= 20 || gameHour < 4;
             let spawnChance = isTimeTestMode ? 0.01 : 0.0005; // Chance 20x maior em modo de teste
+            
+            // Garante que os objetos de cerca tenham resistência
+            floorData.mapObjects.forEach(obj => {
+                if (obj.type === 4 && obj.resistance === undefined) obj.resistance = 4;
+            });
 
-            // Força o spawn a 1h no modo de teste para facilitar os testes
-            if (isTimeTestMode && gameHour === 1) {
-                spawnChance = 0.9; // Quase 100% de chance por frame
-            }
-            if (isNight && Math.random() < spawnChance && !floorData.animals.some(a => a.type === 'wolf')) { // Só spawna se não houver outro lobo
+            // Condição de spawn: (é noite E chance aleatória) OU (é 1h no modo de teste)
+            const shouldSpawn = (isNight && Math.random() < spawnChance) || (isTimeTestMode && gameHour === 1);
+            if (shouldSpawn && !floorData.animals.some(a => a.type === 'wolf')) { // Só spawna se não houver outro lobo
                 let spawnX = -1, spawnY = -1;
                 // Tenta encontrar um local válido na borda para o lobo aparecer
                 for (let i = 0; i < 50; i++) { // Tenta 50 vezes
@@ -1857,7 +1875,7 @@
                     const newAnimal = {
                         type: 'sheep', gender: newGender,
                         age: 0, // Nasce como filhote
-                        x: mother.x, y: mother.y, health: 100,
+                        x: mother.x, y: mother.y,
                         state: 'idle', woolLevel: 0, hunger: 0, path: [], isMoving: false, speed: 1, walkBob: 0, walkBobSpeed: 0.1, lastMoveDir: { dx: 0, dy: 1 }, stateTimer: 0, timeAtMaxHunger: 0,
                         floor: mother.floor
                     };
@@ -1955,6 +1973,11 @@
                             }
                         }
                     }
+
+                    // Lógica de virar para o alvo
+                    if (animal.isMoving && animal.path.length > 0) {
+                        animal.lastMoveDir = { dx: Math.sign(animal.targetX - animal.x), dy: Math.sign(animal.targetY - animal.y) };
+                    }
                 } else if (animal.type === 'wolf') {
                     if (animal.hunger < 100) animal.hunger += 0.05; // Lobos ficam com fome mais rápido
 
@@ -1962,129 +1985,131 @@
                         animal.state = 'hunting';
                     }
 
-                    if (animal.state === 'hunting') {
-                        // Encontra a ovelha mais próxima
-                        let closestSheep = null;
-                        let minDistance = Infinity;
-                        floorData.animals.forEach(other => {
-                            if (other.type === 'sheep') {
-                                const dx = other.x - animal.x;
-                                const dy = other.y - animal.y;
-                                const dist = Math.sqrt(dx * dx + dy * dy);
-                                if (dist < minDistance) {
-                                    minDistance = dist;
-                                    closestSheep = other;
-                                }
-                            }
-                        });
+                    // Se o lobo estiver parado por muito tempo, força a recalcular a rota
+                    if (!animal.isMoving && animal.state !== 'attacking_fence') {
+                        animal.stateTimer = (animal.stateTimer || 0) + 1;
+                        if (animal.stateTimer > 120) { animal.state = 'wandering'; animal.stateTimer = 0; } // Após 2s parado, reseta
+                    } else { animal.stateTimer = 0; }
 
-                        if (closestSheep) {
-                            animal.targetAnimal = closestSheep;
-                            const currentTileX = Math.floor(animal.x / TILE_SIZE);
-                            const currentTileY = Math.floor(animal.y / TILE_SIZE);
-                            const targetTileX = Math.floor(closestSheep.x / TILE_SIZE);
-                            const targetTileY = Math.floor(closestSheep.y / TILE_SIZE);
-                            animal.path = findPath(currentTileX, currentTileY, targetTileX, targetTileY, (px, py) => isAnimalWalkable(px, py, animal, true));
-                            if (animal.path.length > 0) {
-                                animal.isMoving = true;
-                                const firstStep = animal.path.shift();
-                                animal.targetX = firstStep.x * TILE_SIZE;
-                                animal.targetY = firstStep.y * TILE_SIZE;
-                            }
-                        } else {
-                            // Sem ovelhas, volta a vaguear
-                            animal.state = 'wandering';
-                        }
-                    }
-
-                    if (animal.state === 'fleeing') {
+                    // --- Árvore de Decisão da IA do Lobo (Reestruturada) ---
+                    if (animal.state === 'fleeing') { // 1. Prioridade Máxima: Fugir
                         if (!animal.isMoving) { // Encontra um novo ponto de fuga se estiver parado
                             const currentTileX = Math.floor(animal.x / TILE_SIZE);
                             const currentTileY = Math.floor(animal.y / TILE_SIZE);
                             // Escolhe uma borda aleatória para fugir
                             const edge = Math.floor(Math.random() * 4);
                             let targetTileX, targetTileY;
-                            if (edge === 0) { targetTileX = 0; targetTileY = Math.floor(Math.random() * MAP_HEIGHT_TILES); }
-                            else if (edge === 1) { targetTileX = MAP_WIDTH_TILES - 1; targetTileY = Math.floor(Math.random() * MAP_HEIGHT_TILES); }
-                            else if (edge === 2) { targetTileY = 0; targetTileX = Math.floor(Math.random() * MAP_WIDTH_TILES); }
-                            else { targetTileY = MAP_HEIGHT_TILES - 1; targetTileX = Math.floor(Math.random() * MAP_WIDTH_TILES); }
+                            if (edge === 0) { targetTileX = BORDER_SIZE; targetTileY = Math.floor(Math.random() * MAP_HEIGHT_TILES); }
+                            else if (edge === 1) { targetTileX = MAP_WIDTH_TILES - BORDER_SIZE - 1; targetTileY = Math.floor(Math.random() * MAP_HEIGHT_TILES); }
+                            else if (edge === 2) { targetTileY = BORDER_SIZE; targetTileX = Math.floor(Math.random() * MAP_WIDTH_TILES); }
+                            else { targetTileY = MAP_HEIGHT_TILES - BORDER_SIZE - 1; targetTileX = Math.floor(Math.random() * MAP_WIDTH_TILES); }
 
                             animal.path = findPath(currentTileX, currentTileY, targetTileX, targetTileY, (px, py) => isAnimalWalkable(px, py, animal, true));
                             if (animal.path.length > 0) animal.isMoving = true;
                         }
-                    }
-
-                    // Lógica de Perseguir e Atacar o Jogador
-                    if (animal.state === 'chasing_player') {
-                        const playerTileX = Math.floor(player.x / TILE_SIZE);
-                        const playerTileY = Math.floor(player.y / TILE_SIZE);
-                        const dx = player.x - animal.x;
-                        const dy = player.y - animal.y;
-                        if (Math.sqrt(dx*dx + dy*dy) < TILE_SIZE * 1.5) { // Se estiver perto o suficiente
-                            animal.state = 'attacking_player';
-                            animal.stateTimer = 45; // Meio segundo de "wind-up"
-                            animal.isMoving = false;
-                        } else {
-                            // Persegue o jogador (recalcula o caminho periodicamente)
-                            if (!animal.isMoving || Math.random() < 0.1) {
-                                const currentTileX = Math.floor(animal.x / TILE_SIZE);
-                                const currentTileY = Math.floor(animal.y / TILE_SIZE);
-                                animal.path = findPath(currentTileX, currentTileY, playerTileX, playerTileY, (px, py) => isAnimalWalkable(px, py, animal, true));
-                                if (animal.path.length > 0) {
-                                    animal.isMoving = true;
-                                    const firstStep = animal.path.shift();
-                                    animal.targetX = firstStep.x * TILE_SIZE;
-                                    animal.targetY = firstStep.y * TILE_SIZE;
-                                }
-                            }
-                        }
-                    }
-
-                    // Lógica de ataque ao jogador
-                    if (animal.state === 'attacking_player') {
+                    } else if (animal.state === 'attacking_player') { // 2. Atacar o jogador
                         animal.stateTimer--;
-                        if (animal.stateTimer <= 0) {
+                        if (animal.stateTimer <= 0 && (!animal.lastSoundTime || timestamp - animal.lastSoundTime > 400)) {
                             const canHit = timestamp - player.lastHit > 1000; // 1 segundo de invencibilidade
                             if (canHit) {
                                 triggerOnomatopoeia('SNAP!', animal.x, animal.y, '#FF6F00');
                                 player.health -= 10;
-                                player.lastHit = timestamp;
+                                player.lastHit = animal.lastSoundTime = timestamp;
                                 updateHealthBarUI();
                                 console.log(`Jogador atingido! Vida: ${player.health}`);
                                 if (player.health <= 0) {
                                     handlePlayerDeath();
                                 } else {
-                                    // Efeito de tremor na tela
                                     gameContainer.style.animation = 'shake 0.3s';
                                     setTimeout(() => gameContainer.style.animation = '', 300);
                                 }
                             }
                             animal.state = 'chasing_player'; // Volta a perseguir
                         }
-                    }
-
-                    // Lógica de ataque à cerca
-                    if (animal.state === 'attacking_fence') {
-                        animal.stateTimer--;
-                        if (animal.stateTimer <= 0) {
+                    } else if (animal.state === 'chasing_player') { // 3. Perseguir o jogador
+                        const playerTileX = Math.floor(player.x / TILE_SIZE);
+                        const playerTileY = Math.floor(player.y / TILE_SIZE);
+                        const dx = player.x - animal.x;
+                        const dy = player.y - animal.y;
+                        if (Math.sqrt(dx*dx + dy*dy) < TILE_SIZE * 1.5) {
+                            animal.state = 'attacking_player';
+                            animal.stateTimer = 45;
+                            animal.isMoving = false;
+                        } else if (!animal.isMoving || Math.random() < 0.1) {
+                            const currentTileX = Math.floor(animal.x / TILE_SIZE);
+                            const currentTileY = Math.floor(animal.y / TILE_SIZE);
+                            animal.path = findPath(currentTileX, currentTileY, playerTileX, playerTileY, (px, py) => isAnimalWalkable(px, py, animal, true));
+                            if (animal.path.length > 0) animal.isMoving = true;
+                        }
+                    } else if (animal.state === 'attacking_fence') { // 4. Atacar a cerca
+                        if (animal.fenceTarget) {
+                            const dx = animal.fenceTarget.x * TILE_SIZE - animal.x;
+                            const dy = animal.fenceTarget.y * TILE_SIZE - animal.y;
+                            if (Math.abs(dx) > Math.abs(dy)) { animal.lastMoveDir = { dx: Math.sign(dx), dy: 0 }; } 
+                            else if (dy !== 0) { animal.lastMoveDir = { dx: 0, dy: Math.sign(dy) }; }
+                        }
+                        animal.stateTimer = (animal.stateTimer || 0) + 1;
+                        if (animal.stateTimer > 90 && (!animal.lastSoundTime || timestamp - animal.lastSoundTime > 400)) { // Ataca a cada 1.5 segundos
                             const fenceIndex = floorData.mapObjects.findIndex(obj => obj.x === animal.fenceTarget.x && obj.y === animal.fenceTarget.y && obj.type === 4);
                             if (fenceIndex !== -1) {
-                                floorData.mapObjects.splice(fenceIndex, 1);
-                                triggerOnomatopoeia('CRACK!', animal.fenceTarget.x * TILE_SIZE + 16, animal.fenceTarget.y * TILE_SIZE);
+                                const fence = floorData.mapObjects[fenceIndex];
+                                fence.resistance -= 1;
+                                animal.lastSoundTime = timestamp;
+                                triggerOnomatopoeia('SNAP!', animal.x, animal.y, '#FF6F00');
+                                if (fence.resistance <= 0) {
+                                    floorData.mapObjects.splice(fenceIndex, 1);
+                                    triggerOnomatopoeia('CRACK!', fence.x * TILE_SIZE + 16, fence.y * TILE_SIZE);
+                                    animal.state = 'hunting';
+                                    animal.isMoving = false;
+                                }
+                            } else {
+                                animal.state = 'hunting';
                             }
-                            animal.state = 'hunting'; // Volta a caçar
-                            animal.isMoving = false; // Força a recalcular o caminho
+                            animal.stateTimer = 0;
                         }
+                    } else if (animal.state === 'hunting') { // 5. Caçar ovelhas
+                        if (!animal.targetAnimal || !floorData.animals.includes(animal.targetAnimal) || (!animal.isMoving && Math.random() < 0.01)) {
+                            let sheepToHunt = null; let minDistance = Infinity;
+                            floorData.animals.forEach(other => {
+                                if (other.type === 'sheep') {
+                                    const dist = Math.sqrt(Math.pow(other.x - animal.x, 2) + Math.pow(other.y - animal.y, 2));
+                                    if (dist < minDistance) {
+                                        minDistance = dist;
+                                        sheepToHunt = other;
+                                    }
+                                }
+                            });
+                            animal.targetAnimal = sheepToHunt;
+                        }
+                        if (animal.targetAnimal) {
+                            if (!animal.isMoving || Math.random() < 0.1) { // Recalcula o caminho periodicamente
+                                const currentTileX = Math.floor(animal.x / TILE_SIZE);
+                                const currentTileY = Math.floor(animal.y / TILE_SIZE);
+                                const targetTileX = Math.floor(animal.targetAnimal.x / TILE_SIZE);
+                                const targetTileY = Math.floor(animal.targetAnimal.y / TILE_SIZE);
+                                animal.path = findPath(currentTileX, currentTileY, targetTileX, targetTileY, (px, py) => isAnimalWalkable(px, py, animal, true));
+                                if (animal.path.length > 0) animal.isMoving = true;
+                            }
+                        } else {
+                            animal.state = 'wandering';
+                        }
+                    }
+
+                    // Lógica de virar para o alvo (ovelha ou jogador)
+                    if (animal.isMoving) {
+                        const dx = animal.targetX - animal.x;
+                        const dy = animal.targetY - animal.y;
+                        if (Math.abs(dx) > Math.abs(dy)) { animal.lastMoveDir = { dx: Math.sign(dx), dy: 0 }; } else if (dy !== 0) { animal.lastMoveDir = { dx: 0, dy: Math.sign(dy) }; }
                     }
 
                     // Lógica de comer ovelha
                     if (animal.targetAnimal) {
                         const dx = animal.targetAnimal.x - animal.x;
                         const dy = animal.targetAnimal.y - animal.y;
-                        if (Math.sqrt(dx*dx + dy*dy) < TILE_SIZE) {
+                        if (Math.sqrt(dx*dx + dy*dy) < TILE_SIZE * 0.8) { // Precisa estar mais perto para comer
                             console.log("Lobo comeu uma ovelha!");
                             triggerOnomatopoeia('GRRR!', animal.x, animal.y);
-                            animal.targetAnimal.health = 0; // Marca a ovelha para ser removida
+                            animal.targetAnimal.health = 0; // Ovelha é comida
                             animal.hunger = 0;
                             animal.state = 'wandering';
                             animal.targetAnimal = null;
@@ -2134,7 +2159,7 @@
                             const targetTileY = currentTileY - Math.sign(dy) * 5;
                             animal.path = findPath(currentTileX, currentTileY, targetTileX, targetTileY, (px, py) => isAnimalWalkable(px, py, animal));
                             if (animal.path.length > 0) {
-                                animal.isMoving = true;
+                                if (!animal.isMoving) animal.isMoving = true; // Inicia a fuga
                                 const firstStep = animal.path.shift();
                                 animal.targetX = firstStep.x * TILE_SIZE;
                                 animal.targetY = firstStep.y * TILE_SIZE;
@@ -2538,12 +2563,13 @@
                 let attackY = player.y + (player.height / 2) - (attackHeight / 2) + (player.lastMoveDir.dy * TILE_SIZE * 0.8);
 
                 floorData.animals.forEach(targetAnimal => {
-                    if (targetAnimal.type === 'wolf' && attackX < targetAnimal.x + TILE_SIZE && attackX + attackWidth > targetAnimal.x && attackY < targetAnimal.y + TILE_SIZE && attackY + attackHeight > targetAnimal.y) {
+                    if (targetAnimal.type === 'wolf' && attackX < targetAnimal.x + TILE_SIZE && attackX + attackWidth > targetAnimal.x && attackY < targetAnimal.y + TILE_SIZE && attackY + attackHeight > targetAnimal.y && (!targetAnimal.lastSoundTime || timestamp - targetAnimal.lastSoundTime > 400)) {
                         targetAnimal.health -= 25;
                         targetAnimal.isHit = timestamp;
                         targetAnimal.healthBarVisibleUntil = timestamp + 3000;
                         triggerOnomatopoeia('THWACK!', targetAnimal.x, targetAnimal.y, '#FFEB3B');
                         triggerOnomatopoeia('GRRR!', targetAnimal.x, targetAnimal.y, '#FF6F00');
+                        targetAnimal.lastSoundTime = timestamp;
                         targetAnimal.state = 'chasing_player';
                         targetAnimal.targetAnimal = null;
                         console.log(`Lobo atingido! Vida: ${targetAnimal.health}`);
@@ -2854,7 +2880,7 @@
                                 backpackInventory[woodIdx].count--;
                                 triggerResourceFeedback(-1, 'Madeira');
                             } else { console.log("Sem cercas ou madeira para construir."); break; }
-                            floorData.mapObjects.push({ type: 4, x: tX, y: tY }); // A orientação é determinada dinamicamente
+                            floorData.mapObjects.push({ type: 4, x: tX, y: tY, resistance: 4 });
                             }
                             console.log("Cerca construída!");
                     } else if (player.toolSubAction === 'build_stairs') { // Lógica atualizada para usar constructionTargetFloor
@@ -2944,8 +2970,8 @@
 
             if (objectOnTile) {
                 if (isWolf && objectOnTile.type === 4) { // Lobo pode atacar cercas
-                    movingAnimal.state = 'attacking_fence';
-                    movingAnimal.stateTimer = 60; // 1 segundo para quebrar
+                    movingAnimal.state = 'attacking_fence'; // Entra no estado de ataque
+                    movingAnimal.stateTimer = 0; // Zera o timer para o novo estado
                     movingAnimal.fenceTarget = { x: tX, y: tY };
                     movingAnimal.isMoving = false;
                     return false; // Bloqueia o movimento enquanto ataca
@@ -3746,18 +3772,18 @@
                     nextY += Math.sign(dy);
                 }
 
-                if (walkableCheckFn(nextX * TILE_SIZE, nextY * TILE_SIZE)) {
+                if (walkableCheckFn(nextX * TILE_SIZE, nextY * TILE_SIZE, player, true)) { // Passa o animal e isWolf
                     currentX = nextX;
                     currentY = nextY;
                     path.push({ x: currentX, y: currentY });
                 } else {
                     // Tenta mover na outra direção se a principal estiver bloqueada
                     if (Math.abs(dx) > Math.abs(dy)) { // Tentou X, agora tenta Y
-                        if (walkableCheckFn(startX * TILE_SIZE, (currentY + Math.sign(dy)) * TILE_SIZE)) {
+                        if (walkableCheckFn(startX * TILE_SIZE, (currentY + Math.sign(dy)) * TILE_SIZE, player, true)) {
                              currentY += Math.sign(dy); path.push({ x: currentX, y: currentY });
                         } else break; // Bloqueado
                     } else { // Tentou Y, agora tenta X
-                        if (walkableCheckFn((currentX + Math.sign(dx)) * TILE_SIZE, startY * TILE_SIZE)) {
+                        if (walkableCheckFn((currentX + Math.sign(dx)) * TILE_SIZE, startY * TILE_SIZE, player, true)) {
                             currentX += Math.sign(dx); path.push({ x: currentX, y: currentY });
                         } else break; // Bloqueado
                     }
@@ -4234,7 +4260,7 @@
                 worldX: worldX,
                 worldY: worldY,
                 startTime: lastTime,
-                duration: 1200
+                duration: (text === 'Auuuuu...') ? 2500 : 1200 // Uivo dura mais
             };
 
             // Para sons posicionais, verifica o alcance antes de adicionar
