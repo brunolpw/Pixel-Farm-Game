@@ -818,33 +818,59 @@
         let constructionHotbarMapping = new Array(HOTBAR_SIZE).fill(-1);
         let activeConstructionHotbarSlot = 0;
 
+        // Objeto central para IDs de itens, para evitar "magic strings"
+        const ITEM_IDS = {
+            HOE: 'hoe',
+            SEED_TOMATO: 'seed_tomato',
+            SEED_TREE: 'seed_tree',
+            TOMATO: 'tomato',
+            SHOVEL: 'shovel',
+            WATERING_CAN: 'watering_can',
+            AXE: 'axe',
+            PICKAXE: 'pickaxe',
+            STONE: 'stone',
+            WOOD: 'wood',
+            CLAY: 'clay',
+            FENCE: 'fence',
+            WALL: 'wall',
+            DOOR: 'door',
+            GATE: 'gate',
+            ROOF: 'roof',
+            SHEARS: 'shears',
+            WOOL: 'wool',
+            SWORD: 'sword',
+            WOLF_PELT: 'wolf_pelt',
+            SEED_GENERIC: 'seed_generic',
+            CONSTRUCTION_TOOL: 'construction_tool'
+        };
+
 
         const ITEMS = {
-            'hoe': { id: 'hoe', name: 'Enxada', description: '<strong>Enxada</strong><br>Prepara a terra para o plantio.', category: 'ferramenta', stackable: false },
-            'seed_tomato': { id: 'seed_tomato', name: 'Semente de Tomate', description: '<strong>Semente de Tomate</strong><br>Plante em solo arado para cultivar tomates.', category: 'material', stackable: true },
-            'seed_tree': { id: 'seed_tree', name: 'Semente de Árvore', description: '<strong>Semente de Árvore</strong><br>Plante em grama ou terra para crescer uma nova árvore.', category: 'material', stackable: true },
-            'tomato': { id: 'tomato', name: 'Colheita', description: '<strong>Colheita</strong><br>O fruto do seu trabalho. Um tomate suculento.', category: 'material', stackable: true },
-            'shovel': { id: 'shovel', name: 'Pá', description: '<strong>Pá</strong><br>Coleta argila, remove cercas, pisos e plantações. Permite cavar ou aterrar água.', category: 'ferramenta', stackable: false },
-            'watering_can': { id: 'watering_can', name: 'Regador', description: '<strong>Regador</strong><br>Acelera o crescimento das plantas.', category: 'ferramenta', stackable: false },
-            'axe': { id: 'axe', name: 'Machado', description: '<strong>Machado</strong><br>Corta árvores para obter madeira.', category: 'ferramenta', stackable: false },
-            'pickaxe': { id: 'pickaxe', name: 'Picareta', description: '<strong>Picareta</strong><br>Quebra pedras para obter minerais.', category: 'ferramenta', stackable: false },
-            'stone': { id: 'stone', name: 'Pedra', description: '<strong>Pedra</strong><br>Material de construção básico.', category: 'material_construcao', stackable: true },
-            'wood': { id: 'wood', name: 'Madeira', description: '<strong>Madeira</strong><br>Material de construção básico.', category: 'material_construcao', stackable: true },
-            'clay': { id: 'clay', name: 'Argila', description: '<strong>Argila</strong><br>Material úmido, pode ser usado para criar itens mais resistentes.', category: 'material_construcao', stackable: true },
-            'fence': { id: 'fence', name: 'Cerca', description: '<strong>Cerca</strong><br>Uma cerca pré-fabricada.', category: 'construcao', stackable: true },
-            'wall': { id: 'wall', name: 'Muro', description: '<strong>Muro</strong><br>Um muro de tijolos resistente.', category: 'construcao', stackable: true },
-            'door': { id: 'door', name: 'Porta', description: '<strong>Porta</strong><br>Uma porta de madeira.', category: 'construcao', stackable: true },
-            'gate': { id: 'gate', name: 'Porteira', description: '<strong>Porteira</strong><br>Uma porteira de fazenda.', category: 'construcao', stackable: true },
-            'roof': { id: 'roof', name: 'Telhado', description: '<strong>Telhado</strong><br>Cobre as suas construções. Custa 1 Argila.', category: 'construcao', stackable: true },
-            'shears': { id: 'shears', name: 'Tesoura', description: '<strong>Tesoura de Tosquia</strong><br>Use para tosquiar ovelhas e obter lã.', category: 'ferramenta', stackable: false },
-            'wool': { id: 'wool', name: 'Lã', description: '<strong>Lã</strong><br>Lã macia de ovelha. Pode ser usada para artesanato.', category: 'material', stackable: true },
-            'sword': { id: 'sword', name: 'Espada', description: '<strong>Espada</strong><br>Uma espada simples para defesa.', category: 'ferramenta', stackable: false },
-            'wolf_pelt': { id: 'wolf_pelt', name: 'Pele de Lobo', description: '<strong>Pele de Lobo</strong><br>Pele de um lobo. Pode ser útil.', category: 'material', stackable: true },
-            'seed_generic': { id: 'seed_generic', name: 'Sementes', description: '<strong>Sementes</strong><br>Use o menu de contexto (Ctrl) para escolher o que plantar.', category: 'ferramenta', stackable: false, actions: [
+            [ITEM_IDS.HOE]: { id: ITEM_IDS.HOE, name: 'Enxada', description: '<strong>Enxada</strong><br>Prepara a terra para o plantio.', category: 'ferramenta', stackable: false },
+            [ITEM_IDS.SEED_TOMATO]: { id: ITEM_IDS.SEED_TOMATO, name: 'Semente de Tomate', description: '<strong>Semente de Tomate</strong><br>Plante em solo arado para cultivar tomates.', category: 'material', stackable: true },
+            [ITEM_IDS.SEED_TREE]: { id: ITEM_IDS.SEED_TREE, name: 'Semente de Árvore', description: '<strong>Semente de Árvore</strong><br>Plante em grama ou terra para crescer uma nova árvore.', category: 'material', stackable: true },
+            [ITEM_IDS.TOMATO]: { id: ITEM_IDS.TOMATO, name: 'Colheita', description: '<strong>Colheita</strong><br>O fruto do seu trabalho. Um tomate suculento.', category: 'material', stackable: true },
+            [ITEM_IDS.SHOVEL]: { id: ITEM_IDS.SHOVEL, name: 'Pá', description: '<strong>Pá</strong><br>Coleta argila, remove cercas, pisos e plantações. Permite cavar ou aterrar água.', category: 'ferramenta', stackable: false },
+            [ITEM_IDS.WATERING_CAN]: { id: ITEM_IDS.WATERING_CAN, name: 'Regador', description: '<strong>Regador</strong><br>Acelera o crescimento das plantas.', category: 'ferramenta', stackable: false },
+            [ITEM_IDS.AXE]: { id: ITEM_IDS.AXE, name: 'Machado', description: '<strong>Machado</strong><br>Corta árvores para obter madeira.', category: 'ferramenta', stackable: false },
+            [ITEM_IDS.PICKAXE]: { id: ITEM_IDS.PICKAXE, name: 'Picareta', description: '<strong>Picareta</strong><br>Quebra pedras para obter minerais.', category: 'ferramenta', stackable: false },
+            [ITEM_IDS.STONE]: { id: ITEM_IDS.STONE, name: 'Pedra', description: '<strong>Pedra</strong><br>Material de construção básico.', category: 'material_construcao', stackable: true },
+            [ITEM_IDS.WOOD]: { id: ITEM_IDS.WOOD, name: 'Madeira', description: '<strong>Madeira</strong><br>Material de construção básico.', category: 'material_construcao', stackable: true },
+            [ITEM_IDS.CLAY]: { id: ITEM_IDS.CLAY, name: 'Argila', description: '<strong>Argila</strong><br>Material úmido, pode ser usado para criar itens mais resistentes.', category: 'material_construcao', stackable: true },
+            [ITEM_IDS.FENCE]: { id: ITEM_IDS.FENCE, name: 'Cerca', description: '<strong>Cerca</strong><br>Uma cerca pré-fabricada.', category: 'construcao', stackable: true },
+            [ITEM_IDS.WALL]: { id: ITEM_IDS.WALL, name: 'Muro', description: '<strong>Muro</strong><br>Um muro de tijolos resistente.', category: 'construcao', stackable: true },
+            [ITEM_IDS.DOOR]: { id: ITEM_IDS.DOOR, name: 'Porta', description: '<strong>Porta</strong><br>Uma porta de madeira.', category: 'construcao', stackable: true },
+            [ITEM_IDS.GATE]: { id: ITEM_IDS.GATE, name: 'Porteira', description: '<strong>Porteira</strong><br>Uma porteira de fazenda.', category: 'construcao', stackable: true },
+            [ITEM_IDS.ROOF]: { id: ITEM_IDS.ROOF, name: 'Telhado', description: '<strong>Telhado</strong><br>Cobre as suas construções. Custa 1 Argila.', category: 'construcao', stackable: true },
+            [ITEM_IDS.SHEARS]: { id: ITEM_IDS.SHEARS, name: 'Tesoura', description: '<strong>Tesoura de Tosquia</strong><br>Use para tosquiar ovelhas e obter lã.', category: 'ferramenta', stackable: false },
+            [ITEM_IDS.WOOL]: { id: ITEM_IDS.WOOL, name: 'Lã', description: '<strong>Lã</strong><br>Lã macia de ovelha. Pode ser usada para artesanato.', category: 'material', stackable: true },
+            [ITEM_IDS.SWORD]: { id: ITEM_IDS.SWORD, name: 'Espada', description: '<strong>Espada</strong><br>Uma espada simples para defesa.', category: 'ferramenta', stackable: false },
+            [ITEM_IDS.WOLF_PELT]: { id: ITEM_IDS.WOLF_PELT, name: 'Pele de Lobo', description: '<strong>Pele de Lobo</strong><br>Pele de um lobo. Pode ser útil.', category: 'material', stackable: true },
+            [ITEM_IDS.SEED_GENERIC]: { id: ITEM_IDS.SEED_GENERIC, name: 'Sementes', description: '<strong>Sementes</strong><br>Use o menu de contexto (Ctrl) para escolher o que plantar.', category: 'ferramenta', stackable: false, actions: [
                     { label: "Plantar Tomate", action: "set_sub_action", value: "plant_tomato" },
                     { label: "Plantar Árvore", action: "set_sub_action", value: "plant_tree" }
                 ]},
-            'construction_tool': { id: 'construction_tool', name: 'Construção', description: '<strong>Construção</strong><br>Permite construir e remover estruturas.', category: 'ferramenta', stackable: false, actions: [
+            [ITEM_IDS.CONSTRUCTION_TOOL]: { id: ITEM_IDS.CONSTRUCTION_TOOL, name: 'Construção', description: '<strong>Construção</strong><br>Permite construir e remover estruturas.', category: 'ferramenta', stackable: false, actions: [
                     { label: "Mudar para modo 'Pegar'", action: "set_sub_action", value: "pickup_mode" },
                     { label: "Construir Escada", action: "set_sub_action", value: "build_stairs" },
                     { label: "Construir Porta", action: "set_sub_action", value: "build_door" },
@@ -1799,8 +1825,8 @@
                 if (worldData[i] && worldData[i].animals) {
                     worldData[i].animals = worldData[i].animals.filter(animal => {
                         if (animal.health <= 0) {
-                            if (animal.type === 'wolf') {
-                                addItemToInventory('wolf_pelt', 1);
+                            if (animal.type === 'wolf') { // Usa string aqui pois 'type' não é um ID de item
+                                addItemToInventory(ITEM_IDS.WOLF_PELT, 1);
                                 triggerOnomatopoeia('Poof!', animal.x, animal.y);
                             }
                             return false;
@@ -2559,7 +2585,7 @@
 
             // --- Lógica de Interação com Animais ---
             const animal = floorData.animals.find(a => tX >= Math.floor(a.x / TILE_SIZE) && tX < Math.ceil((a.x + TILE_SIZE) / TILE_SIZE) && tY >= Math.floor(a.y / TILE_SIZE) && tY < Math.ceil((a.y + TILE_SIZE) / TILE_SIZE));
-            if (item.id === 'sword') {
+            if (item.id === ITEM_IDS.SWORD) { // Já estava usando a constante, ótimo!
                 triggerOnomatopoeia('Swoosh!', player.x, player.y, '#B0E0E6', 20);
                 const attackWidth = TILE_SIZE * 1.5;
                 const attackHeight = TILE_SIZE * 1.5;
@@ -2583,10 +2609,10 @@
             }
 
             if (animal) {
-                if (item.id === 'shears' && animal.type === 'sheep' && animal.woolLevel >= 100 && animal.age >= 100) {
+                if (item.id === ITEM_IDS.SHEARS && animal.type === 'sheep' && animal.woolLevel >= 100 && animal.age >= 100) {
                     animal.woolLevel = 0;
-                    triggerOnomatopoeia('Snip!', animal.x + 16, animal.y, 'white', 20);
-                    addItemToInventory('wool', 1);
+                    triggerOnomatopoeia('Snip!', animal.x + 16, animal.y, 'white', 18);
+                    addItemToInventory(ITEM_IDS.WOOL, 1);
                     saveGame();
                     updateHotbarUI();
                     updateBackpackUI();
@@ -2615,8 +2641,8 @@
                     targetObject.regrowAt = timestamp + 300000; // 5 minutos para crescer de volta
 
                     // Chance de dropar semente de árvore
-                    if (Math.random() < 0.25) { // 25% de chance
-                        addItemToInventory('seed_tree', 1);
+                    if (Math.random() < 0.25) {
+                        addItemToInventory(ITEM_IDS.SEED_TREE, 1);
                         console.log("Encontrou uma semente de árvore!");
                     }
 
@@ -2631,7 +2657,7 @@
                 }
                 if (item.name === "Pá" && targetObject.type === 4) { // Cerca
                     floorData.mapObjects.splice(objectIndex, 1); // Remove a cerca
-                    addItemToInventory('wood', 1); // Devolve 1 madeira
+                    addItemToInventory(ITEM_IDS.WOOD, 1); // Devolve 1 madeira
                     triggerOnomatopoeia('Pluck!', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#B0BEC5', 16);
                     console.log("Cerca removida!");
                     saveGame();
@@ -2650,7 +2676,7 @@
                 }
                 if (item.name === "Pá" && targetObject.type === 16) { // Toco
                     floorData.mapObjects.splice(objectIndex, 1); // Remove o toco
-                    addItemToInventory('wood', 1); // Ganha 1 madeira extra
+                    addItemToInventory(ITEM_IDS.WOOD, 1); // Ganha 1 madeira extra
                     triggerOnomatopoeia('Pluck!', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#B0BEC5', 16);
                     console.log("Toco removido.");
                     saveGame();
@@ -2678,11 +2704,11 @@
                 // Lógica Universal de "Pegar"
                 if (item.name === "Construção" && player.toolSubAction === 'pickup_mode') {
                     let pickedUpItem = null;
-                    if (targetObject.type === 4) pickedUpItem = 'fence';
-                    else if (targetObject.type === 5) pickedUpItem = 'wall';
-                    else if (targetObject.type === 6) pickedUpItem = 'door';
-                    else if (targetObject.type === 7) pickedUpItem = 'gate';
-                    else if (targetObject.type === 11) pickedUpItem = 'roof';
+                    if (targetObject.type === 4) pickedUpItem = ITEM_IDS.FENCE;
+                    else if (targetObject.type === 5) pickedUpItem = ITEM_IDS.WALL;
+                    else if (targetObject.type === 6) pickedUpItem = ITEM_IDS.DOOR;
+                    else if (targetObject.type === 7) pickedUpItem = ITEM_IDS.GATE;
+                    else if (targetObject.type === 11) pickedUpItem = ITEM_IDS.ROOF;
 
                     if (pickedUpItem) {
                         floorData.mapObjects.splice(objectIndex, 1);
@@ -2693,9 +2719,9 @@
                         updateBackpackUI();
                         return;
                     }
-                    else if (targetObject.type === 7) pickedUpItem = 'gate';
-                    else if (targetObject.type === 9) { floorData.mapObjects.splice(objectIndex, 1); const otherStairIndex = worldData[targetObject.targetFloor].mapObjects.findIndex(o => o.x === targetObject.targetX && o.y === targetObject.targetY && o.type === 10); if(otherStairIndex !== -1) worldData[targetObject.targetFloor].mapObjects.splice(otherStairIndex, 1); addItemToInventory('wood', 20); pickedUpItem = 'stairs'; }
-                    else if (targetObject.type === 10) { floorData.mapObjects.splice(objectIndex, 1); const otherStairIndex = worldData[targetObject.targetFloor].mapObjects.findIndex(o => o.x === targetObject.targetX && o.y === targetObject.targetY && o.type === 9); if(otherStairIndex !== -1) worldData[targetObject.targetFloor].mapObjects.splice(otherStairIndex, 1); addItemToInventory('wood', 20); pickedUpItem = 'stairs'; }
+                    else if (targetObject.type === 7) pickedUpItem = ITEM_IDS.GATE;
+                    else if (targetObject.type === 9) { floorData.mapObjects.splice(objectIndex, 1); const otherStairIndex = worldData[targetObject.targetFloor].mapObjects.findIndex(o => o.x === targetObject.targetX && o.y === targetObject.targetY && o.type === 10); if(otherStairIndex !== -1) worldData[targetObject.targetFloor].mapObjects.splice(otherStairIndex, 1); addItemToInventory(ITEM_IDS.WOOD, 20); pickedUpItem = 'stairs'; }
+                    else if (targetObject.type === 10) { floorData.mapObjects.splice(objectIndex, 1); const otherStairIndex = worldData[targetObject.targetFloor].mapObjects.findIndex(o => o.x === targetObject.targetX && o.y === targetObject.targetY && o.type === 9); if(otherStairIndex !== -1) worldData[targetObject.targetFloor].mapObjects.splice(otherStairIndex, 1); addItemToInventory(ITEM_IDS.WOOD, 20); pickedUpItem = 'stairs'; }
 
                     if (pickedUpItem) {
                         floorData.mapObjects.splice(objectIndex, 1);
@@ -2718,18 +2744,19 @@
             // Lógica de Colheita
             if (tId === 7) {
                 triggerOnomatopoeia('Pop!', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#FFCA28', 20);
-                floorData.map[tY][tX] = 2;
+                floorData.map[tY][tX] = 2; // Define o tile como Solo Arado
+                updatePreRenderedTile(tX, tY, 2); // Atualiza a renderização do tile
                 delete floorData.plantGrowthData[tK]; // Remove os dados de crescimento da planta
-                addItemToInventory('tomato', 1);
+                addItemToInventory(ITEM_IDS.TOMATO, 1);
                 const seedsGained = Math.floor(Math.random() * 4); // 0, 1, 2 ou 3 sementes
-                if (seedsGained > 0) addItemToInventory('seed_tomato', seedsGained);
+                if (seedsGained > 0) addItemToInventory(ITEM_IDS.SEED_TOMATO, seedsGained);
                 saveGame(); updateHotbarUI(); updateBackpackUI(); return;
             }
 
             // Lógica Universal de "Pegar" para pisos
             if (item.name === "Construção" && player.toolSubAction === 'pickup_mode' && tId === 8) {
                 floorData.map[tY][tX] = 0; // Volta para grama
-                addItemToInventory('wood', 1); // Devolve 1 madeira
+                addItemToInventory(ITEM_IDS.WOOD, 1); // Devolve 1 madeira
                 triggerOnomatopoeia('Lift!', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#B0BEC5', 16);
                 updatePreRenderedTile(tX, tY, 0);
                 console.log("Piso removido!");
@@ -2743,7 +2770,7 @@
                 case "Enxada": if (tId === 0 || tId === 1) { triggerOnomatopoeia('Scrape', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#BCAAA4', 14); floorData.map[tY][tX] = 2; updatePreRenderedTile(tX, tY, 2); saveGame(); } break;
                 case "Sementes":
                     if (player.toolSubAction === 'plant_tomato') {
-                        const seedIdx = backpackInventory.findIndex(i => i && i.id === 'seed_tomato' && i.count > 0);
+                        const seedIdx = backpackInventory.findIndex(i => i && i.id === ITEM_IDS.SEED_TOMATO && i.count > 0);
                         if (tId === 2 && seedIdx !== -1) {
                             triggerOnomatopoeia('...', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#ccc', 14);
                             floorData.map[tY][tX] = 4; floorData.plantGrowthData[tK] = { plantedAt: timestamp, boosted: false };
@@ -2752,7 +2779,7 @@
                             updatePreRenderedTile(tX, tY, 4); saveGame(); updateHotbarUI(); updateBackpackUI();
                         }
                     } else if (player.toolSubAction === 'plant_tree') {
-                        const seedIdx = backpackInventory.findIndex(i => i && i.id === 'seed_tree' && i.count > 0);
+                        const seedIdx = backpackInventory.findIndex(i => i && i.id === ITEM_IDS.SEED_TREE && i.count > 0);
                         if ((tId === 0 || tId === 1 || tId === 12 || tId === 13 || tId === 14) && seedIdx !== -1) {
                             const tK = `${tX},${tY}`;
                             triggerOnomatopoeia('...', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#ccc', 14);
@@ -2767,7 +2794,7 @@
                 case "Pá":
                     if (tId === 9) { // Coleta argila
                         const clayGained = Math.floor(Math.random() * 5) + 1; // 1 a 5
-                        addItemToInventory('clay', clayGained); 
+                        addItemToInventory(ITEM_IDS.CLAY, clayGained); 
                         triggerOnomatopoeia('Scoop!', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#BCAAA4', 16);
                         floorData.map[tY][tX] = 1; // Volta para terra
                         updatePreRenderedTile(tX, tY, 1);
@@ -2777,7 +2804,7 @@
                         updateBackpackUI();
                     } else if (tId === 8) { // Remove piso de madeira
                         floorData.map[tY][tX] = 0; // Volta para grama
-                        addItemToInventory('wood', 1); // Devolve 1 madeira
+                        addItemToInventory(ITEM_IDS.WOOD, 1); // Devolve 1 madeira
                         triggerOnomatopoeia('Lift!', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#B0BEC5', 16);
                         updatePreRenderedTile(tX, tY, 0);
                         saveGame();
@@ -2809,8 +2836,8 @@
                     const isGrassOrDirt = (tId === 0 || tId === 1 || tId === 12 || tId === 13 || tId === 14);
                     if (player.toolSubAction === 'build_wall') {
                         if (isGrassOrDirt || tId === 8) { // Permite construir muro em piso de madeira
-                            const wallItemIdx = backpackInventory.findIndex(i => i && i.id === 'wall' && i.count > 0);
-                            const stoneIdx = backpackInventory.findIndex(i => i && i.id === 'stone' && i.count >= 5);
+                            const wallItemIdx = backpackInventory.findIndex(i => i && i.id === ITEM_IDS.WALL && i.count > 0);
+                            const stoneIdx = backpackInventory.findIndex(i => i && i.id === ITEM_IDS.STONE && i.count >= 5);
                             if (wallItemIdx !== -1) {
                                 backpackInventory[wallItemIdx].count--;
                                 triggerResourceFeedback(-1, 'Muro');
@@ -2823,7 +2850,7 @@
                         }
                     } else if (player.toolSubAction === 'build_floor') {
                         if (isGrassOrDirt || tId === 10) { // Permite construir piso no vazio ou sobre vegetação
-                            const woodIdx = backpackInventory.findIndex(i => i && i.id === 'wood' && i.count > 0);
+                            const woodIdx = backpackInventory.findIndex(i => i && i.id === ITEM_IDS.WOOD && i.count > 0);
                             if (woodIdx !== -1) {
                                 backpackInventory[woodIdx].count--;
                                 triggerResourceFeedback(-1, 'Madeira');
@@ -2838,8 +2865,8 @@
                             const hasVerticalWall = floorData.mapObjects.some(obj => obj.type === 5 && obj.x === tX && (obj.y === tY - 1 || obj.y === tY + 1));
                             if (!hasHorizontalWall && !hasVerticalWall) { console.log("A porta deve ser construída ao lado de um muro."); break; }
 
-                            const doorItemIdx = backpackInventory.findIndex(i => i && i.id === 'door' && i.count > 0);
-                            const woodIdx = backpackInventory.findIndex(i => i && i.id === 'wood' && i.count >= 4);
+                            const doorItemIdx = backpackInventory.findIndex(i => i && i.id === ITEM_IDS.DOOR && i.count > 0);
+                            const woodIdx = backpackInventory.findIndex(i => i && i.id === ITEM_IDS.WOOD && i.count >= 4);
                             if (doorItemIdx !== -1) {
                                 backpackInventory[doorItemIdx].count--;
                                 triggerResourceFeedback(-1, 'Porta');
@@ -2858,8 +2885,8 @@
                             const hasVerticalFence = floorData.mapObjects.some(obj => obj.type === 4 && obj.x === tX && (obj.y === tY - 1 || obj.y === tY + 1));
                             if (!hasHorizontalFence && !hasVerticalFence) { console.log("A porteira deve ser construída ao lado de uma cerca."); break; }
 
-                            const gateItemIdx = backpackInventory.findIndex(i => i && i.id === 'gate' && i.count > 0);
-                            const woodIdx = backpackInventory.findIndex(i => i && i.id === 'wood' && i.count >= 4);
+                            const gateItemIdx = backpackInventory.findIndex(i => i && i.id === ITEM_IDS.GATE && i.count > 0);
+                            const woodIdx = backpackInventory.findIndex(i => i && i.id === ITEM_IDS.WOOD && i.count >= 4);
                             if (gateItemIdx !== -1) {
                                 backpackInventory[gateItemIdx].count--;
                                 triggerResourceFeedback(-1, 'Porteira');
@@ -2875,8 +2902,8 @@
                     } else if (player.toolSubAction === 'build_fence') {
                         if (isGrassOrDirt) {
                             if (player.toolSubAction === 'pickup_mode') break; // Modo pegar não constrói
-                            const fenceItemIdx = backpackInventory.findIndex(i => i && i.id === 'fence' && i.count > 0);
-                            const woodIdx = backpackInventory.findIndex(i => i && i.id === 'wood' && i.count > 0);
+                            const fenceItemIdx = backpackInventory.findIndex(i => i && i.id === ITEM_IDS.FENCE && i.count > 0);
+                            const woodIdx = backpackInventory.findIndex(i => i && i.id === ITEM_IDS.WOOD && i.count > 0);
                             if (fenceItemIdx !== -1) {
                                 backpackInventory[fenceItemIdx].count--;
                                 triggerResourceFeedback(-1, 'Cerca');
@@ -2899,7 +2926,7 @@
 
                             const targetTileIsFree = worldData[upperFloorIndex].mapObjects.every(obj => obj.x !== tX || obj.y !== tY);
                             if (targetTileIsFree) {
-                                const woodIdx = backpackInventory.findIndex(i => i && i.id === 'wood' && i.count >= 5);
+                                const woodIdx = backpackInventory.findIndex(i => i && i.id === ITEM_IDS.WOOD && i.count >= 5);
                                 if (woodIdx !== -1) {
                                     backpackInventory[woodIdx].count -= 5;
                                     triggerResourceFeedback(-5, 'Madeira');
@@ -2921,7 +2948,7 @@
                         const hasSupport = lowerFloor && (lowerFloor.map[tY][tX] !== 10 || lowerFloor.mapObjects.some(obj => obj.x === tX && obj.y === tY));
 
                         if (hasSupport) {
-                            const clayIdx = backpackInventory.findIndex(i => i && i.id === 'clay' && i.count >= 1);
+                            const clayIdx = backpackInventory.findIndex(i => i && i.id === ITEM_IDS.CLAY && i.count >= 1);
                             if (clayIdx !== -1) {
                                 backpackInventory[clayIdx].count -= 1;
                                 triggerResourceFeedback(-1, 'Argila');
@@ -3178,7 +3205,7 @@
 
             contextMenu.innerHTML = ''; // Limpa o menu
 
-            if (item.id === 'seed_generic') {
+            if (item.id === ITEM_IDS.SEED_GENERIC) {
                 // Lógica dinâmica para sementes
                 const availableSeeds = backpackInventory.filter(i => i && i.id.startsWith('seed_') && i.id !== 'seed_generic');
                 if (availableSeeds.length === 0) {
@@ -3281,8 +3308,8 @@
             // Filtra apenas os itens de construção
             backpackInventory.forEach((item, index) => {
                 if (item && item.id) {
-                    const itemDef = ITEMS[item.id];
-                    if (itemDef && (itemDef.category === 'construcao' || itemDef.category === 'material_construcao' || itemDef.id === 'construction_tool')) {
+                    const itemDef = ITEMS[item.id]; // 'construction_tool' é um ID de item
+                    if (itemDef && (itemDef.category === 'construcao' || itemDef.category === 'material_construcao' || itemDef.id === ITEM_IDS.CONSTRUCTION_TOOL)) {
                         if (currentSlotIndex < 20) {
                             constructionSlots[currentSlotIndex] = { item: item, originalIndex: index };
                             currentSlotIndex++;
@@ -3472,7 +3499,7 @@
             // Preenche a hotbar de construção
             backpack.forEach((item, index) => {
                  const itemDef = item ? ITEMS[item.id] : null;
-                 if (itemDef && (itemDef.category === 'construcao' || itemDef.category === 'material_construcao' || itemDef.id === 'construction_tool')) {
+                 if (itemDef && (itemDef.category === 'construcao' || itemDef.category === 'material_construcao' || itemDef.id === ITEM_IDS.CONSTRUCTION_TOOL)) {
                      const emptySlot = constructionHotbarMapping.findIndex(m => m === -1);
                      if (emptySlot !== -1 && !constructionHotbarMapping.includes(index)) constructionHotbarMapping[emptySlot] = index;
                  }
@@ -3500,7 +3527,7 @@
         }
         // CORRIGIDO: loadGame
         function loadGame() {
-            const defaultItems = [ { id: 'hoe', count: 1 }, { id: 'sword', count: 1 }, { id: 'seed_generic', count: 1 }, { id: 'shovel', count: 1 }, { id: 'watering_can', count: 0 }, { id: 'shears', count: 1 }, { id: 'construction_tool', count: 1 }, { id: 'axe', count: 1 }, { id: 'pickaxe', count: 1 }, { id: 'seed_tomato', count: 10 } ];
+            const defaultItems = [ { id: ITEM_IDS.HOE, count: 1 }, { id: ITEM_IDS.SWORD, count: 1 }, { id: ITEM_IDS.SEED_GENERIC, count: 1 }, { id: ITEM_IDS.SHOVEL, count: 1 }, { id: ITEM_IDS.WATERING_CAN, count: 0 }, { id: ITEM_IDS.SHEARS, count: 1 }, { id: ITEM_IDS.CONSTRUCTION_TOOL, count: 1 }, { id: ITEM_IDS.AXE, count: 1 }, { id: ITEM_IDS.PICKAXE, count: 1 }, { id: ITEM_IDS.SEED_TOMATO, count: 10 } ];
 
             const savedData = localStorage.getItem('pixelFarmSaveData');
             if (savedData) {
@@ -3833,10 +3860,10 @@
 
             // Verifica se há um animal no tile
             const animalOnTile = floorData.animals.find(a => tileX >= Math.floor(a.x / TILE_SIZE) && tileX < Math.ceil((a.x + TILE_SIZE) / TILE_SIZE) && tileY >= Math.floor(a.y / TILE_SIZE) && tileY < Math.ceil((a.y + TILE_SIZE) / TILE_SIZE));
-            if (animalOnTile) {
-                if (item.id === 'shears' && animalOnTile.type === 'sheep' && animalOnTile.woolLevel >= 100 && animalOnTile.age >= 100) return true;
+            if (animalOnTile) { // Usa string 'sheep' pois é um tipo de animal, não um item
+                if (item.id === ITEM_IDS.SHEARS && animalOnTile.type === 'sheep' && animalOnTile.woolLevel >= 100 && animalOnTile.age >= 100) return true;
                 // Espada é acionável em lobos
-                if (item.id === 'sword' && animalOnTile.type === 'wolf') {
+                if (item.id === ITEM_IDS.SWORD && animalOnTile.type === 'wolf') {
                     return true;
                 }
                 return false; // Bloqueia outras ações no tile do animal
@@ -3844,11 +3871,11 @@
 
             if (objectIndex !== -1) {
                 const targetObject = floorData.mapObjects[objectIndex];
-                if (item.id === 'pickaxe' && targetObject.type === 0) return true;
-                if (item.id === 'axe' && targetObject.type === 1) return true;
-                if (item.id === 'shovel' && (targetObject.type === 4 || targetObject.type === 15 || targetObject.type === 16)) return true;
-                if (item.id === 'watering_can' && backpackInventory[bpIdx].count > 0 && ((targetObject.type >= 17 && targetObject.type <= 19 && floorData.treeGrowthData[`${targetObject.x},${targetObject.y}`] && !floorData.treeGrowthData[`${targetObject.x},${targetObject.y}`].boosted) || (targetObject.type === 16 && targetObject.regrowAt && !targetObject.boosted))) return true;
-                if (item.id === 'construction_tool' && player.toolSubAction === 'pickup_mode' && [4, 5, 6, 7, 9, 10, 11].includes(targetObject.type)) return true; // Escadas e telhados podem ser pegos
+                if (item.id === ITEM_IDS.PICKAXE && targetObject.type === 0) return true;
+                if (item.id === ITEM_IDS.AXE && targetObject.type === 1) return true;
+                if (item.id === ITEM_IDS.SHOVEL && (targetObject.type === 4 || targetObject.type === 15 || targetObject.type === 16)) return true;
+                if (item.id === ITEM_IDS.WATERING_CAN && backpackInventory[bpIdx].count > 0 && ((targetObject.type >= 17 && targetObject.type <= 19 && floorData.treeGrowthData[`${targetObject.x},${targetObject.y}`] && !floorData.treeGrowthData[`${targetObject.x},${targetObject.y}`].boosted) || (targetObject.type === 16 && targetObject.regrowAt && !targetObject.boosted))) return true;
+                if (item.id === ITEM_IDS.CONSTRUCTION_TOOL && player.toolSubAction === 'pickup_mode' && [4, 5, 6, 7, 9, 10, 11].includes(targetObject.type)) return true; // Escadas e telhados podem ser pegos
                 // if (targetObject.type === 9 || targetObject.type === 10) return true; // Escadas agora são automáticas
                 return false;
             }
@@ -3856,25 +3883,25 @@
             if (tId === 7) return true; // Colheita
 
             switch (item.id) {
-                case 'hoe': return (tId === 0 || tId === 1);
-                case 'seed_generic':
+                case ITEM_IDS.HOE: return (tId === 0 || tId === 1);
+                case ITEM_IDS.SEED_GENERIC:
                     if (player.toolSubAction === 'plant_tomato') {
-                        return tId === 2 && backpackInventory.some(i => i && i.id === 'seed_tomato' && i.count > 0);
+                        return tId === 2 && backpackInventory.some(i => i && i.id === ITEM_IDS.SEED_TOMATO && i.count > 0);
                     } else if (player.toolSubAction === 'plant_tree') {
-                        return (tId === 0 || tId === 1 || tId === 12 || tId === 13 || tId === 14) && backpackInventory.some(i => i && i.id === 'seed_tree' && i.count > 0);
+                        return (tId === 0 || tId === 1 || tId === 12 || tId === 13 || tId === 14) && backpackInventory.some(i => i && i.id === ITEM_IDS.SEED_TREE && i.count > 0);
                     }
                     return false;
-                case 'shovel': return (tId === 1 || tId === 2 || (tId >= 4 && tId <= 7) || tId === 0 || tId === 3 || tId === 8 || tId === 9 || tId === 12 || tId === 13 || tId === 14);
-                case 'watering_can': return (tId === 3 || (tId >= 4 && tId <= 6 && backpackInventory[bpIdx].count > 0) || ((tId === 1 || tId === 2) && backpackInventory[bpIdx].count > 0));
-                case 'construction_tool':
+                case ITEM_IDS.SHOVEL: return (tId === 1 || tId === 2 || (tId >= 4 && tId <= 7) || tId === 0 || tId === 3 || tId === 8 || tId === 9 || tId === 12 || tId === 13 || tId === 14);
+                case ITEM_IDS.WATERING_CAN: return (tId === 3 || (tId >= 4 && tId <= 6 && backpackInventory[bpIdx].count > 0) || ((tId === 1 || tId === 2) && backpackInventory[bpIdx].count > 0));
+                case ITEM_IDS.CONSTRUCTION_TOOL:
                     if (player.toolSubAction === 'pickup_mode') { return tId === 8; }
-                    if (player.toolSubAction === 'build_floor') { return ((tId === 0 || tId === 1 || tId === 10 || tId === 12 || tId === 13 || tId === 14) && backpackInventory.some(i => i && i.id === 'wood' && i.count > 0)); }
-                    if (player.toolSubAction === 'build_door') { if (tId !== 8) return false; const hasMaterial = backpackInventory.some(i => i && i.id === 'door' && i.count > 0) || backpackInventory.some(i => i && i.id === 'wood' && i.count >= 4); const hasAdjacentWall = floorData.mapObjects.some(obj => obj.type === 5 && ( (obj.y === tileY && (obj.x === tileX - 1 || obj.x === tileX + 1)) || (obj.x === tileX && (obj.y === tileY - 1 || obj.y === tileY + 1)))); return hasMaterial && hasAdjacentWall; }
-                    if (player.toolSubAction === 'build_gate') { if (tId !== 0 && tId !== 1 && tId !== 12 && tId !== 13 && tId !== 14) return false; const hasMaterial = backpackInventory.some(i => i && i.id === 'gate' && i.count > 0) || backpackInventory.some(i => i && i.id === 'wood' && i.count >= 4); const hasAdjacentFence = floorData.mapObjects.some(obj => obj.type === 4 && ( (obj.y === tileY && (obj.x === tileX - 1 || obj.x === tileX + 1)) || (obj.x === tileX && (obj.y === tileY - 1 || obj.y === tileY + 1)))); return hasMaterial && hasAdjacentFence; }
-                    if (player.toolSubAction === 'build_wall') { return ((tId === 0 || tId === 1 || tId === 8 || tId === 12 || tId === 13 || tId === 14) && (backpackInventory.some(i => i && i.id === 'wall' && i.count > 0) || backpackInventory.some(i => i && i.id === 'stone' && i.count >= 5))); }
-                    if (player.toolSubAction === 'build_stairs') { const upperFloorIndex = targetFloorIndex + 1; if (tId !== 8) return false; let isUpperTileFree = true; if (worldData[upperFloorIndex]) { isUpperTileFree = worldData[upperFloorIndex].mapObjects.every(obj => obj.x !== tileX || obj.y !== tileY); } return isUpperTileFree && backpackInventory.some(i => i && i.id === 'wood' && i.count >= 5); }
-                    if (player.toolSubAction === 'build_roof') { if (!backpackInventory.some(i => i && i.id === 'clay' && i.count >= 1)) return false; const lowerFloorIndex = targetFloorIndex - 1; if (lowerFloorIndex < 0) return false; const lowerFloor = worldData[lowerFloorIndex]; if (!lowerFloor) return false; return lowerFloor.map[tileY][tileX] !== 10 || lowerFloor.mapObjects.some(obj => obj.x === tileX && obj.y === tileY); }
-                    if (player.toolSubAction === 'build_fence') { return ((tId === 0 || tId === 1 || tId === 12 || tId === 13 || tId === 14) && (backpackInventory.some(i => i && i.id === 'fence' && i.count > 0) || backpackInventory.some(i => i && i.id === 'wood' && i.count > 0))); }
+                    if (player.toolSubAction === 'build_floor') { return ((tId === 0 || tId === 1 || tId === 10 || tId === 12 || tId === 13 || tId === 14) && backpackInventory.some(i => i && i.id === ITEM_IDS.WOOD && i.count > 0)); }
+                    if (player.toolSubAction === 'build_door') { if (tId !== 8) return false; const hasMaterial = backpackInventory.some(i => i && i.id === ITEM_IDS.DOOR && i.count > 0) || backpackInventory.some(i => i && i.id === ITEM_IDS.WOOD && i.count >= 4); const hasAdjacentWall = floorData.mapObjects.some(obj => obj.type === 5 && ( (obj.y === tileY && (obj.x === tileX - 1 || obj.x === tileX + 1)) || (obj.x === tileX && (obj.y === tileY - 1 || obj.y === tileY + 1)))); return hasMaterial && hasAdjacentWall; }
+                    if (player.toolSubAction === 'build_gate') { if (tId !== 0 && tId !== 1 && tId !== 12 && tId !== 13 && tId !== 14) return false; const hasMaterial = backpackInventory.some(i => i && i.id === ITEM_IDS.GATE && i.count > 0) || backpackInventory.some(i => i && i.id === ITEM_IDS.WOOD && i.count >= 4); const hasAdjacentFence = floorData.mapObjects.some(obj => obj.type === 4 && ( (obj.y === tileY && (obj.x === tileX - 1 || obj.x === tileX + 1)) || (obj.x === tileX && (obj.y === tileY - 1 || obj.y === tileY + 1)))); return hasMaterial && hasAdjacentFence; }
+                    if (player.toolSubAction === 'build_wall') { return ((tId === 0 || tId === 1 || tId === 8 || tId === 12 || tId === 13 || tId === 14) && (backpackInventory.some(i => i && i.id === ITEM_IDS.WALL && i.count > 0) || backpackInventory.some(i => i && i.id === ITEM_IDS.STONE && i.count >= 5))); }
+                    if (player.toolSubAction === 'build_stairs') { const upperFloorIndex = targetFloorIndex + 1; if (tId !== 8) return false; let isUpperTileFree = true; if (worldData[upperFloorIndex]) { isUpperTileFree = worldData[upperFloorIndex].mapObjects.every(obj => obj.x !== tileX || obj.y !== tileY); } return isUpperTileFree && backpackInventory.some(i => i && i.id === ITEM_IDS.WOOD && i.count >= 5); }
+                    if (player.toolSubAction === 'build_roof') { if (!backpackInventory.some(i => i && i.id === ITEM_IDS.CLAY && i.count >= 1)) return false; const lowerFloorIndex = targetFloorIndex - 1; if (lowerFloorIndex < 0) return false; const lowerFloor = worldData[lowerFloorIndex]; if (!lowerFloor) return false; return lowerFloor.map[tileY][tileX] !== 10 || lowerFloor.mapObjects.some(obj => obj.x === tileX && obj.y === tileY); }
+                    if (player.toolSubAction === 'build_fence') { return ((tId === 0 || tId === 1 || tId === 12 || tId === 13 || tId === 14) && (backpackInventory.some(i => i && i.id === ITEM_IDS.FENCE && i.count > 0) || backpackInventory.some(i => i && i.id === ITEM_IDS.WOOD && i.count > 0))); }
             }
 
             return false;
@@ -3896,7 +3923,7 @@
 
             // Prioridade máxima: Clicar num lobo com a espada
             const bpIdx = hotbarMapping[activeHotbarSlot];
-            if (bpIdx !== -1 && backpackInventory[bpIdx] && backpackInventory[bpIdx].id === 'sword') {
+            if (bpIdx !== -1 && backpackInventory[bpIdx] && backpackInventory[bpIdx].id === ITEM_IDS.SWORD) { // Já estava usando a constante
                 const animalOnTile = worldData[player.currentFloor].animals.find(a => a.type === 'wolf' && clickedTileX >= Math.floor(a.x / TILE_SIZE) && clickedTileX < Math.ceil((a.x + TILE_SIZE) / TILE_SIZE) && clickedTileY >= Math.floor(a.y / TILE_SIZE) && clickedTileY < Math.ceil((a.y + TILE_SIZE) / TILE_SIZE));
                 if (animalOnTile) {
                     // Vira o jogador na direção do lobo
@@ -3976,7 +4003,7 @@
             const bpIdx = hotbarMapping[activeHotbarSlot];
             if (bpIdx !== -1 && backpackInventory[bpIdx]) {
                 const item = ITEMS[backpackInventory[bpIdx].id];
-                if (item && item.id.startsWith('seed_') && isActionable(mouseHoverTile.x, mouseHoverTile.y)) {
+                if (item && item.id.startsWith('seed_') && isActionable(mouseHoverTile.x, mouseHoverTile.y)) { // 'seed_' é um prefixo, não um ID completo
                     mouseIcon.style.display = 'none';
                     return;
                 }
