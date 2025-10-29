@@ -1851,7 +1851,7 @@
                     };
                     floorData.animals.push(newWolf);
                     console.log("Um lobo apareceu!");
-                    triggerOnomatopoeia('Auuuuu...', newWolf.x, newWolf.y, '#FF8C00', true, canvas.width * 4);
+                    triggerOnomatopoeia('Auuuuu...', newWolf.x, newWolf.y, '#FF8C00', 24, true, canvas.width * 4);
                 }
             }
 
@@ -1860,7 +1860,7 @@
             if (sheeps.length > 0 && Math.random() < 0.005) {
                 const randomSheep = sheeps[Math.floor(Math.random() * sheeps.length)];
                 if (randomSheep)
-                    triggerOnomatopoeia('Bééé...', randomSheep.x + 16, randomSheep.y, 'white', true);
+                    triggerOnomatopoeia('Bééé...', randomSheep.x + 16, randomSheep.y, 'white', 18, true);
             }
             // --- Lógica de Reprodução (executada uma vez por frame) ---
             const ANIMAL_CAP = calculateAnimalCapacity(player.currentFloor);
@@ -2012,7 +2012,7 @@
                         if (animal.stateTimer <= 0 && (!animal.lastSoundTime || timestamp - animal.lastSoundTime > 400)) {
                             const canHit = timestamp - player.lastHit > 1000; // 1 segundo de invencibilidade
                             if (canHit) {
-                                triggerOnomatopoeia('SNAP!', animal.x, animal.y, '#FF6F00');
+                                triggerOnomatopoeia('SNAP!', animal.x, animal.y, '#FF6F00', 22);
                                 player.health -= 10;
                                 player.lastHit = animal.lastSoundTime = timestamp;
                                 updateHealthBarUI();
@@ -2055,10 +2055,10 @@
                                 const fence = floorData.mapObjects[fenceIndex];
                                 fence.resistance -= 1;
                                 animal.lastSoundTime = timestamp;
-                                triggerOnomatopoeia('SNAP!', animal.x, animal.y, '#FF6F00');
+                                triggerOnomatopoeia('SNAP!', animal.x, animal.y, '#FF6F00', 22);
                                 if (fence.resistance <= 0) {
                                     floorData.mapObjects.splice(fenceIndex, 1);
-                                    triggerOnomatopoeia('CRACK!', fence.x * TILE_SIZE + 16, fence.y * TILE_SIZE);
+                                    triggerOnomatopoeia('CRACK!', fence.x * TILE_SIZE + 16, fence.y * TILE_SIZE, '#E53935', 24);
                                     animal.state = 'hunting';
                                     animal.isMoving = false;
                                 }
@@ -2108,7 +2108,7 @@
                         const dy = animal.targetAnimal.y - animal.y;
                         if (Math.sqrt(dx*dx + dy*dy) < TILE_SIZE * 0.8) { // Precisa estar mais perto para comer
                             console.log("Lobo comeu uma ovelha!");
-                            triggerOnomatopoeia('GRRR!', animal.x, animal.y);
+                            triggerOnomatopoeia('GRRR!', animal.x, animal.y, '#FF6F00', 18);
                             animal.targetAnimal.health = 0; // Ovelha é comida
                             animal.hunger = 0;
                             animal.state = 'wandering';
@@ -2402,7 +2402,11 @@
                 else if (anim.type === 'onomatopoeia') {
                     const yOffset = Math.sin(progress * Math.PI) * -15; // Efeito "salto"
                     const alpha = 1 - Math.pow(progress, 2);
-                    ctx.font = 'bold 20px "Comic Sans MS", cursive, sans-serif';
+                    
+                    // Adiciona um leve movimento horizontal para afastar as mensagens
+                    anim.x += anim.driftX * (1 - progress);
+
+                    ctx.font = `bold ${anim.size}px "Comic Sans MS", cursive, sans-serif`;
                     ctx.textAlign = 'center';
                     ctx.strokeStyle = 'black';
                     ctx.lineWidth = 4;
@@ -2556,7 +2560,7 @@
             // --- Lógica de Interação com Animais ---
             const animal = floorData.animals.find(a => tX >= Math.floor(a.x / TILE_SIZE) && tX < Math.ceil((a.x + TILE_SIZE) / TILE_SIZE) && tY >= Math.floor(a.y / TILE_SIZE) && tY < Math.ceil((a.y + TILE_SIZE) / TILE_SIZE));
             if (item.id === 'sword') {
-                triggerOnomatopoeia('Swoosh!', player.x, player.y);
+                triggerOnomatopoeia('Swoosh!', player.x, player.y, '#B0E0E6', 20);
                 const attackWidth = TILE_SIZE * 1.5;
                 const attackHeight = TILE_SIZE * 1.5;
                 let attackX = player.x + (player.width / 2) - (attackWidth / 2) + (player.lastMoveDir.dx * TILE_SIZE * 0.8);
@@ -2567,8 +2571,8 @@
                         targetAnimal.health -= 25;
                         targetAnimal.isHit = timestamp;
                         targetAnimal.healthBarVisibleUntil = timestamp + 3000;
-                        triggerOnomatopoeia('THWACK!', targetAnimal.x, targetAnimal.y, '#FFEB3B');
-                        triggerOnomatopoeia('GRRR!', targetAnimal.x, targetAnimal.y, '#FF6F00');
+                        triggerOnomatopoeia('THWACK!', targetAnimal.x, targetAnimal.y, '#FFEB3B', 22);
+                        triggerOnomatopoeia('GRRR!', targetAnimal.x, targetAnimal.y, '#FF6F00', 18);
                         targetAnimal.lastSoundTime = timestamp;
                         targetAnimal.state = 'chasing_player';
                         targetAnimal.targetAnimal = null;
@@ -2581,7 +2585,7 @@
             if (animal) {
                 if (item.id === 'shears' && animal.type === 'sheep' && animal.woolLevel >= 100 && animal.age >= 100) {
                     animal.woolLevel = 0;
-                    triggerOnomatopoeia('Snip!', animal.x + 16, animal.y);
+                    triggerOnomatopoeia('Snip!', animal.x + 16, animal.y, 'white', 20);
                     addItemToInventory('wool', 1);
                     saveGame();
                     updateHotbarUI();
@@ -2597,7 +2601,7 @@
                 if (item.name === "Picareta" && targetObject.type === 0) { // Rocha
                     floorData.mapObjects.splice(objectIndex, 1); // Remove a rocha
                     const stoneGained = Math.floor(Math.random() * 11) + 5; // Ganho de 5 a 15 pedras
-                    triggerOnomatopoeia('Clank!', tX * TILE_SIZE + 16, tY * TILE_SIZE);
+                    triggerOnomatopoeia('Clank!', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#B0BEC5', 16);
                     addItemToInventory('stone', stoneGained);
                     console.log(`Rocha quebrada! Ganhou ${stoneGained} pedras.`);
                     saveGame();
@@ -2617,7 +2621,7 @@
                     }
 
                     const woodGained = Math.floor(Math.random() * 11) + 5; // Ganho de 5 a 15 madeiras
-                    triggerOnomatopoeia('Chop!', tX * TILE_SIZE + 16, tY * TILE_SIZE);
+                    triggerOnomatopoeia('Chop!', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#B0BEC5', 16);
                     addItemToInventory('wood', woodGained);
                     console.log(`Árvore cortada! Ganhou ${woodGained} madeiras.`);
                     saveGame();
@@ -2628,7 +2632,7 @@
                 if (item.name === "Pá" && targetObject.type === 4) { // Cerca
                     floorData.mapObjects.splice(objectIndex, 1); // Remove a cerca
                     addItemToInventory('wood', 1); // Devolve 1 madeira
-                    triggerOnomatopoeia('Pluck!', tX * TILE_SIZE + 16, tY * TILE_SIZE);
+                    triggerOnomatopoeia('Pluck!', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#B0BEC5', 16);
                     console.log("Cerca removida!");
                     saveGame();
                     updateHotbarUI();
@@ -2638,7 +2642,7 @@
                 if (item.name === "Pá" && targetObject.type === 15) { // Esqueleto
                     floorData.mapObjects.splice(objectIndex, 1); // Remove o esqueleto
                     console.log("Esqueleto removido.");
-                    triggerOnomatopoeia('Crumble...', tX * TILE_SIZE + 16, tY * TILE_SIZE);
+                    triggerOnomatopoeia('Crumble...', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#CFD8DC', 18);
                     saveGame();
                     updateHotbarUI();
                     updateBackpackUI();
@@ -2647,7 +2651,7 @@
                 if (item.name === "Pá" && targetObject.type === 16) { // Toco
                     floorData.mapObjects.splice(objectIndex, 1); // Remove o toco
                     addItemToInventory('wood', 1); // Ganha 1 madeira extra
-                    triggerOnomatopoeia('Pluck!', tX * TILE_SIZE + 16, tY * TILE_SIZE);
+                    triggerOnomatopoeia('Pluck!', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#B0BEC5', 16);
                     console.log("Toco removido.");
                     saveGame();
                     updateHotbarUI();
@@ -2663,7 +2667,7 @@
                         if (targetObject.regrowAt && !targetObject.boosted) { targetObject.regrowAt -= 30000; targetObject.boosted = true; actionTaken = true; } // Reduz 10% de 5min
                     }
                     if (actionTaken) {
-                        triggerOnomatopoeia('Splash!', tX * TILE_SIZE + 16, tY * TILE_SIZE);
+                        triggerOnomatopoeia('Splash!', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#81D4FA', 18);
                         inventoryItem.count--;
                         activeAnimations.push({ type: 'water', x: tX, y: tY, startTime: timestamp, duration: 500 });
                         updateHotbarUI(); updateBackpackUI(); saveGame();
@@ -2713,7 +2717,7 @@
 
             // Lógica de Colheita
             if (tId === 7) {
-                triggerOnomatopoeia('Pop!', tX * TILE_SIZE + 16, tY * TILE_SIZE);
+                triggerOnomatopoeia('Pop!', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#FFCA28', 20);
                 floorData.map[tY][tX] = 2;
                 delete floorData.plantGrowthData[tK]; // Remove os dados de crescimento da planta
                 addItemToInventory('tomato', 1);
@@ -2726,7 +2730,7 @@
             if (item.name === "Construção" && player.toolSubAction === 'pickup_mode' && tId === 8) {
                 floorData.map[tY][tX] = 0; // Volta para grama
                 addItemToInventory('wood', 1); // Devolve 1 madeira
-                triggerOnomatopoeia('Lift!', tX * TILE_SIZE + 16, tY * TILE_SIZE);
+                triggerOnomatopoeia('Lift!', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#B0BEC5', 16);
                 updatePreRenderedTile(tX, tY, 0);
                 console.log("Piso removido!");
                 saveGame();
@@ -2736,12 +2740,12 @@
             }
 
             switch (item.name) {
-                case "Enxada": if (tId === 0 || tId === 1) { triggerOnomatopoeia('Scrape', tX * TILE_SIZE + 16, tY * TILE_SIZE); floorData.map[tY][tX] = 2; updatePreRenderedTile(tX, tY, 2); saveGame(); } break;
+                case "Enxada": if (tId === 0 || tId === 1) { triggerOnomatopoeia('Scrape', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#BCAAA4', 14); floorData.map[tY][tX] = 2; updatePreRenderedTile(tX, tY, 2); saveGame(); } break;
                 case "Sementes":
                     if (player.toolSubAction === 'plant_tomato') {
                         const seedIdx = backpackInventory.findIndex(i => i && i.id === 'seed_tomato' && i.count > 0);
                         if (tId === 2 && seedIdx !== -1) {
-                            triggerOnomatopoeia('...', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#ccc');
+                            triggerOnomatopoeia('...', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#ccc', 14);
                             floorData.map[tY][tX] = 4; floorData.plantGrowthData[tK] = { plantedAt: timestamp, boosted: false };
                             backpackInventory[seedIdx].count--;
                             if (backpackInventory[seedIdx].count <= 0) backpackInventory[seedIdx] = null;
@@ -2751,7 +2755,7 @@
                         const seedIdx = backpackInventory.findIndex(i => i && i.id === 'seed_tree' && i.count > 0);
                         if ((tId === 0 || tId === 1 || tId === 12 || tId === 13 || tId === 14) && seedIdx !== -1) {
                             const tK = `${tX},${tY}`;
-                            triggerOnomatopoeia('...', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#ccc');
+                            triggerOnomatopoeia('...', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#ccc', 14);
                             floorData.mapObjects.push({ type: 17, x: tX, y: tY });
                             floorData.treeGrowthData[tK] = { plantedAt: timestamp, boosted: false, originalTile: tId };
                             backpackInventory[seedIdx].count--;
@@ -2763,8 +2767,8 @@
                 case "Pá":
                     if (tId === 9) { // Coleta argila
                         const clayGained = Math.floor(Math.random() * 5) + 1; // 1 a 5
-                        addItemToInventory('clay', clayGained);
-                        triggerOnomatopoeia('Scoop!', tX * TILE_SIZE + 16, tY * TILE_SIZE);
+                        addItemToInventory('clay', clayGained); 
+                        triggerOnomatopoeia('Scoop!', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#BCAAA4', 16);
                         floorData.map[tY][tX] = 1; // Volta para terra
                         updatePreRenderedTile(tX, tY, 1);
                         console.log(`Coletou ${clayGained} de argila.`);
@@ -2774,7 +2778,7 @@
                     } else if (tId === 8) { // Remove piso de madeira
                         floorData.map[tY][tX] = 0; // Volta para grama
                         addItemToInventory('wood', 1); // Devolve 1 madeira
-                        triggerOnomatopoeia('Lift!', tX * TILE_SIZE + 16, tY * TILE_SIZE);
+                        triggerOnomatopoeia('Lift!', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#B0BEC5', 16);
                         updatePreRenderedTile(tX, tY, 0);
                         saveGame();
                     } else if (tId === 1 || tId === 2 || (tId >= 4 && tId <= 7)) {
@@ -2782,11 +2786,11 @@
                     } else if (tId === 0) {
                         let aW = false; const ne = [[0, 1], [0, -1], [1, 0], [-1, 0]]; for (const [nx, ny] of ne) { const cX = tX + nx; const cY = tY + ny; if (cX >= 0 && cX < MAP_WIDTH_TILES && cY >= 0 && cY < MAP_HEIGHT_TILES) { if (floorData.map[cY][cX] === 3) { aW = true; break; } } } if (aW) { floorData.map[tY][tX] = 3; updatePreRenderedTile(tX, tY, 3); saveGame(); }
                     } else if (tId === 3) {
-                        floorData.map[tY][tX] = 0; updatePreRenderedTile(tX, tY, 0); saveGame(); triggerOnomatopoeia('Fill', tX * TILE_SIZE + 16, tY * TILE_SIZE);
+                        floorData.map[tY][tX] = 0; updatePreRenderedTile(tX, tY, 0); saveGame(); triggerOnomatopoeia('Fill', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#BCAAA4', 14);
                     }
                     break;
                 case "Regador": {
-                    if (tId === 3) { triggerOnomatopoeia('Glug!', tX * TILE_SIZE + 16, tY * TILE_SIZE); inventoryItem.count = 10; updateHotbarUI(); updateBackpackUI(); saveGame(); }
+                    if (tId === 3) { triggerOnomatopoeia('Glug!', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#81D4FA', 18); inventoryItem.count = 10; updateHotbarUI(); updateBackpackUI(); saveGame(); }
                     else if (inventoryItem.count > 0) {
                         let actionTaken = false;
                         if (tId === 1 || tId === 2) { // Terra ou Arado -> Argila
@@ -2795,7 +2799,7 @@
                             const pD = floorData.plantGrowthData[tK]; if (pD && !pD.boosted) { pD.boosted = true; actionTaken = true; }
                         }
                         if (actionTaken) {
-                            triggerOnomatopoeia('Splash!', tX * TILE_SIZE + 16, tY * TILE_SIZE); inventoryItem.count--; activeAnimations.push({ type: 'water', x: tX, y: tY, startTime: timestamp, duration: 500 }); updateHotbarUI(); updateBackpackUI(); saveGame();
+                            triggerOnomatopoeia('Splash!', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#81D4FA', 18); inventoryItem.count--; activeAnimations.push({ type: 'water', x: tX, y: tY, startTime: timestamp, duration: 500 }); updateHotbarUI(); updateBackpackUI(); saveGame();
                         }
                     }
                     break; }
@@ -4251,11 +4255,12 @@
             console.log(`Feedback: ${quantity} ${resourceName}`);
         }
 
-        function triggerOnomatopoeia(text, worldX, worldY, color = 'white', isPositional = false, customRange = null) {
+        function triggerOnomatopoeia(text, worldX, worldY, color = 'white', size = 20, isPositional = false, customRange = null) {
             const anim = {
                 type: 'onomatopoeia',
                 text: text,
                 color: color,
+                size: size,
                 isPositional: isPositional,
                 // Para sons posicionais, guardamos a posição no mundo para recalcular
                 // Para sons não posicionais, guardamos a posição na tela inicial
@@ -4264,7 +4269,8 @@
                 worldX: worldX,
                 worldY: worldY,
                 startTime: lastTime,
-                duration: (text === 'Auuuuu...') ? 2500 : 1200 // Uivo dura mais
+                duration: (text === 'Auuuuu...') ? 2500 : 1200, // Uivo dura mais
+                driftX: (Math.random() - 0.5) * 0.3 // Movimento horizontal aleatório
             };
 
             // Para sons posicionais, verifica o alcance antes de adicionar
@@ -4277,6 +4283,21 @@
                 const HEARING_RANGE = customRange || canvas.width * 2;
                 if (dist > HEARING_RANGE) return;
             }
+
+            // --- Sistema Anti-Colisão de Onomatopeias ---
+            const FONT_HEIGHT = size * 1.2; // Altura aproximada da fonte
+            let finalY = anim.y;
+            let overlaps;
+            do {
+                overlaps = false;
+                for (const otherAnim of activeAnimations) {
+                    if (otherAnim.type === 'onomatopoeia' && Math.abs(otherAnim.x - anim.x) < 50 && Math.abs(otherAnim.y - finalY) < Math.max(FONT_HEIGHT, otherAnim.size * 1.2)) {
+                        finalY -= FONT_HEIGHT; // Move a nova mensagem para cima
+                        overlaps = true;
+                    }
+                }
+            } while (overlaps);
+            anim.y = finalY;
 
             activeAnimations.push(anim);
         }
