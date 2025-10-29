@@ -3980,7 +3980,11 @@
 
 
             if (dist < 1.5) { // Alcance de interação
-                if (isActionable(mouseHoverTile.x, mouseHoverTile.y)) {
+                const floorData = worldData[player.currentFloor];
+                const objectOnTile = floorData.mapObjects.find(obj => obj.x === mouseHoverTile.x && obj.y === mouseHoverTile.y);
+                const isInteractiveObject = objectOnTile && (objectOnTile.type === 6 || objectOnTile.type === 7);
+
+                if (isActionable(mouseHoverTile.x, mouseHoverTile.y) || isInteractiveObject) {
                     mouseIcon.classList.add('cursor-action');
                 } else {
                     mouseIcon.classList.add('cursor-invalid');
