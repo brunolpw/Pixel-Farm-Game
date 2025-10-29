@@ -3400,26 +3400,25 @@
 
         function handleHotbarSlotClick(event) {
             const clickedHotbarIndex = parseInt(event.currentTarget.dataset.hotbarIndex, 10);
+
+            // --- Lógica de Atribuição de Itens ---
             if (isBackpackOpen) {
                 if (selectedBackpackIndex !== -1) {
-                    // Verifica se o item a ser atribuído é uma ferramenta
                     const itemToAssign = backpackInventory[selectedBackpackIndex];
                     if (itemToAssign && ITEMS[itemToAssign.id].category !== 'ferramenta') {
                         console.log("Apenas ferramentas podem ser atribuídas à hotbar.");
-                        selectedBackpackIndex = -1; // Limpa a seleção
-                        updateBackpackUI(); // Redesenha a mochila para remover a seleção
-                        return; // Bloqueia a atribuição
+                        selectedBackpackIndex = -1;
+                        updateBackpackUI();
+                        return;
                     }
-
-                    const currentMapping = hotbarMapping; // Mochila só interage com a hotbar normal
-                    console.log(`Atribuindo mochila[${selectedBackpackIndex}] -> hotbar[${clickedHotbarIndex}]`);
-                    const existingHotbarSlot = currentMapping.indexOf(selectedBackpackIndex);
+                    const existingHotbarSlot = hotbarMapping.indexOf(selectedBackpackIndex);
                     if(existingHotbarSlot !== -1) { hotbarMapping[existingHotbarSlot] = -1; }
-                    currentMapping[clickedHotbarIndex] = selectedBackpackIndex;
+                    hotbarMapping[clickedHotbarIndex] = selectedBackpackIndex;
                     selectedBackpackIndex = -1;
                     updateBackpackUI(); updateHotbarUI(); saveGame();
                     closeContextMenu();
-                } // CORREÇÃO: Lógica de atribuição para construção
+                    return;
+                }
             } else if (isConstructionModeActive) {
                 if (selectedConstructionIndex !== -1) {
                     const existingHotbarSlot = constructionHotbarMapping.indexOf(selectedConstructionIndex);
@@ -3427,23 +3426,30 @@
                     constructionHotbarMapping[clickedHotbarIndex] = selectedConstructionIndex;
                     selectedConstructionIndex = -1;
                     updateConstructionUI(); updateHotbarUI(); saveGame();
+                    return;
                 }
-            } else {
-                const currentActiveSlot = isConstructionModeActive ? activeConstructionHotbarSlot : activeHotbarSlot;
-                if (clickedHotbarIndex === currentActiveSlot && !player.isMoving && !player.isUsingTool) {
-                     const currentMapping = isConstructionModeActive ? constructionHotbarMapping : hotbarMapping;
-                     const bpIdx = currentMapping[currentActiveSlot];
-                     if(bpIdx !== -1 && backpackInventory[bpIdx] && ITEMS[backpackInventory[bpIdx].id]){
-                        // Se uma sub-ação foi escolhida, usa a ferramenta imediatamente
-                        if (player.toolSubAction) {
+            }
+
+            // --- Lógica de Uso ou Abertura de Menu ---
+            const currentActiveSlot = isConstructionModeActive ? activeConstructionHotbarSlot : activeHotbarSlot;
+            if (clickedHotbarIndex === currentActiveSlot && !player.isMoving && !player.isUsingTool) {
+                 const currentMapping = isConstructionModeActive ? constructionHotbarMapping : hotbarMapping;
+                 const bpIdx = currentMapping[currentActiveSlot];
+                 if (bpIdx !== -1 && backpackInventory[bpIdx]) {
+                    const item = ITEMS[backpackInventory[bpIdx].id];
+                    if (item) {
+                        const hasMultipleActions = (item.actions && item.actions.length > 0) || item.id === ITEM_IDS.SEED_GENERIC;
+                        if (hasMultipleActions && !player.toolSubAction) {
+                            openContextMenu(clickedHotbarIndex);
+                        } else {
                             triggerUseTool();
                         }
-                        console.log("Clique para usar slot ativo:", activeHotbarSlot); // DEBUG
-                        triggerUseTool(); // Chama a função helper
-                     }
-                } else {
-                    updateActiveHotbarSlot(clickedHotbarIndex);
-                }
+                    } else {
+                        triggerUseTool();
+                    }
+                 }
+            } else {
+                updateActiveHotbarSlot(clickedHotbarIndex);
             }
         }
 
@@ -3460,6 +3466,7 @@
             const droppedOnHotbarIndex = parseInt(targetSlot.dataset.hotbarIndex, 10);
             console.log("Drop:", draggedHotbarIndex, "onto", droppedOnHotbarIndex);
             if (draggedHotbarIndex !== droppedOnHotbarIndex) {
+                const currentActiveSlot = isConstructionModeActive ? activeConstructionHotbarSlot : activeHotbarSlot;
                 const currentMapping = isConstructionModeActive ? constructionHotbarMapping : hotbarMapping;
                 const sourceMapping = currentMapping[draggedHotbarIndex];
                 const targetMapping = currentMapping[droppedOnHotbarIndex];
