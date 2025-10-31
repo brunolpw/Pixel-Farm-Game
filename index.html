@@ -1751,7 +1751,7 @@
         function updatePlayerMovement(timestamp) {
             // Se não está se movendo, verifica se há um caminho a seguir
             if (!player.isMoving && player.path.length > 0) {
-                const nextTile = player.path.shift(); // Pega o próximo tile do caminho
+                const nextTile = player.path.shift();
                 const nextTargetX = nextTile.x * TILE_SIZE;
                 const nextTargetY = nextTile.y * TILE_SIZE;
 
@@ -1776,7 +1776,7 @@
                 if (player.x === player.targetX && player.y === player.targetY) {
                     player.isMoving = false;
                     player.walkBob = 0;
-                    if (player.path.length === 0) { // Chegou ao destino final
+                    if (player.path.length === 0) {
                         saveGame();
 
                         // --- Lógica de Transição Automática de Andar ---
@@ -1786,7 +1786,7 @@
                         const stairIndex = worldData[player.currentFloor].mapObjects.findIndex(obj => obj.x === playerTileX && obj.y === playerTileY && (obj.type === 9 || obj.type === 10));
                         if (stairIndex !== -1) {
                             const stair = worldData[player.currentFloor].mapObjects[stairIndex];
-                            changeFloor(stair);
+                            changeFloor(stair); // A função changeFloor já salva o jogo
                             return; // Interrompe para evitar bugs pós-transição
                         }
                     }
@@ -1885,7 +1885,7 @@
                         x: spawnX * TILE_SIZE, y: spawnY * TILE_SIZE,
                         state: 'wandering', hunger: 0, path: [], isMoving: false, speed: 1.5, // Lobos são mais rápidos
                         walkBob: 0, walkBobSpeed: 0.2, lastMoveDir: { dx: 0, dy: 1 }, stateTimer: 0,
-                        floor: player.currentFloor
+                        floor: player.currentFloor // Garante que o andar seja definido
                     };
                     floorData.animals.push(newWolf);
                     console.log("Um lobo apareceu!");
@@ -3001,6 +3001,9 @@
             const tX = Math.floor(pixelX / TILE_SIZE);
             const tY = Math.floor(pixelY / TILE_SIZE);
             const floorData = worldData[movingAnimal.floor]; // Usa o andar do animal
+            // Adiciona uma verificação de segurança para o andar do animal
+            if (typeof movingAnimal.floor !== 'number' || !floorData) return false;
+
             if (!floorData) return false; // Segurança
 
             if (tX < 0 || tX >= MAP_WIDTH_TILES || tY < 0 || tY >= MAP_HEIGHT_TILES) return false;
