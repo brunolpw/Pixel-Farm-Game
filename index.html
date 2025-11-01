@@ -1746,8 +1746,78 @@
         function updateNightOverlay() { if(!nightOverlay)return; const mO=0.7; let tO=0; if(gameHour>=20||gameHour<4)tO=mO; else if(gameHour===4)tO=mO*0.66; else if(gameHour===5)tO=mO*0.33; else if(gameHour>=6&&gameHour<18)tO=0; else if(gameHour===18)tO=mO*0.33; else if(gameHour===19)tO=mO*0.66; nightOverlay.style.opacity=tO; }
         function drawTimeIcon() { timeIconCtx.clearRect(0,0,timeIconCanvas.width,timeIconCanvas.height); const cX=timeIconCanvas.width/2; const cY=timeIconCanvas.height/2; const r=8; if(gameHour>=6&&gameHour<18){timeIconCtx.fillStyle='#FFD700'; timeIconCtx.beginPath(); timeIconCtx.arc(cX,cY,r,0,Math.PI*2); timeIconCtx.fill();}else{timeIconCtx.fillStyle='#A0A0A0'; timeIconCtx.beginPath(); timeIconCtx.arc(cX,cY,r,0,Math.PI*2); timeIconCtx.fill(); timeIconCtx.fillStyle='rgba(0,0,0,0)'; timeIconCtx.globalCompositeOperation='destination-out'; timeIconCtx.beginPath(); timeIconCtx.arc(cX+r*0.4,cY-r*0.4,r,0,Math.PI*2); timeIconCtx.fill(); timeIconCtx.globalCompositeOperation='source-over';} }
         function drawGameClock() { if(!gameClockSpan)return; const hS=String(gameHour).padStart(2,'0'); const mS=String(gameMinute).padStart(2,'0'); gameClockSpan.textContent=`${hS}:${mS}`; drawTimeIcon(); }
-        function drawLighting(timestamp) { lightCtx.clearRect(0,0,lightCanvas.width,lightCanvas.height); if(gameHour>=18||gameHour<6){ lightCtx.save(); const cNO=nightOverlay?parseFloat(nightOverlay.style.opacity):0; lightCtx.fillStyle=`rgba(0,0,30,${cNO*0.9})`; lightCtx.fillRect(0,0,lightCanvas.width,lightCanvas.height); lightCtx.globalCompositeOperation='destination-out'; for(const obj of worldData[player.currentFloor].mapObjects){ const xOS=obj.x*TILE_SIZE-camera.x; const yOS=obj.y*TILE_SIZE-camera.y; let lR=0; let lX=xOS+TILE_SIZE/2; let lY=yOS+TILE_SIZE/2; if(obj.type===2){lR=3.5*TILE_SIZE;}else if(obj.type===3){lR=2.5*TILE_SIZE; lY=yOS+TILE_SIZE*0.75;} if(lR>0){if(lX+lR>0&&lX-lR<lightCanvas.width&&lY+lR>0&&lY-lR<lightCanvas.height){ const pu=Math.sin(timestamp*0.005)*0.05+0.95; const gr=lightCtx.createRadialGradient(lX,lY,0,lX,lY,lR*pu); gr.addColorStop(0,'rgba(255,255,255,1)'); gr.addColorStop(0.3,'rgba(255,255,255,0.9)'); gr.addColorStop(0.7,'rgba(255,255,255,0.5)'); gr.addColorStop(1,'rgba(255,255,255,0)'); lightCtx.fillStyle=gr; lightCtx.beginPath(); lightCtx.arc(lX,lY,lR*pu,0,Math.PI*2); lightCtx.fill();}}} lightCtx.globalCompositeOperation='source-over'; lightCtx.restore();} }
         
+        function drawLighting(timestamp) { 
+            lightCtx.clearRect(0, 0, lightCanvas.width, lightCanvas.height); 
+            
+            if (gameHour >= 18 || gameHour < 6) {
+                lightCtx.save();
+                const cNO = nightOverlay
+                    ? parseFloat(nightOverlay.style.opacity)
+                    : 0;
+                //debugger;
+                lightCtx.fillStyle=`rgba(0,0,30,${cNO * 0.3})`;
+                lightCtx.fillRect(0,0,lightCanvas.width,lightCanvas.height);
+                const lightSources = [];
+
+                for (const obj of worldData[player.currentFloor].mapObjects) {
+                    const xOS = obj.x * TILE_SIZE - camera.x;
+                    const yOS = obj.y * TILE_SIZE - camera.y;
+                    let lR = 0;
+                    let lX = xOS + TILE_SIZE/2;
+                    let lY = yOS + TILE_SIZE/2;
+
+                    if (obj.type === 2) {
+                        lR = 3.5 * TILE_SIZE;
+                    } else if (obj.type === 3) {
+                        lR = 2.5 * TILE_SIZE;
+                        lY = yOS + TILE_SIZE * 0.75;
+                    }
+
+                    if (lR > 0) {
+                        if(lX + lR > 0 
+                        && lX - lR < lightCanvas.width 
+                        && lY + lR > 0 
+                        && lY - lR < lightCanvas.height) {
+                            lightSources.push({ lX, lY, lR });
+                        }
+                    }
+                }
+
+                //lightCtx.globalCompositeOperation = 'destination-out';
+                lightCtx.globalCompositeOperation = "xor";
+                for (const src of lightSources) {
+                    const pu = Math.sin(timestamp*0.005) * 0.05 + 0.95;
+                    const gr = lightCtx.createRadialGradient(src.lX, src.lY, 0, src.lX, src.lY, src.lR * pu);
+                    gr.addColorStop(0,'rgba(255, 255, 255, 0.01)');
+                    gr.addColorStop(0.2,'rgba(175, 43, 30, 0.3)');
+                    gr.addColorStop(0.3,'rgba(175, 43, 30, 0.2)');
+                    gr.addColorStop(0.5,'rgba(247, 173, 77, 0.1)');
+                    gr.addColorStop(0.7,'rgba(247, 173, 77, 0.05)');
+                    gr.addColorStop(1,'rgba(247, 230, 150, 0.05)');
+                    lightCtx.fillStyle = gr;
+                    lightCtx.beginPath();
+                    lightCtx.arc(src.lX,src.lY,src.lR*pu,0,Math.PI*2);
+                    lightCtx.fill();
+                }
+
+                // lightCtx.globalCompositeOperation='source-over';
+                lightCtx.globalCompositeOperation="overlay";
+                for (const src of lightSources) {
+                    const pu = Math.sin(timestamp*0.005) * 0.05 + 0.95;
+                    const gr = lightCtx.createRadialGradient(src.lX, src.lY, 0, src.lX, src.lY, src.lR * pu);
+                    gr.addColorStop(0,'rgba(255, 220, 150, 0.2)');
+                    gr.addColorStop(0.5,'rgba(255, 180, 50, 0.1)');
+                    gr.addColorStop(1,'rgba(255, 150, 0, 0)');
+                    lightCtx.fillStyle = gr;
+                    lightCtx.beginPath();
+                    lightCtx.arc(src.lX,src.lY,src.lR*pu,0,Math.PI*2);
+                    lightCtx.fill();
+                }
+                lightCtx.restore();
+            }
+        }
+
         function updatePlayerMovement(timestamp) {
             // Se não está se movendo, verifica se há um caminho a seguir
             if (!player.isMoving && player.path.length > 0) {
