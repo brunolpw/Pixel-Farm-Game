@@ -1723,7 +1723,7 @@
             ctx.shadowBlur = 0;
         }
         function updateGameTime() {
-            if (isTimeTestMode) {
+            if (isTimeTestMode && timeRangeSlider) {
                 // Em modo teste, o tempo é controlado pelo slider, então não fazemos nada aqui.
                 return;
             }
@@ -1746,7 +1746,7 @@
             if (timeRangeSlider) { timeRangeSlider.value = gameHour; }
         }
         function updateNightOverlay() { if(!nightOverlay)return; const mO=0.7; let tO=0; if(gameHour>=20||gameHour<4)tO=mO; else if(gameHour===4)tO=mO*0.66; else if(gameHour===5)tO=mO*0.33; else if(gameHour>=6&&gameHour<18)tO=0; else if(gameHour===18)tO=mO*0.33; else if(gameHour===19)tO=mO*0.66; nightOverlay.style.opacity=tO; }
-        function drawTimeIcon() { timeIconCtx.clearRect(0,0,timeIconCanvas.width,timeIconCanvas.height); const cX=timeIconCanvas.width/2; const cY=timeIconCanvas.height/2; const r=8; if(gameHour>=6&&gameHour<18){timeIconCtx.fillStyle='#FFD700'; timeIconCtx.beginPath(); timeIconCtx.arc(cX,cY,r,0,Math.PI*2); timeIconCtx.fill();}else{timeIconCtx.fillStyle='#A0A0A0'; timeIconCtx.beginPath(); timeIconCtx.arc(cX,cY,r,0,Math.PI*2); timeIconCtx.fill(); timeIconCtx.fillStyle='rgba(0,0,0,0)'; timeIconCtx.globalCompositeOperation='destination-out'; timeIconCtx.beginPath(); timeIconCtx.arc(cX+r*0.4,cY-r*0.4,r,0,Math.PI*2); timeIconCtx.fill(); timeIconCtx.globalCompositeOperation='source-over';} }
+        function drawTimeIcon() { if(!timeIconCtx) return; timeIconCtx.clearRect(0,0,timeIconCanvas.width,timeIconCanvas.height); const cX=timeIconCanvas.width/2; const cY=timeIconCanvas.height/2; const r=8; if(gameHour>=6&&gameHour<18){timeIconCtx.fillStyle='#FFD700'; timeIconCtx.beginPath(); timeIconCtx.arc(cX,cY,r,0,Math.PI*2); timeIconCtx.fill();}else{timeIconCtx.fillStyle='#A0A0A0'; timeIconCtx.beginPath(); timeIconCtx.arc(cX,cY,r,0,Math.PI*2); timeIconCtx.fill(); timeIconCtx.fillStyle='rgba(0,0,0,0)'; timeIconCtx.globalCompositeOperation='destination-out'; timeIconCtx.beginPath(); timeIconCtx.arc(cX+r*0.4,cY-r*0.4,r,0,Math.PI*2); timeIconCtx.fill(); timeIconCtx.globalCompositeOperation='source-over';} }
         function drawGameClock() { if(!gameClockSpan)return; const hS=String(gameHour).padStart(2,'0'); const mS=String(gameMinute).padStart(2,'0'); gameClockSpan.textContent=`${hS}:${mS}`; drawTimeIcon(); }
         
         function drawLighting(timestamp) { 
@@ -1757,8 +1757,8 @@
                 const cNO = nightOverlay
                     ? parseFloat(nightOverlay.style.opacity)
                     : 0;
-                //debugger;
-                lightCtx.fillStyle=`rgba(0,0,30,${cNO * 0.3})`;
+                
+                lightCtx.fillStyle=`rgba(10, 5, 40, ${cNO * 0.5})`;
                 lightCtx.fillRect(0,0,lightCanvas.width,lightCanvas.height);
                 const lightSources = [];
 
@@ -4307,7 +4307,7 @@
         // --- Inicialização ---
         function init() {
             backpackIcon = document.getElementById('backpackIcon');
-            if (!backpackIcon) { console.error("Ícone da mochila não encontrado!"); return; }
+            if (!backpackIcon) { console.error("Ícone da mochila não encontrado!"); }
             timeRangeSlider = document.getElementById('timeRangeSlider');
             if (!timeRangeSlider) { console.error("Slider de tempo não encontrado!"); return; }
             timeTestModeCheckbox = document.getElementById('timeTestModeCheckbox');
