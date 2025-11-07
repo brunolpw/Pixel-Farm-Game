@@ -851,7 +851,8 @@
             SWORD: 'sword',
             WOLF_PELT: 'wolf_pelt',
             SEED_GENERIC: 'seed_generic',
-            CONSTRUCTION_TOOL: 'construction_tool'
+            CONSTRUCTION_TOOL: 'construction_tool',
+            HAMMER: 'hammer' // Novo item Martelo
         };
 
 
@@ -862,7 +863,7 @@
             [ITEM_IDS.TOMATO]: { id: ITEM_IDS.TOMATO, name: 'Colheita', emoji: '🍅', description: '<strong>Colheita</strong><br>O fruto do seu trabalho. Um tomate suculento.', category: 'material', stackable: true },
             [ITEM_IDS.SHOVEL]: { id: ITEM_IDS.SHOVEL, name: 'Pá', emoji: '🪏', description: '<strong>Pá</strong><br>Coleta argila, remove cercas, pisos e plantações. Permite cavar ou aterrar água.', category: 'ferramenta', stackable: false },
             [ITEM_IDS.WATERING_CAN]: { id: ITEM_IDS.WATERING_CAN, name: 'Regador', emoji: '💧', description: '<strong>Regador</strong><br>Acelera o crescimento das plantas.', category: 'ferramenta', stackable: false },
-            [ITEM_IDS.AXE]: { id: ITEM_IDS.AXE, name: 'Machado', emoji: '🪓', description: '<strong>Machado</strong><br>Corta árvores para obter madeira.', category: 'ferramenta', stackable: false },
+            [ITEM_IDS.AXE]: { id: ITEM_IDS.AXE, name: 'Machado', emoji: '🪓', description: '<strong>Machado</strong><br>Corta árvores para obter madeira.', category: 'ferramenta', stackable: false }, // Removido Martelo daqui
             [ITEM_IDS.PICKAXE]: { id: ITEM_IDS.PICKAXE, name: 'Picareta', emoji: '⛏️', description: '<strong>Picareta</strong><br>Quebra pedras para obter minerais.', category: 'ferramenta', stackable: false },
             [ITEM_IDS.STONE]: { id: ITEM_IDS.STONE, name: 'Pedra', emoji: '🪨', description: '<strong>Pedra</strong><br>Material de construção básico.', category: 'material_construcao', stackable: true },
             [ITEM_IDS.WOOD]: { id: ITEM_IDS.WOOD, name: 'Madeira', emoji: '🪵', description: '<strong>Madeira</strong><br>Material de construção básico.', category: 'material_construcao', stackable: true },
@@ -880,6 +881,7 @@
                     { label: "Plantar Tomate", action: "set_sub_action", value: "plant_tomato" },
                     { label: "Plantar Árvore", action: "set_sub_action", value: "plant_tree" }
                 ]},
+            [ITEM_IDS.HAMMER]: { id: ITEM_IDS.HAMMER, name: 'Martelo', emoji: '🔨', description: '<strong>Martelo</strong><br>Use para remover estruturas construídas.', category: 'ferramenta', stackable: false },
             [ITEM_IDS.CONSTRUCTION_TOOL]: { id: ITEM_IDS.CONSTRUCTION_TOOL, name: 'Construção', emoji: '🛠️', description: '<strong>Construção</strong><br>Permite construir e remover estruturas.', category: 'ferramenta', stackable: false, actions: [
                     { label: "Mudar para modo 'Pegar'", action: "set_sub_action", value: "pickup_mode" },
                     { label: "Escada", action: "set_sub_action", value: "build_stairs" },
@@ -2816,6 +2818,26 @@
                     }
                 }
 
+                // Lógica de Remoção com o Martelo
+                if (item.id === ITEM_IDS.HAMMER) {
+                    let removedItem = false;
+                    if ([4, 5, 6, 7, 11].includes(targetObject.type)) { // Cerca, Muro, Porta, Porteira, Telhado
+                        floorData.mapObjects.splice(objectIndex, 1);
+                        removedItem = true;
+                    } else if (targetObject.type === 9 || targetObject.type === 10) { // Escadas
+                        const otherStairIndex = worldData[targetObject.targetFloor].mapObjects.findIndex(o => o.x === targetObject.targetX && o.y === targetObject.targetY && (o.type === 9 || o.type === 10));
+                        if(otherStairIndex !== -1) worldData[targetObject.targetFloor].mapObjects.splice(otherStairIndex, 1);
+                        floorData.mapObjects.splice(objectIndex, 1);
+                        removedItem = true;
+                    }
+
+                    if (removedItem) {
+                        triggerOnomatopoeia('Pop!', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#B0BEC5', 16);
+                        console.log("Objeto removido com o martelo.");
+                        saveGame();
+                        return;
+                    }
+                }
                 return; // Impede o uso da ferramenta no chão se houver um objeto
             }
 
@@ -2846,6 +2868,50 @@
                 updateHotbarUI();
                 updateBackpackUI();
                 return;
+            }
+
+            // Lógica de Remoção de Piso com o Martelo
+            if (item.id === ITEM_IDS.HAMMER && tId === 8) {
+                floorData.map[tY][tX] = 0; // Volta para grama
+                addItemToInventory(ITEM_IDS.WOOD, 1); // Devolve 1 madeira
+                triggerOnomatopoeia('Lift!', tX * TILE_SIZE + 16, tY * TILE_SIZE, '#B0BEC5', 16);
+                updatePreRenderedTile(tX, tY, 0);
+                console.log("Piso removido com o martelo!");
+                saveGame();
+                return;
+            }
+
+            // --- Lógica de Construção com Materiais (Modo Construção) ---
+            if (isConstructionModeActive) {
+                const materialId = item.id;
+                let constructed = false;
+                const isGrassOrDirt = (tId === 0 || tId === 1 || tId === 12 || tId === 13 || tId === 14);
+
+                if (materialId === ITEM_IDS.WOOD && (isGrassOrDirt || tId === 10)) {
+                    inventoryItem.count--;
+                    triggerResourceFeedback(-1, 'Madeira');
+                    floorData.map[tY][tX] = 8; // Piso
+                    updatePreRenderedTile(tX, tY, 8, targetFloorIndex);
+                    constructed = true;
+                } else if (materialId === ITEM_IDS.STONE && (isGrassOrDirt || tId === 8)) {
+                    inventoryItem.count--;
+                    triggerResourceFeedback(-1, 'Pedra');
+                    floorData.mapObjects.push({ type: 5, x: tX, y: tY }); // Muro
+                    constructed = true;
+                } else if (materialId === ITEM_IDS.FENCE && isGrassOrDirt) {
+                    inventoryItem.count--;
+                    triggerResourceFeedback(-1, 'Cerca');
+                    floorData.mapObjects.push({ type: 4, x: tX, y: tY, resistance: 4 }); // Cerca
+                    constructed = true;
+                }
+
+                if (constructed) {
+                    if (inventoryItem.count <= 0) backpackInventory[bpIdx] = null;
+                    console.log(`Construído com ${item.name}`);
+                    saveGame();
+                    updateHotbarUI();
+                    return;
+                }
             }
 
             switch (item.name) {
@@ -3070,9 +3136,9 @@
         function isAnimalWalkable(pixelX, pixelY, movingAnimal, isWolf = false) {
             const tX = Math.floor(pixelX / TILE_SIZE);
             const tY = Math.floor(pixelY / TILE_SIZE);
-            const floorData = worldData[movingAnimal.floor]; // Usa o andar do animal
             // Adiciona uma verificação de segurança para o andar do animal
-            if (typeof movingAnimal.floor !== 'number' || !floorData) return false;
+            if (!movingAnimal || typeof movingAnimal.floor !== 'number') return false;
+            const floorData = worldData[movingAnimal.floor]; // Usa o andar do animal
 
             if (!floorData) return false; // Segurança
 
@@ -3645,7 +3711,7 @@
         }
         // CORRIGIDO: loadGame
         function loadGame() {
-            const defaultItems = [ { id: ITEM_IDS.HOE, count: 1 }, { id: ITEM_IDS.SWORD, count: 1 }, { id: ITEM_IDS.SEED_GENERIC, count: 1 }, { id: ITEM_IDS.SHOVEL, count: 1 }, { id: ITEM_IDS.WATERING_CAN, count: 0 }, { id: ITEM_IDS.SHEARS, count: 1 }, { id: ITEM_IDS.CONSTRUCTION_TOOL, count: 1 }, { id: ITEM_IDS.AXE, count: 1 }, { id: ITEM_IDS.PICKAXE, count: 1 }, { id: ITEM_IDS.SEED_TOMATO, count: 10 } ];
+            const defaultItems = [ { id: ITEM_IDS.HOE, count: 1 }, { id: ITEM_IDS.SWORD, count: 1 }, { id: ITEM_IDS.SEED_GENERIC, count: 1 }, { id: ITEM_IDS.SHOVEL, count: 1 }, { id: ITEM_IDS.WATERING_CAN, count: 0 }, { id: ITEM_IDS.SHEARS, count: 1 }, { id: ITEM_IDS.CONSTRUCTION_TOOL, count: 1 }, { id: ITEM_IDS.AXE, count: 1 }, { id: ITEM_IDS.PICKAXE, count: 1 }, { id: ITEM_IDS.HAMMER, count: 1 }, { id: ITEM_IDS.SEED_TOMATO, count: 10 } ];
 
             const savedData = localStorage.getItem('pixelFarmSaveData');
             if (savedData) {
@@ -3902,7 +3968,7 @@
              isHolding = false; // Reseta estado de hold ao soltar
          }
 
-        function findPath(startX, startY, endX, endY, walkableCheckFn = isWalkable) {
+        function findPath(startX, startY, endX, endY, walkableCheckFn, movingEntity) {
             let path = [];
             let currentX = startX;
             let currentY = startY;
@@ -3921,18 +3987,18 @@
                     nextY += Math.sign(dy);
                 }
 
-                if (walkableCheckFn(nextX * TILE_SIZE, nextY * TILE_SIZE, player, true)) { // Passa o animal e isWolf
+                if (walkableCheckFn(nextX * TILE_SIZE, nextY * TILE_SIZE, movingEntity)) {
                     currentX = nextX;
                     currentY = nextY;
                     path.push({ x: currentX, y: currentY });
                 } else {
                     // Tenta mover na outra direção se a principal estiver bloqueada
                     if (Math.abs(dx) > Math.abs(dy)) { // Tentou X, agora tenta Y
-                        if (walkableCheckFn(startX * TILE_SIZE, (currentY + Math.sign(dy)) * TILE_SIZE, player, true)) {
+                        if (walkableCheckFn(startX * TILE_SIZE, (currentY + Math.sign(dy)) * TILE_SIZE, movingEntity)) {
                              currentY += Math.sign(dy); path.push({ x: currentX, y: currentY });
                         } else break; // Bloqueado
                     } else { // Tentou Y, agora tenta X
-                        if (walkableCheckFn((currentX + Math.sign(dx)) * TILE_SIZE, startY * TILE_SIZE, player, true)) {
+                        if (walkableCheckFn((currentX + Math.sign(dx)) * TILE_SIZE, startY * TILE_SIZE, movingEntity)) {
                             currentX += Math.sign(dx); path.push({ x: currentX, y: currentY });
                         } else break; // Bloqueado
                     }
@@ -3992,7 +4058,7 @@
                 if (item.id === ITEM_IDS.PICKAXE && targetObject.type === 0) return true;
                 if (item.id === ITEM_IDS.AXE && targetObject.type === 1) return true;
                 if (item.id === ITEM_IDS.SHOVEL && (targetObject.type === 4 || targetObject.type === 15 || targetObject.type === 16)) return true;
-                if (item.id === ITEM_IDS.WATERING_CAN && backpackInventory[bpIdx].count > 0 && ((targetObject.type >= 17 && targetObject.type <= 19 && floorData.treeGrowthData[`${targetObject.x},${targetObject.y}`] && !floorData.treeGrowthData[`${targetObject.x},${targetObject.y}`].boosted) || (targetObject.type === 16 && targetObject.regrowAt && !targetObject.boosted))) return true;
+                if (item.id === ITEM_IDS.WATERING_CAN && backpackInventory[bpIdx].count > 0 && ((targetObject.type >= 17 && targetObject.type <= 19 && floorData.treeGrowthData[`${targetObject.x},${targetObject.y}`] && !floorData.treeGrowthData[`${targetObject.x},${targetObject.y}`].boosted) || (targetObject.type === 16 && targetObject.regrowAt && !targetObject.boosted))) return true;                if (item.id === ITEM_IDS.HAMMER && [4, 5, 6, 7, 9, 10, 11].includes(targetObject.type)) return true; // Martelo remove estruturas
                 if (item.id === ITEM_IDS.CONSTRUCTION_TOOL && player.toolSubAction === 'pickup_mode' && [4, 5, 6, 7, 9, 10, 11].includes(targetObject.type)) return true;
                 // if (targetObject.type === 9 || targetObject.type === 10) return true; // Escadas agora são automáticas
                 return false;
@@ -4000,6 +4066,12 @@
 
             if (tId === 7) return true; // Colheita
 
+            // Lógica de construção com materiais
+            if (isConstructionModeActive) {
+                if (item.id === ITEM_IDS.WOOD && (tId === 0 || tId === 1 || tId === 10 || tId === 12 || tId === 13 || tId === 14)) return true; // Construir Piso
+                if (item.id === ITEM_IDS.STONE && (tId === 0 || tId === 1 || tId === 8 || tId === 12 || tId === 13 || tId === 14)) return true; // Construir Muro
+                if (item.id === ITEM_IDS.FENCE && (tId === 0 || tId === 1 || tId === 12 || tId === 13 || tId === 14)) return true; // Construir Cerca
+            }
             switch (item.id) {
                 case ITEM_IDS.HOE: return (tId === 0 || tId === 1);
                 case ITEM_IDS.SEED_GENERIC: {
@@ -4013,6 +4085,7 @@
                 }
                 case ITEM_IDS.SHOVEL: return (tId === 1 || tId === 2 || (tId >= 4 && tId <= 7) || tId === 0 || tId === 3 || tId === 8 || tId === 9 || tId === 12 || tId === 13 || tId === 14);
                 case ITEM_IDS.WATERING_CAN: return (tId === 3 || (tId >= 4 && tId <= 6 && backpackInventory[bpIdx].count > 0) || ((tId === 1 || tId === 2) && backpackInventory[bpIdx].count > 0));
+                case ITEM_IDS.HAMMER: return tId === 8; // Martelo remove piso
                 case ITEM_IDS.CONSTRUCTION_TOOL:
                     if (player.toolSubAction === 'pickup_mode') { return tId === 8; }
                     if (player.toolSubAction === 'build_floor') { return ((tId === 0 || tId === 1 || tId === 10 || tId === 12 || tId === 13 || tId === 14) && backpackInventory.some(i => i && i.id === ITEM_IDS.WOOD && i.count > 0)); }
@@ -4080,7 +4153,7 @@
                 // Se for um tile caminhável, encontra um caminho
                 if (isWalkable(clickedTileX * TILE_SIZE, clickedTileY * TILE_SIZE)) {
                     if (isContextMenuOpen) closeContextMenu();
-                    player.path = findPath(playerTileX, playerTileY, clickedTileX, clickedTileY);
+                    player.path = findPath(playerTileX, playerTileY, clickedTileX, clickedTileY, isWalkable, player);
                 }
             }
         }
@@ -4112,6 +4185,26 @@
             const playerTileX = Math.floor(player.x / TILE_SIZE);
             const playerTileY = Math.floor(player.y / TILE_SIZE);
             const dist = Math.sqrt(Math.pow(playerTileX - mouseHoverTile.x, 2) + Math.pow(playerTileY - mouseHoverTile.y, 2));
+
+            // --- Preview da Construção com Materiais ---
+            if (isConstructionModeActive && isActionable(mouseHoverTile.x, mouseHoverTile.y, true)) {
+                const bpIdx = constructionHotbarMapping[activeConstructionHotbarSlot];
+                if (bpIdx > -1 && backpackInventory[bpIdx]) {
+                    const x_px = mouseHoverTile.x * TILE_SIZE;
+                    const y_px = mouseHoverTile.y * TILE_SIZE;
+
+                    const item = ITEMS[backpackInventory[bpIdx].id];
+                    ctx.globalAlpha = 0.6;
+                    if (item.id === ITEM_IDS.WOOD) {
+                        drawFloorTile(ctx, x_px, y_px, TILE_SIZE);
+                    } else if (item.id === ITEM_IDS.STONE) {
+                        drawWall(ctx, x_px, y_px);
+                    } else if (item.id === ITEM_IDS.FENCE) {
+                        drawFence(ctx, x_px, y_px, mouseHoverTile.x, mouseHoverTile.y, constructionTargetFloor);
+                    }
+                    ctx.globalAlpha = 1.0;
+                }
+            }
 
             // Se for uma ação de construção, o preview já é o cursor.
             if (isConstructionModeActive && player.toolSubAction && player.toolSubAction !== 'pickup_mode' && isActionable(mouseHoverTile.x, mouseHoverTile.y)) {
@@ -4322,9 +4415,8 @@
                 // Só fecha se o clique for fora do container E não for um clique na hotbar para atribuir um item
                 if (isConstructionInventoryOpen && !constructionContainer.contains(e.target) && e.target !== constructionIcon && !(isClickOnHotbar && selectedConstructionIndex !== -1)) {
                     toggleConstructionInventory(false);
-                }
-                if (isBackpackOpen && !backpackContainer.contains(e.target) && e.target !== backpackIcon && !(isClickOnHotbar && selectedBackpackIndex !== -1)) {
-                    toggleBackpack(false);
+                } else if (isBackpackOpen && !backpackContainer.contains(e.target) && e.target !== backpackIcon && !(isClickOnHotbar && selectedBackpackIndex !== -1)) {
+                    toggleBackpack(false); // Fecha a mochila se clicar fora
                 }
 
                 if (isContextMenuOpen && !contextMenu.contains(e.target) && !hotbarElement.contains(e.target)) { // Mantém a lógica do menu de contexto
